@@ -9,5 +9,9 @@
 #define ERR_INVALID_INPUT_PARA      2001
 #define ERR_FILE_NOT_EXIST          2002
 #define ERR_OPEN_FILE               2003
+#define ERR_REACH_MAX_STREAM        2004
+#define ERR_STREAM_NOT_FOUND        2005
+#define ERR_MALLOC_FAILED           2006
+#define ERR_ENTRY_NOT_FOUND         2007
 
 #endif

@@ -2,31 +2,29 @@
 #define STORAGE_STREAM_MAP_
 
 #include <stdint.h>
+#include "stream.h"
 
-class RecordFile
-{
-private:
-    uint8_t disk_id_; //所属的磁盘id
-    uint16_t number_; // 文件编号
-    uint64_t firstIFrameTime; //文件中第一个关键帧的时间
-    uint64_t endIFrameTime; // 文件中最后一个关键帧的时间
+namespace storage {
 
-public:
-    
-};
-
-class Stream
-{
-private:
-    uint16_t stream_id;
-    map<uint64_t, RecordFile> record_file_; // 所有视频数据的存放文件
-
-public:
-    Stream()
-};
+#define LENGTH_1M (1024*1024)
 
 class StreamMap
 {
 private:
-    map<uint16_t, 
+    Mutex mutex_;
+    map<StreamAddr, Stream> streams_map_; // stream addr -> stream
+    Logger *logger_;
+
+public:
+    StreamMap(Logger *logger) : next_index(0), logger_(logger) { }
+
+    int32_t Open(StreamAddr *addr, bool createIfMissing, Stream *stream);
+
+    int32_t AddStream(uint16_t* stream_id);
+    int32_t DelStream(uint16_t stream_id);
+    int32_t FindStream(uint16_t stream_id);
+    int32_t IsStreamExist(uint16_t stream_id);
 };
+}
+
+#endif
