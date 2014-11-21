@@ -28,8 +28,8 @@ int32_t StreamMap::Open(StreamAddr &addr, bool create_if_missing, Stream **strea
         Stream stream;
 
         stream.CopyAddr(addr);
-        s.write_buffer_ = (char *)malloc(sizeof(LENGTH_1M));
-        s.read_buffer = (char *)malloc(sizeof(LENGTH_1M));
+        s.write_buffer_ = (char *)malloc(sizeof(BUFFER_LENGTH));
+        s.read_buffer = (char *)malloc(sizeof(BUFFER_LENGTH));
         if ((NULL == s.write_buffer_)
             || (NULL == s.read_buffer_))
         {
