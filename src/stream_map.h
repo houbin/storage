@@ -6,8 +6,7 @@
 
 namespace storage {
 
-#define LENGTH_1M (1024*1024)
-
+#define BUFFER_LENGTH (1 * 1024 * 1024)
 class StreamMap
 {
 private:
