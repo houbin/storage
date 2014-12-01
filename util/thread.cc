@@ -7,6 +7,7 @@ namespace storage
 void Thread::Create(size_t stack_size)
 {
     int ret = 0;
+	pthread_attr_t *attr = NULL;
 
     if (stack_size != 0)
     {
@@ -25,6 +26,11 @@ void Thread::Create(size_t stack_size)
     {
         assert("pthread_create error" == 0);
     }
+
+	if (attr != NULL)
+	{
+		free(attr);
+	}
 
     return;
 }

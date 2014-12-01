@@ -10,7 +10,6 @@ class Thread
 {
 private:
     pthread_t thread_id;
-    pthread_attr_t *attr;
 public:
     Thread() : thread_id(0), attr(NULL) { }
 
