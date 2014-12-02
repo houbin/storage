@@ -1,8 +1,19 @@
-#include "util/thread.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <errno.h>
 #include <assert.h>
+#include <signal.h>
+#include "thread.h"
 
 namespace storage
 {
+
+Thread::Thread()
+: thread_id_(0)
+{
+
+}
 
 void Thread::Create(size_t stack_size)
 {
@@ -21,15 +32,15 @@ void Thread::Create(size_t stack_size)
         pthread_attr_setstacksize(attr, stack_size);
     }
 
-    ret = pthread_create(&pthread_id, attr, (void*)Entry, NULL);
+    ret = pthread_create(&thread_id_, attr, &EntryWrap, this);
     if (ret != 0)
     {
         assert("pthread_create error" == 0);
     }
 
 	if (attr != NULL)
-	{
-		free(attr);
+	{ 
+		free(attr); 
 	}
 
     return;
@@ -38,29 +49,31 @@ void Thread::Create(size_t stack_size)
 int Thread::Join(void **retval)
 {
     int ret = 0;
-    if (pthread_id == 0)
+    if (thread_id_ == 0)
     {
         assert("join on thread that was never started" == 0);
         return -EINVAL;
     }
 
-    ret = pthread_join(pthread_id, retval);
-    assert(ret == 0)
-    thread_id = 0;
+    ret = pthread_join(thread_id_, retval);
+    assert(ret == 0);
+    thread_id_ = 0;
 
     return ret;
 }
 
 int Thread::Detach()
 {
-    return pthread_detach(pthread_id);
+    return pthread_detach(thread_id_);
 }
 
 int Thread::Kill(int sig)
 {
-    if (thread_id)
+	int ret = 0;
+
+    if (thread_id_)
     {
-        ret = pthread_kill(thread_id, sig);
+        ret = pthread_kill(thread_id_, sig);
     }
     else
     {
@@ -68,6 +81,13 @@ int Thread::Kill(int sig)
     }
 
     return ret;
+}
+
+void* Thread::EntryWrap(void *arg)
+{
+	void *r = ((Thread *)arg)->Entry();
+
+	return r;
 }
 
 }

@@ -22,28 +22,28 @@ private:
 public:
 	Cond() : waiter_mutex_(NULL)
 	{
-		int r = pthread_cond_init(&c_, NULL);
+		int r = pthread_cond_init(&cond_, NULL);
 		assert(r == 0);
 	}
 
 	~Cond()
 	{
-		int r = pthread_cond_destroy(&c_);
+		int r = pthread_cond_destroy(&cond_);
 		assert(r == 0);
 	}
 
 	int32_t Wait(Mutex &mutex)
 	{
-		assert(waiter_mutex_ == NULL || waiter_mutex_ == mutex);
+		assert(waiter_mutex_ == NULL || waiter_mutex_ == &mutex);
 		waiter_mutex_ = &mutex;
 
 		int r = pthread_cond_wait(&cond_, &mutex.mu_);
 		return (int32_t)r;
 	}
 
-	int32_t WaitUnit(Mutex &mutex, UTime time)
+	int32_t WaitUtil(Mutex &mutex, UTime time)
 	{
-		assert(waiter_mutex_ == NULL || waiter_mutex_ == mutex)
+		assert(waiter_mutex_ == NULL || waiter_mutex_ == &mutex);
 
 		waiter_mutex_ = &mutex;
 

@@ -1,7 +1,7 @@
 #ifndef STORAGE_THREAD_H_
 #define STORAGE_THREAD_H_
 
-#include <pthread>
+#include <pthread.h>
 
 namespace storage
 {
@@ -9,16 +9,17 @@ namespace storage
 class Thread
 {
 private:
-    pthread_t thread_id;
+    pthread_t thread_id_;
 public:
-    Thread() : thread_id(0), attr(NULL) { }
+    Thread();
 
     void Create(size_t stack_size = 0);
     int Join(void **ret = 0);
     int Detach();
     int Kill(int sig);
+    virtual void* Entry() = 0;
 
-    virtual void* Entry(void *arg);
+	static void *EntryWrap(void *arg);
 };
 
 }

@@ -30,7 +30,7 @@ public:
 
     public:
         Locker(Mutex& m) : mutex_(m) { mutex_.Lock(); }
-        ~Locker() { mutex.Unlock(); }
+        ~Locker() { mutex_.Unlock(); }
     };
 };
 
