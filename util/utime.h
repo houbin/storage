@@ -1,6 +1,10 @@
 #ifndef STORAGE_UTIME_H_
 #define STORAGE_UTIME_H_
 
+#include <sys/time.h>
+#include <math.h>
+#include <stdint.h>
+
 namespace storage
 {
 
@@ -29,7 +33,7 @@ public:
 	UTime(struct timeval &time) { tv_sec = time.tv_sec; tv_nsec = (time.tv_usec * 1000); }
 	UTime(struct timespec &time) { tv_sec = time.tv_sec; tv_nsec = time.tv_nsec; }
 
-	UTime(UTime &time) { tv_sec = time.tv_sec; tv_nsec = time.tv_nsec; }
+	UTime(const UTime &time) { tv_sec = time.tv_sec; tv_nsec = time.tv_nsec; }
 	UTime& operator=(const UTime& time)
 	{
 		this->tv_sec = time.tv_sec;
@@ -81,7 +85,7 @@ inline UTime operator+(const UTime &l, const UTime &r)
 inline UTime operator-(const UTime &l, const UTime &r)
 {
 	return UTime(l.tv_sec - r.tv_sec - (l.tv_nsec < r.tv_nsec ? 1 : 0), 
-				(l.tv_nsec < r.tv_nsec) ? (l.tv_nsec + 1000000000ul - r.tv_nsec) : (l.tv_nsec - r.tv_nsec);
+				(l.tv_nsec < r.tv_nsec) ? (l.tv_nsec + 1000000000ul - r.tv_nsec) : (l.tv_nsec - r.tv_nsec));
 }
 
 inline bool operator>(const UTime &a, const UTime &b)

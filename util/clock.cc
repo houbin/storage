@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include "clock.h"
+#include <cstddef>
 
 namespace storage
 {
@@ -10,7 +11,7 @@ UTime GetClockNow()
 
 	gettimeofday(&tv, NULL);
 
-	UTime n(&tv);
+	UTime n(tv);
 
 	return n;
 }

@@ -19,7 +19,7 @@ void SafeTimer::Init()
 void SafeTimer::Shutdown()
 {
 	Log(logger_, "shutdown");
-	if (thread != NULL)
+	if (thread_ != NULL)
 	{
 		CancelAllEvents();
 		stopping_ = true;
@@ -28,7 +28,7 @@ void SafeTimer::Shutdown()
 		thread_->Join();
 		lock_.Lock();
 		delete thread_;
-		thread = NULL;
+		thread_ = NULL;
 	}
 }
 
@@ -40,7 +40,7 @@ void SafeTimer::TimerThread()
 	Log(logger_, "TimerThread starting");
 
 	lock_.Lock();
-	while (!stopping)
+	while (!stopping_)
 	{
 		UTime t = GetClockNow();
 
@@ -53,11 +53,11 @@ void SafeTimer::TimerThread()
 
 			Context *callback = iter->second;
 
-			events_.erase(callback)
+			events_.erase(callback);
 			schedule_.erase(iter);
 
 			Log(logger_, "TimerThread executing %p", callback);
-			callback->Complete();
+			callback->Complete(0);
 		}
 
 		Log(logger_, "TimerThread going to sleep");
@@ -85,14 +85,16 @@ void SafeTimer::AddEventAfter(double seconds, Context *callback)
 	t += seconds;
 
 	AddEventAt(t, callback);
+
+	return;
 }
 
 void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
-	Log(logger_. "AddEventAfterd %d.%d -> %p", t.tv_sec, t.tv_nsec, callback);
+	Log(logger_, "AddEventAfter %d.%d -> %p", t.tv_sec, t.tv_nsec, callback);
 
 	scheduled_map_t::value_type s_val(t, callback);
-	scheduled_map_t::iterator i = schedule.insert(s_val);
+	scheduled_map_t::iterator i = schedule_.insert(s_val);
 
 	event_lookup_map_t::value_type e_val(callback, i);
 	pair<event_lookup_map_t::iterator, bool> rval(events_.insert(e_val));
@@ -103,6 +105,8 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
 	{
 		cond_.Signal();
 	}
+
+	return;
 }
 
 bool SafeTimer::CancelEvent(Context *callback)
@@ -118,7 +122,7 @@ bool SafeTimer::CancelEvent(Context *callback)
 	Context *ct = p->first;
 
 	events_.erase(p);
-	scheduler_.erase(p->second);
+	schedule_.erase(p->second);
 
 	if(ct != NULL)
 	{
@@ -128,12 +132,12 @@ bool SafeTimer::CancelEvent(Context *callback)
 	return true;
 }
 
-void SafeTimer::CancelAllEvents()
+bool SafeTimer::CancelAllEvents()
 {
 	while(!events_.empty())
 	{
 		map<Context*, multimap<UTime, Context*>::iterator>::iterator p = events_.begin();
-		Log(logger_, "cancelled %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
+		Log(logger_, "cancelled %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, p->first);
 
 		Context *ct = p->first;
 		events_.erase(p);
@@ -143,6 +147,8 @@ void SafeTimer::CancelAllEvents()
 			delete ct;
 		}
 	}
+
+	return true;
 }
 
 }
