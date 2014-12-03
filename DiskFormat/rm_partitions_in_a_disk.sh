@@ -1,7 +1,7 @@
 #!/bin/sh
 #umount partitions in a disk
 LOG_PATH=./format_partition.log
-exec 1>>${LOG_PATH} 2>>1
+#exec 1>>${LOG_PATH} 2>>1
  
 FORMAT_DISK=$1
 
