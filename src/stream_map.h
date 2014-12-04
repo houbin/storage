@@ -10,20 +10,21 @@ namespace storage {
 class StreamMap
 {
 private:
-    Mutex mutex_;
-    map<StreamAddr, Stream> streams_map_; // stream addr -> stream
     Logger *logger_;
+    Mutex mutex_;
+    map<uint16_t, Stream> streams_map_; // stream_id -> stream
 
 public:
     StreamMap(Logger *logger) : next_index(0), logger_(logger) { }
 
-    int32_t Open(StreamAddr *addr, bool createIfMissing, Stream *stream);
+    int32_t Open(uint16_t stream_id, bool createIfMissing, Stream *stream);
 
     int32_t AddStream(uint16_t* stream_id);
     int32_t DelStream(uint16_t stream_id);
     int32_t FindStream(uint16_t stream_id);
     int32_t IsStreamExist(uint16_t stream_id);
 };
+
 }
 
 #endif

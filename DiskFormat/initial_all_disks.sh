@@ -82,11 +82,23 @@ then
 	exit
 fi
 	
-chmod +x ${SCRIPT_PATH}
+chmod +x ./mount_one_disk.sh
 for disk in ${spare_disks}
 do
 	./mount_one_disk.sh $disk
 done
 
-echo
 echo "Initial all spare disk ok"
+echo
+
+echo "Start to fallocate files on disk"
+
+chmod +x ./fallocate_on_disk.sh
+for disk in ${spare_disks}
+do
+	./fallocate_on_disk.sh $disk
+done
+
+echo "Fallocate files on all disk ok"
+
+

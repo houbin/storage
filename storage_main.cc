@@ -51,6 +51,8 @@ int main(int argc, char *argv[])
 		cout << "key is " << iter->first << ", value is " << iter->second << endl;
 	}
 
+	char mount_dir[] = "/jovision";
+
 
 
 	return 0;

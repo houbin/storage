@@ -9,7 +9,7 @@ namespace storage
 #define BUFFER_COUNT_LIMIT 256
 #define RECORD_FILE_SIZE (BUFFER_COUNT_LIMIT * BUFFER_LENGTH)
 
-using std::string;
+using namespace std;
 class RecordFile
 {
 private:
