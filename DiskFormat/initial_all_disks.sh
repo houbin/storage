@@ -99,6 +99,6 @@ do
 	./fallocate_on_disk.sh $disk
 done
 
-echo "Fallocate files on all disk ok"
+echo "Fallocate files on all disks ok"
 
 
