@@ -1,5 +1,5 @@
-#ifndef STORAGE_MUTEX_H_
-#define STORAGE_MUTEX_H_
+#ifndef STORAGE_m_H_
+#define STORAGE_m_H_
 #include <pthread.h>
 
 namespace storage{
@@ -8,7 +8,7 @@ class Mutex
 {
 private:
     const char *name;
-    pthread_mutex_t mu_;
+    pthread_mutex_t m_;
 
     // no copying
     Mutex(const Mutex &);
@@ -26,11 +26,11 @@ public:
     class Locker
     {
     private:
-        Mutex &mutex_;
+        Mutex &m_;
 
     public:
-        Locker(Mutex& m) : mutex_(m) { mutex_.Lock(); }
-        ~Locker() { mutex_.Unlock(); }
+        Locker(Mutex& m) : m_(m) { m_.Lock(); }
+        ~Locker() { m_.Unlock(); }
     };
 };
 

@@ -12,13 +12,15 @@ namespace storage
 using namespace std;
 class RecordFile
 {
+public:
+
 private:
     string mount_point_;
     uint16_t number_; // 文件编号
-    uint64_t firstIFrameTime_; //文件中第一个关键帧的时间
-    uint64_t endIFrameTime_; // 文件中最后一个关键帧的时间
-public:
-    
+	bool locked; // 文件是否被用户锁定
+
+	UTime start_time_;
+    UTime end_time_; 
 };
 
 }

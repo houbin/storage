@@ -15,7 +15,7 @@ private:
 	pthread_cond_t cond_;
 	Mutex *waiter_mutex_;	
 
-	// no copying allow
+	// no copying allowed
 	Cond(const Cond &);
 	void operator=(Cond &c);
 
@@ -37,7 +37,7 @@ public:
 		assert(waiter_mutex_ == NULL || waiter_mutex_ == &mutex);
 		waiter_mutex_ = &mutex;
 
-		int r = pthread_cond_wait(&cond_, &mutex.mu_);
+		int r = pthread_cond_wait(&cond_, &mutex.m_);
 		return (int32_t)r;
 	}
 
@@ -50,7 +50,7 @@ public:
 		struct timespec ts;
 		time.ToTimeSpec(&ts);
 
-		int r = pthread_cond_timedwait(&cond_, &mutex.mu_, &ts);
+		int r = pthread_cond_timedwait(&cond_, &mutex.m_, &ts);
 
 		return (int32_t)r;
 	}
@@ -59,7 +59,7 @@ public:
 	{
 		int r = pthread_cond_signal(&cond_);
 
-		return r;
+		return (int32_t)r;
 	}
 
 	int32_t SignalAll()

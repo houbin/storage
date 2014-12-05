@@ -18,14 +18,14 @@ namespace storage
 class Config {  
     // Data  
 protected:  
-
-public:  
     std::string m_Delimiter;  //!< separator between key and value  
     std::string m_Comment;    //!< separator between value and comments  
     std::map<std::string,std::string> m_Contents;  //!< extracted keys and values  
   
     typedef std::map<std::string,std::string>::iterator mapi;  
     typedef std::map<std::string,std::string>::const_iterator mapci;  
+
+public:  
     // Methods  
   
     Config( std::string filename,std::string delimiter = "=",std::string comment = "#" );  
