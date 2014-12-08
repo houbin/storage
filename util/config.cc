@@ -4,7 +4,7 @@
   
 using namespace std;  
   
-namespace storage
+namespace util
 {
 
 Config::Config( string filename, string delimiter,  

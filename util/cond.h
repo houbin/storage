@@ -6,7 +6,7 @@
 #include "mutex.h"
 #include "utime.h"
 
-namespace storage
+namespace util
 {
 
 class Cond
@@ -20,56 +20,14 @@ private:
 	void operator=(Cond &c);
 
 public:
-	Cond() : waiter_mutex_(NULL)
-	{
-		int r = pthread_cond_init(&cond_, NULL);
-		assert(r == 0);
-	}
+	Cond();
+	~Cond();
 
-	~Cond()
-	{
-		int r = pthread_cond_destroy(&cond_);
-		assert(r == 0);
-	}
-
-	int32_t Wait(Mutex &mutex)
-	{
-		assert(waiter_mutex_ == NULL || waiter_mutex_ == &mutex);
-		waiter_mutex_ = &mutex;
-
-		int r = pthread_cond_wait(&cond_, &mutex.m_);
-		return (int32_t)r;
-	}
-
-	int32_t WaitUtil(Mutex &mutex, UTime time)
-	{
-		assert(waiter_mutex_ == NULL || waiter_mutex_ == &mutex);
-
-		waiter_mutex_ = &mutex;
-
-		struct timespec ts;
-		time.ToTimeSpec(&ts);
-
-		int r = pthread_cond_timedwait(&cond_, &mutex.m_, &ts);
-
-		return (int32_t)r;
-	}
-
-	int32_t Signal()
-	{
-		int r = pthread_cond_signal(&cond_);
-
-		return (int32_t)r;
-	}
-
-	int32_t SignalAll()
-	{
-		int r = pthread_cond_broadcast(&cond_);
-		
-		return r;
-	}
-
-}; // end of class Cond
+	int32_t Wait(Mutex &mutex);
+	int32_t WaitUtil(Mutex &mutex, UTime time);
+	int32_t Signal();
+	int32_t SignalAll();
+};
 
 }
 

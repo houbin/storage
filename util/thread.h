@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 
-namespace storage
+namespace util
 {
 
 class Thread

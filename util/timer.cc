@@ -6,7 +6,7 @@
 
 using namespace std;
 
-namespace storage
+namespace util
 {
 
 void SafeTimer::Init()

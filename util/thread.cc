@@ -6,7 +6,7 @@
 #include <signal.h>
 #include "thread.h"
 
-namespace storage
+namespace util
 {
 
 Thread::Thread()

@@ -1,6 +1,9 @@
 #ifndef STORAGE_CONTEXT_H_
 #define STORAGE_CONTEXT_H_
 
+namespace util
+{
+
 class Context
 {
 private:
@@ -21,5 +24,7 @@ public:
 		delete this;
 	}
 };
+
+}
 
 #endif

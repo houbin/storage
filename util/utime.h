@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdint.h>
 
-namespace storage
+namespace util
 {
 
 class UTime

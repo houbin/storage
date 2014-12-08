@@ -2,7 +2,7 @@
 #include "clock.h"
 #include <cstddef>
 
-namespace storage
+namespace util
 {
 
 UTime GetClockNow()

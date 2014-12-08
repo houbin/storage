@@ -1,6 +1,6 @@
 #include "mutex.h"
 
-namespace storage
+namespace util
 {
 
 Mutex::Mutex()

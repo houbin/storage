@@ -1,0 +1,54 @@
+一. index文件规划
+index文件用于存放预分配文件的信息、存放数据信息及索引
+现在将index文件划分为四个段
+1. index文件自述段
+2. 文件描述段
+3. 录像描述段
+4. I帧索引段
+
+二. index文件自述段
+1.用于index文件的自我描述，对index索引文件表示的预分配文件数以及各描述段所在的偏移量
+
+2. 数据结构
+file_count_						4		描述预分配文件总个数
+seq_count_						4       下面段个数
+file_describe_seq_offset_		4		文件描述段的偏移量
+record_seq_offset_				4		录像片段的偏移量
+i_frame_index_seq_offset_		4		I帧索引段的偏移量
+checksum_						4		校验和
+
+三. 文件描述段
+1. 作用
+用于对文件存放数据的信息进行描述
+
+2. 数据结构
+stream_id_		2		表示视频源的id
+locked_			2		视频源数据是否被锁
+start_time_		8		该文件中起始帧的时间
+end_time_		8		该文件中结束帧的时间
+checksum_		4		校验和
+
+共24个字节
+
+四. 录像描述段
+1. 作用
+用于对文件存放的录像段信息进行描述
+
+2. 数据结构
+start_time_		8		录像起始时间
+end_time_		8		录像结束时间
+checksum_		4		校验和
+
+共20字节
+
+五. I帧索引段
+1. 作用
+用于对录像文件中存放的I帧时间进行索引，以便查找录像时方便
+
+2. 数据结构
+i_frame_time_t		8		1M数据中的第一个I帧时间
+offset_				4		I帧在录像文件中的偏移量
+checksum_			4		校验和
+
+共16字节
+

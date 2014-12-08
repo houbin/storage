@@ -10,7 +10,7 @@
 #include <map>
 using namespace std;
 
-namespace storage
+namespace util
 {
 
 class SafeTimerThread;

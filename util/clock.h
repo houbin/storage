@@ -3,7 +3,7 @@
 
 #include "utime.h"
 
-namespace storage
+namespace util
 {
 
 extern UTime GetClockNow();

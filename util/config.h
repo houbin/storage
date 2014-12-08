@@ -9,7 +9,7 @@
 #include <fstream>  
 #include <sstream>  
   
-namespace storage
+namespace util
 {
 /* 
 * \brief Generic configuration Class 

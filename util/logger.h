@@ -12,7 +12,7 @@
 #include <assert.h>
 #include "errcode.h"
 
-namespace storage {
+namespace util {
 
 class Logger
 {

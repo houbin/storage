@@ -1,8 +1,8 @@
-#ifndef STORAGE_m_H_
-#define STORAGE_m_H_
+#ifndef STORAGE_MUTEX_H_
+#define STORAGE_MUTEX_H_
 #include <pthread.h>
 
-namespace storage{
+namespace util {
 
 class Mutex
 {
