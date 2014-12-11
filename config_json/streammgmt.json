@@ -1,0 +1,25 @@
+[
+    {
+        "method": "streammgmt_get_service",
+        "param": 
+		{
+			"sid": "device id",
+			"type": "IPC"
+			"ip": "127.0.0.1",
+			"port": "9101",
+			"chcnt": 16,
+			"ch": 1,
+			"name": "username",
+			"passwd": "123456",
+		},
+        "result": 
+		{
+			"protocol": "rtsp¡¢rtmp¡¢cloudsee",
+			"url": "http://127.0.0.1/live0.h264",
+			"ip": "127.0.0.1",
+			"prot": 9101,
+			"ch": 1,
+		},
+        "error": {}
+    }
+]

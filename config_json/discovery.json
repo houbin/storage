@@ -1,0 +1,20 @@
+[
+    {
+        "method": "discovery",
+        "param": {},
+        "result": 
+		{
+			"devs":
+			[
+				{
+					"sid": "device id",
+					"type": "StreamServer"
+					"ip": "127.0.0.1",
+					"port": "9101",
+					"chcnt": 300,
+				}
+			]
+		},
+        "error": {}
+    },
+]

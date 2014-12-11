@@ -1,0 +1,80 @@
+[
+    {
+        "method": "chsmgmt_get_chs",
+        "param": {},
+        "result": 
+		{
+			"chs":
+			[
+				{
+					"sid": "device id",
+					"type": "StreamServer"
+					"ip": "127.0.0.1",
+					"port": "9101",
+					"chcnt": 16,
+					"ch": 1,
+					"name": "username",
+					"passwd": "123456",
+					"streamserverip": "127.0.0.1",
+					"streamserverport": 8000,
+				}
+			]
+		},
+        "error": {}
+    },
+    {
+        "method": "chsmgmt_add_ch",
+        "param": 
+		{
+			"sid": "device id",
+			"type": "StreamServer"
+			"ip": "127.0.0.1",
+			"port": "9101",
+			"chcnt": 16,
+			"ch": 1,
+			"name": "username",
+			"passwd": "123456",
+			"streamserverip": "127.0.0.1",
+			"streamserverport": 8000,
+		},
+        "
+": {},
+        "error": {
+			"errcode": -32602,
+			"message":"Invalid Params"
+		}
+    },
+    {
+        "method": "chsmgmt_del_ch",
+        "param":
+		{
+			"sid": "device id",
+			"type": "StreamServer"
+			"ip": "127.0.0.1",
+			"port": "9101",
+			"chcnt": 16,
+			"name": "username",
+			"passwd": "123456",
+		},
+        "result": {},
+        "error": {}
+    },
+    {
+        "method": "chsmgmt_modify_ch",
+        "param":
+		{
+			"sid": "device id",
+			"type": "StreamServer"
+			"ip": "127.0.0.1",
+			"port": "9101",
+			"chcnt": 16,
+			"ch": 1,
+			"name": "username",
+			"passwd": "123456",
+			"streamserverip": "127.0.0.1",
+			"streamserverport": 8000,
+		},
+        "result": {},
+        "error": {}
+    }
+]
