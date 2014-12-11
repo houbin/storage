@@ -1,6 +1,6 @@
 #include "logger.h"
 
-namespace storage
+namespace util
 {
 
 void Logger::Logv(const char* format, va_list ap)
