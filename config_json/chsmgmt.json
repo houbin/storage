@@ -26,19 +26,28 @@
         "method": "chsmgmt_add_ch",
         "param": 
 		{
-			"sid": "device id",
-			"type": "StreamServer"
-			"ip": "127.0.0.1",
-			"port": "9101",
-			"chcnt": 16,
-			"ch": 1,
-			"name": "username",
-			"passwd": "123456",
-			"streamserverip": "127.0.0.1",
-			"streamserverport": 8000,
-		},
-        "
-": {},
+			"channels":
+			[
+				{
+					"type": "IPC/DVR/NVR",
+					"sid": "A361/N65465413",
+					"protocol": "cloudsee/rtsp/onvif",
+					"bMainStream": true,
+					"bSubStream": false,
+					"mainstream": "rtsp://127.0.0.1/live0.264",
+					"substream": "rtsp://127.0.0.1/live1.264",
+					"ip": "127.0.0.1",
+					"port": "9101",
+					"channelcnt": 4,
+					"channelid": 0,
+					"name": "admin",
+					"passwd": "123456",
+					"streamserverip": "127.0.0.1",
+					"streamserverport": 8000,
+				}
+			]
+		}
+        "result": {},
         "error": {
 			"errcode": -32602,
 			"message":"Invalid Params"
