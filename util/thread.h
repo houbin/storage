@@ -13,6 +13,7 @@ private:
 public:
     Thread();
 
+	bool IsStarted() const;
     void Create(size_t stack_size = 0);
     int Join(void **ret = 0);
     int Detach();

@@ -15,6 +15,11 @@ Thread::Thread()
 
 }
 
+bool Thread::IsStarted() const
+{
+	return (thread_id_ != 0);
+}
+
 void Thread::Create(size_t stack_size)
 {
     int ret = 0;

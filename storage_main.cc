@@ -6,9 +6,11 @@
 #include "util/config_options.h"
 #include "util/logger.h"
 #include "util/errcode.h"
+#include "src/discovery.h"
 
 using namespace std;
 using namespace util;
+using namespace storage;
 
 void Usage(char *arg)
 {
@@ -71,8 +73,12 @@ int main(int argc, char *argv[])
 		assert(ret != 0);
 	}
 
-	cout << "log dir is " << log_dir.c_str() << endl;
-
+	Discovery discovery(logger);
+	discovery.Bind();
+	discovery.Start();
+	
+	/* wait for discovery join */
+	discovery.Join();
 	
 	return 0;
 }
