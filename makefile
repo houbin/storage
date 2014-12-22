@@ -38,8 +38,8 @@ deps : $(DEPS)
 objs : $(OBJS)
 
 clean :
-	@$(RM-F) *.o
-	@$(RM-F) *.d
+	@$(RM-F) $(OBJS)
+	@$(RM-F) $(DEPS)
 
 veryclean: clean
 	@$(RM-F) $(EXECUTABLE)
