@@ -28,9 +28,9 @@ int RecvDiscovery(grpc_t *grpc, void *buffer, int len, int *timeout)
 		return -errno;
 	}
 
-	Log(logger, "poll got %d", ret);
+	Log(logger, "poll got %d, pfd.revents is %d", pfd.revents);
 
-	if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP));
+	if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP))
 	{
 		Log(logger, "pdf.revents is POLLERR or POLLNVAL or POLLHUP");
 		return -1;
@@ -44,7 +44,8 @@ int RecvDiscovery(grpc_t *grpc, void *buffer, int len, int *timeout)
 		return -errno;
 	}
 
-	return 0;
+	Log(logger, "recvfrom ret %d", ret);
+	return ret;
 }
 
 int SendResponse(grpc_t *grpc, void *buffer, int len)
@@ -65,6 +66,8 @@ int SendResponse(grpc_t *grpc, void *buffer, int len)
 	discovery_fd = user_info->discovery_fd;
 	send_addr = user_info->send_addr;
 
+	Log(logger, "SendResponse start");
+
 	addr_len = sizeof(*send_addr);
 	ret = sendto(discovery_fd, buffer, len, 0, (struct sockaddr *)send_addr, addr_len);
 	if (ret < 0)
@@ -73,7 +76,7 @@ int SendResponse(grpc_t *grpc, void *buffer, int len)
 		return -errno;
 	}
 
-	return 0;
+	return ret;
 }
 
 namespace storage
@@ -100,7 +103,7 @@ int32_t Discovery::Bind()
 {
 	int ret;
 	int optval = 1;
-	struct sockaddr_in discovery_addr;
+	struct sockaddr_in discovery_addr = {0};
 
 	discovery_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
 	if (discovery_fd_ < 0)
@@ -208,3 +211,4 @@ void Discovery::Stop()
 }
 
 }
+

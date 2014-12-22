@@ -33,8 +33,8 @@ void Logger::Logv(const char* format, va_list ap)
         localtime_r(&sec, &t);
         
         p += snprintf(p, limit - p, 
-                     "%04d/%02d/%02d-%02d:%02d:%02d.%06d %llx ",
-                     t.tm_year + 1970,
+                     "%04d/%02d/%02d %02d:%02d:%02d.%06d %llx ",
+                     t.tm_year + 1900,
                      t.tm_mon + 1,
                      t.tm_mday,
                      t.tm_hour,

@@ -1,7 +1,11 @@
 //Need user to modify this file.
-#include <stdbool.h>
-#include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <net/if_arp.h>
 #include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <stdbool.h>
 #include <net/if.h>
 #include "storage_json.h"
 
@@ -219,7 +223,7 @@ int USERDEF_storage_json_get_first_up_interface(IF_INFO *if_info)
 	}
 
 	ifc.ifc_len = sizeof(buf);
-	ifc.ifc_buf = buf;
+	ifc.ifc_req = buf;
 
 	/* 获取接口列表 */
 	ret = ioctl(fd, SIOCGIFCONF, (char *)&ifc);
@@ -256,7 +260,7 @@ int USERDEF_storage_json_get_first_up_interface(IF_INFO *if_info)
 			}
 			
 			strncpy(if_info->name, name_temp, MAX_STR_LEN);
-			strncpy(if_info->ip, (char*)inet_ntoa(((struct sockaddr_in*)(&buf[i].ifr_addr))->sin_addr), MAX_STR_LEN);
+			strncpy(if_info->ip, (char*)inet_ntoa(((struct sockaddr_in*)(&buf[i].ifr_addr))->sin_addr), (size_t)MAX_STR_LEN);
 
 			ret = ioctl(fd, SIOCGIFHWADDR, (char *)&buf[i]);
 			if (ret < 0)
