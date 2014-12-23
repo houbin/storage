@@ -7,13 +7,13 @@ namespace util
 
 UTime GetClockNow()
 {
-	struct timeval tv;
+    struct timeval tv;
 
-	gettimeofday(&tv, NULL);
+    gettimeofday(&tv, NULL);
 
-	UTime n(tv);
+    UTime n(tv);
 
-	return n;
+    return n;
 }
 
 }

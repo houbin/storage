@@ -10,8 +10,8 @@ namespace storage
 class MountPoints
 {
 private:
-	string mountpoints_parent_dir;
-	vector<string> mount_points;
+    string mountpoints_parent_dir;
+    vector<string> mount_points;
 
 public:
 

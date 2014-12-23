@@ -18,45 +18,45 @@ class SafeTimerThread;
 class SafeTimer
 {
 private:
-	Logger *logger_;
-	Mutex &lock_;
-	Cond cond_;
-	SafeTimerThread *thread_;
+    Logger *logger_;
+    Mutex &lock_;
+    Cond cond_;
+    SafeTimerThread *thread_;
 
-	bool stopping_;
+    bool stopping_;
 
-	multimap<UTime, Context*> schedule_;
-	map<Context*, multimap<UTime, Context*>::iterator> events_;
+    multimap<UTime, Context*> schedule_;
+    map<Context*, multimap<UTime, Context*>::iterator> events_;
 
 public:
-	SafeTimer(Logger *logger, Mutex &l) : logger_(logger), lock_(l), thread_(NULL), stopping_(false) { }
-	~SafeTimer() { assert(thread_ == NULL); }
+    SafeTimer(Logger *logger, Mutex &l) : logger_(logger), lock_(l), thread_(NULL), stopping_(false) { }
+    ~SafeTimer() { assert(thread_ == NULL); }
 
-	void Init();
-	void Shutdown();
+    void Init();
+    void Shutdown();
 
-	void TimerThread();
+    void TimerThread();
 
-	void AddEventAfter(double seconds, Context *callback);
-	void AddEventAt(UTime when, Context *callback);
+    void AddEventAfter(double seconds, Context *callback);
+    void AddEventAt(UTime when, Context *callback);
 
-	bool CancelEvent(Context *callback);
-	bool CancelAllEvents();
+    bool CancelEvent(Context *callback);
+    bool CancelAllEvents();
 };
 
 class SafeTimerThread : public Thread
 {
 private:
-	SafeTimer *parent_;
+    SafeTimer *parent_;
 
 public:
-	SafeTimerThread(SafeTimer *s) : parent_(s) { }
+    SafeTimerThread(SafeTimer *s) : parent_(s) { }
 
-	void *Entry()
-	{
-		parent_->TimerThread();
-		return NULL;
-	}
+    void *Entry()
+    {
+        parent_->TimerThread();
+        return NULL;
+    }
 };
 
 }

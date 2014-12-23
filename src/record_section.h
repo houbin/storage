@@ -7,8 +7,8 @@ namespace storage
 class RecordSection
 {
 private:
-	UTime start_time_
-	UTime end_time_;
+    UTime start_time_
+    UTime end_time_;
 
 public:
 };

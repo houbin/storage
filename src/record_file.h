@@ -17,9 +17,9 @@ public:
 private:
     string mount_point_;
     uint16_t number_; // 文件编号
-	bool locked; // 文件是否被用户锁定
+    bool locked; // 文件是否被用户锁定
 
-	UTime start_time_;
+    UTime start_time_;
     UTime end_time_; 
 };
 

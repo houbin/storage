@@ -11,10 +11,10 @@ using namespace util;
 
 typedef struct user_def_info
 {
-	int discovery_fd;
-	Logger *logger;
-	struct sockaddr_in *send_addr;
-	struct sockaddr_in from_addr;
+    int discovery_fd;
+    Logger *logger;
+    struct sockaddr_in *send_addr;
+    struct sockaddr_in from_addr;
 } UserDefInfo;
 
 namespace storage
@@ -25,17 +25,17 @@ namespace storage
 class Discovery : public Thread
 {
 private:
-	Logger *logger_;
-	int discovery_fd_;
-	struct sockaddr_in send_addr_;
-	bool done_;
-	
+    Logger *logger_;
+    int discovery_fd_;
+    struct sockaddr_in send_addr_;
+    bool done_;
+    
 public:
-	Discovery(Logger *logger);
-	int32_t Start();
-	int32_t Bind();
-	void *Entry();
-	void Stop();
+    Discovery(Logger *logger);
+    int32_t Start();
+    int32_t Bind();
+    void *Entry();
+    void Stop();
 };
 
 }

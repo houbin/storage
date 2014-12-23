@@ -17,13 +17,13 @@ Thread::Thread()
 
 bool Thread::IsStarted() const
 {
-	return (thread_id_ != 0);
+    return (thread_id_ != 0);
 }
 
 void Thread::Create(size_t stack_size)
 {
     int ret = 0;
-	pthread_attr_t *attr = NULL;
+    pthread_attr_t *attr = NULL;
 
     if (stack_size != 0)
     {
@@ -43,10 +43,10 @@ void Thread::Create(size_t stack_size)
         assert("pthread_create error" == 0);
     }
 
-	if (attr != NULL)
-	{ 
-		free(attr); 
-	}
+    if (attr != NULL)
+    { 
+        free(attr); 
+    }
 
     return;
 }
@@ -74,7 +74,7 @@ int Thread::Detach()
 
 int Thread::Kill(int sig)
 {
-	int ret = 0;
+    int ret = 0;
 
     if (thread_id_)
     {
@@ -90,9 +90,9 @@ int Thread::Kill(int sig)
 
 void* Thread::EntryWrap(void *arg)
 {
-	void *r = ((Thread *)arg)->Entry();
+    void *r = ((Thread *)arg)->Entry();
 
-	return r;
+    return r;
 }
 
 }

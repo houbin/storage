@@ -21,7 +21,7 @@ public:
     void Lock();
     void Unlock();
 
-	friend class Cond;
+    friend class Cond;
 
     class Locker
     {

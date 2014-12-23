@@ -81,7 +81,7 @@ void Logger::Logv(const char* format, va_list ap)
         break;
     }
 
-	return;
+    return;
 }
 
 int32_t NewLogger(const char* name, Logger **logger)
@@ -106,7 +106,7 @@ void LogFunc(Logger *info_log, const char* format, ...)
         va_end(ap);
     }
 
-	return;
+    return;
 }
 
 }

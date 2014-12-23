@@ -14,6 +14,6 @@
 #define ERR_MALLOC_FAILED           2006
 #define ERR_ENTRY_NOT_FOUND         2007
 
-#define ERR_CREATE_SOCKET			2008
+#define ERR_CREATE_SOCKET            2008
 
 #endif
