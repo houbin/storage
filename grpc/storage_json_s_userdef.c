@@ -268,7 +268,7 @@ int USERDEF_storage_json_get_first_up_interface(IF_INFO *if_info)
 				return -1;
 			}
 
-			snprintf(if_info->mac, MAX_STR_LEN, "N%02x%02x%02x%02x%02x%02x", 
+			snprintf(if_info->mac, MAX_STR_LEN, "%02x%02x%02x%02x%02x%02x", 
 	                    (unsigned char) buf[i].ifr_hwaddr.sa_data[0],
 						(unsigned char) buf[i].ifr_hwaddr.sa_data[1],
 						(unsigned char) buf[i].ifr_hwaddr.sa_data[2],
@@ -291,6 +291,7 @@ int USERDEF_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_REQ_storage_jso
 {
 	int ret = 0;
 	IF_INFO if_info = {0};
+    char buffer[MAX_STR_LEN + 1] = {0};
 
 	ret = USERDEF_storage_json_get_first_up_interface(&if_info);
 	if (ret < 0)
@@ -301,7 +302,8 @@ int USERDEF_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_REQ_storage_jso
 	}
 	else
 	{
-		resp->sid = grpc_strdup(grpc, if_info.mac);
+        snprintf(buffer, MAX_STR_LEN, "%c%s", 'N', if_info.mac);
+		resp->sid = grpc_strdup(grpc, buffer);
 		resp->ip = grpc_strdup(grpc, if_info.ip);
 		resp->port = grpc_strdup(grpc, "0000");
 	}
@@ -313,23 +315,6 @@ int USERDEF_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_REQ_storage_jso
 
 int USERDEF_storage_json_broadcast_get_inet(grpc_t *grpc, PARAM_REQ_storage_json_broadcast_get_inet *req, PARAM_RESP_storage_json_broadcast_get_inet *resp)
 {
-#if 1
-	__NULL_FUNC_DBG__();
-	grpc_s_set_error(grpc, GRPC_ERR_METHOD_NOT_IMPLEMENTED, "Method not implemented");
-	return GRPC_ERR_METHOD_NOT_IMPLEMENTED;
-#else
-	__NULL_FUNC_DBG__();
-	int cnt = 1;
-	int i;
-	resp->users_cnt = cnt;
-	resp->users = grpc_malloc(grpc, cnt * sizeof(*resp->users));
-	for (i=0;i<cnt;i++)
-	{
-		resp->users[i].name = grpc_strdup(grpc, "username");
-	}
-
-	//grpc_set_error(grpc, 0, );
-#endif
 
 	return 0;
 }
