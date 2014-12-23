@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string>
 #include <assert.h>
+#include <errno.h>
+#include <netinet/in.h>
 #include <getopt.h>
 #include "util/config_options.h"
 #include "util/logger.h"
@@ -73,7 +75,19 @@ int main(int argc, char *argv[])
         assert(ret != 0);
     }
 
-    Discovery discovery(logger);
+#define DISCOVERY_RECV_PORT 9001
+#define DISCOVERY_SEND_PORT 9002
+
+    struct sockaddr_in in_addr = {0};
+    struct sockaddr_in out_addr = {0};
+    in_addr.sin_family = AF_INET;
+    in_addr.sin_port = htons(DISCOVERY_RECV_PORT);
+    in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    out_addr.sin_family = AF_INET;
+    out_addr.sin_port = htons(DISCOVERY_SEND_PORT);
+    out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    Discovery discovery(logger, in_addr, &out_addr);
     discovery.Bind();
     discovery.Start();
     

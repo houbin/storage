@@ -11,7 +11,7 @@ LIBDIR := ./lib
 LIBS := pthread grpc cJSON rt stdc++ resolv m
 INCLUDES := ./util ./include
 SRC_DIR := ./util
-SRC_FILE := ./src/discovery.cc
+SRC_FILE := 
 
 
 # Flags
