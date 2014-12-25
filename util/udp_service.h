@@ -6,17 +6,6 @@
 #include "thread.h"
 #include "logger.h"
 
-using namespace util;
-
-typedef struct user_def_info
-{
-    int fd;
-    Logger *logger;
-    struct sockaddr_in *send_addr;
-    struct sockaddr_in from_addr;
-    bool if_broadcast;
-} UserDefInfo;
-
 namespace util
 {
 
@@ -38,6 +27,17 @@ public:
     void *Entry();
     void Stop();
 };
+
+using namespace util;
+typedef struct user_def_info
+{
+    int fd;
+    Logger *logger;
+    struct sockaddr_in *send_addr;
+    struct sockaddr_in from_addr;
+    bool if_broadcast;
+    UDP_SERVICE *udp_service;
+} UserDefInfo;
 
 }
 

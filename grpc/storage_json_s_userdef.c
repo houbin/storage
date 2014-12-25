@@ -8,6 +8,9 @@
 #include <stdbool.h>
 #include <net/if.h>
 #include "storage_json.h"
+#include "../util/udp_service.h"
+#include "../src/stream_map.h"
+#include "../src/vmsc_service.h"
 
 int USERDEF_storage_json_account_get_users(grpc_t *grpc, PARAM_REQ_storage_json_account_get_users *req, PARAM_RESP_storage_json_account_get_users *resp)
 {
@@ -126,24 +129,43 @@ int USERDEF_storage_json_channel_get(grpc_t *grpc, PARAM_REQ_storage_json_channe
 
 int USERDEF_storage_json_channel_add(grpc_t *grpc, PARAM_REQ_storage_json_channel_add *req, PARAM_RESP_storage_json_channel_add *resp)
 {
-#if 1
-	__NULL_FUNC_DBG__();
-	grpc_s_set_error(grpc, GRPC_ERR_METHOD_NOT_IMPLEMENTED, "Method not implemented");
-	return GRPC_ERR_METHOD_NOT_IMPLEMENTED;
-#else
-	__NULL_FUNC_DBG__();
-	int cnt = 1;
-	int i;
-	resp->users_cnt = cnt;
-	resp->users = grpc_malloc(grpc, cnt * sizeof(*resp->users));
-	for (i=0;i<cnt;i++)
-	{
-		resp->users[i].name = grpc_strdup(grpc, "username");
-	}
+    UserDefInfo *user_info = NULL;
 
-	//grpc_set_error(grpc, 0, );
-#endif
+    assert(grpc != NULL);
+    assert(grpc->userdef != NULL);
+    assert(req != NULL);
+    assert(req->channels != NULL);
 
+    user_info = grpc->userdef;
+    assert(user_info->udp_service != NULL);
+
+    VmscService *vmsc_service = (VmscService *)(user_info->udp_service);
+    
+    int channels = req->channels_cnt;
+    int i = 0;
+    for (i = 0; i < channels; i++)
+    {
+        StreamInfo stream_info(req->channels[i].type, 
+                               req->channels[i].sid,
+                               req->channels[i].protocol,
+                               req->channels[i].bMainStream,
+                               req->channels[i].bSubStream,
+                               req->channels[i].mainstream,
+                               req->channels[i].substream,
+                               req->channels[i].ip,
+                               req->channels[i].port,
+                               "temp", //TODO 需要把此字段加到json文件中, 用于表示IPC的名字
+                               req->channels[i].channelcnt,
+                               req->channels[i].channelid,
+                               req->channels[i].name,
+                               req->channels[i].passwd,
+                               req->channels[i].streamserverip,
+                               req->channels[i].streamserverport,
+                               0); 
+        
+        vmsc_service->AddRecordRequest(stream_info);
+    }
+    
 	return 0;
 }
 

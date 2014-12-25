@@ -173,6 +173,7 @@ void *UDP_SERVICE::Entry()
     user_info.send_addr = this->send_addr_;
     user_info.if_broadcast = this->if_broadcast_;
     memset(&(user_info.from_addr), 0, sizeof(user_info.from_addr));
+    user_info.udp_service = this;
 
     memset(&init_param, 0, sizeof(init_param));
     init_param.userdef = &user_info;

@@ -9,6 +9,8 @@
 #include "util/logger.h"
 #include "util/errcode.h"
 #include "src/discovery.h"
+#include "src/vmsc_service.h"
+#include "src/stream_map.h"
 
 using namespace std;
 using namespace util;
@@ -25,6 +27,8 @@ int main(int argc, char *argv[])
     int opt;
     int32_t ret;
     string config_file;
+    struct sockaddr_in in_addr = {0}; // in_addr 在主函数中复用，但是discovery_out_addr不能复用
+    struct sockaddr_in discovery_out_addr = {0};
 
     struct option longopts[] = {
         {"config", 1, NULL, 'c'},
@@ -59,7 +63,6 @@ int main(int argc, char *argv[])
 
     if (config_file == "")
     {
-        fprintf(stdout, "config file is NULL, so use default config: /etc/jovision/storage.conf\n");
         config_file.assign("/etc/jovision/storage.conf");
     }
     
@@ -77,22 +80,37 @@ int main(int argc, char *argv[])
 
 #define DISCOVERY_RECV_PORT 9001
 #define DISCOVERY_SEND_PORT 9002
-
-    struct sockaddr_in in_addr = {0};
-    struct sockaddr_in out_addr = {0};
+    memset(&in_addr, 0, sizeof(struct sockaddr_in));
+    memset(&discovery_out_addr, 0, sizeof(struct sockaddr_in));
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(DISCOVERY_RECV_PORT);
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    out_addr.sin_family = AF_INET;
-    out_addr.sin_port = htons(DISCOVERY_SEND_PORT);
-    out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    discovery_out_addr.sin_family = AF_INET;
+    discovery_out_addr.sin_port = htons(DISCOVERY_SEND_PORT);
+    discovery_out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    Discovery discovery(logger, in_addr, &discovery_out_addr);
 
-    Discovery discovery(logger, in_addr, &out_addr);
+#define VMSCSERVICE_RECV_PORT 9003
+    StreamManager stream_manager(logger);
+    memset(&in_addr, 0, sizeof(struct sockaddr_in));
+    in_addr.sin_family = AF_INET;
+    in_addr.sin_port = htons(VMSCSERVICE_RECV_PORT);
+    in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    VmscService vmsc_service(logger, in_addr, &stream_manager);
+
+    /* bind */
     discovery.Bind();
+    vmsc_service.Bind();
+
+    /* thread start */
     discovery.Start();
-    
-    /* wait for discovery join */
+    vmsc_service.Start();
+
+    /* wait for join */
     discovery.Join();
+    vmsc_service.Join();
+
+    delete config_option;
     
     return 0;
 }
