@@ -3,8 +3,9 @@
 namespace util
 {
 
-Mutex::Mutex()
+Mutex::Mutex(const char* name)
 {
+    name_ = name;
     pthread_mutex_init(&m_, NULL);
 }
 

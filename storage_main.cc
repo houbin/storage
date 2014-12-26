@@ -10,7 +10,8 @@
 #include "util/errcode.h"
 #include "src/discovery.h"
 #include "src/vmsc_service.h"
-#include "src/stream_map.h"
+#include "src/stream_manager.h"
+#include "src/udp_service.h"
 
 using namespace std;
 using namespace util;
@@ -93,7 +94,7 @@ int main(int argc, char *argv[])
 #define VMSCSERVICE_RECV_PORT 9003
     StreamManager stream_manager(logger);
     memset(&in_addr, 0, sizeof(struct sockaddr_in));
-    memset(&out_addr, 0, sizeof(struct sockadd_in)); /* 使用全0的out_addr，内部处理为sendto到recv的addr */
+    memset(&out_addr, 0, sizeof(struct sockaddr_in)); /* 使用全0的out_addr，内部处理为sendto到recv的addr */
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(VMSCSERVICE_RECV_PORT);
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);

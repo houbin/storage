@@ -2,7 +2,9 @@
 #define STORAGE_STREAM_INFO_H_   
 
 #include <string>
-using namespace string;
+#include "../util/logger.h"
+
+using namespace util;
 
 namespace storage
 {
@@ -28,9 +30,8 @@ private:
     int  stream_server_port_;
     int stream_server_channel_id_;
 
-    StreamInfo(const StreamInfo&);
-    void operator=(const StreamInfo&);
 public:
+    StreamInfo() {}
     StreamInfo(char *stream_type, 
                char *sid, 
                char *protocol, 
@@ -50,6 +51,7 @@ public:
                int stream_server_channel_id);
 
     bool operator<(const StreamInfo &info) const;
+    void PrintToLogFile(Logger *logger);
 };
 
 

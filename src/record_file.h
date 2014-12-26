@@ -2,7 +2,6 @@
 #define STORAGE_RECORD_FILE_
 
 #include <string>
-#include "stream_map.h"
 
 namespace storage
 {

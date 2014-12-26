@@ -23,9 +23,6 @@ CPPFLAGS += -MMD
 RM-F := rm -f
 
 # # You should't need to change anything below this points
-C_SRCS := $(wildcard grpc/*.c)
-C_OBJS := $(patsubst %.c, %.o, %(C_SRCS))
-
 SRCS := $(wildcard *.cc) $(wildcard $(addsuffix /*.cc, $(SRC_DIR))) $(wildcard $(addsuffix /*.cc, $(UTIL_DIR)))
 OBJS := $(patsubst %.cc, %.o, $(SRCS))
 DEPS := $(patsubst %.o, %.d, $(OBJS))
@@ -42,7 +39,6 @@ objs : $(OBJS)
 
 clean :
 	@$(RM-F) $(OBJS)
-	@$(RM-F) $(C_OBJS)
 	@$(RM-F) $(DEPS)
 
 veryclean: clean
@@ -57,7 +53,7 @@ endif
 -include $(DEPS)
 
 $(EXECUTABLE) : $(OBJS) $(C_OBJS)
-	$(CC) $(CFLAGS) -o $(EXECUTABLE) $(OBJS) $(C_OBJS) $(addprefix -L, $(LIBDIR)) $(addprefix -l, $(LIBS))
+	$(CC) $(CFLAGS) -o $(EXECUTABLE) $(OBJS) ./grpc/storage_json_c_userdef.o ./grpc/storage_json.o ./grpc/storage_json_s_userdef.o $(addprefix -L, $(LIBDIR)) $(addprefix -l, $(LIBS))
 
 info:
 	@echo $(SRCS)

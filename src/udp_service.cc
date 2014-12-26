@@ -13,6 +13,7 @@ namespace storage
 {
 
 UDP_SERVICE::UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr)
+: if_use_recv_addr_to_send_(false), if_broadcast_(false)
 {
     logger_ = logger;
     memcpy(&recv_addr_, &recv_addr, sizeof(recv_addr_));
@@ -22,8 +23,54 @@ UDP_SERVICE::UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct s
     memset(&temp, 0, sizeof(struct sockaddr_in));
     if (memcmp(&send_addr_, &temp, sizeof(struct sockaddr_in)) == 0)
     {
-        if_use_recv_addr_to_send = true;
+        if_use_recv_addr_to_send_ = true;
     }
+
+    if (send_addr_.sin_addr.s_addr == htonl(INADDR_BROADCAST))
+    {
+        if_broadcast_ = true;
+    }
+}
+
+int32_t UDP_SERVICE::Bind()
+{
+    int optval = 1;
+    int32_t ret = 0;;
+
+    Log(logger_, "bind");
+
+    fd_ = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd_ < 0)
+    {
+        Log(logger_, "create socket error: %s", strerror(errno));
+        return -errno;
+    }
+
+    ret = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    if (ret < 0)
+    {
+        Log(logger_, "setsockopt reuseaddr error: %s", strerror(errno));
+        return -errno;
+    }
+
+    if (if_broadcast_)
+    {
+        ret = setsockopt(fd_, SOL_SOCKET, SO_BROADCAST, &optval, sizeof(optval));
+        if (ret < 0)
+        {
+            Log(logger_, "setsockopt broadcast error: %s", strerror(errno));
+            return -errno;
+        }
+    }
+
+    ret = bind(fd_, (struct sockaddr *)&recv_addr_, sizeof(struct sockaddr_in));
+    if (ret < 0)
+    {
+        Log(logger_, "bind error: %s", strerror(errno));
+        return -errno;
+    }
+
+    return 0;
 }
 
 int32_t UDP_SERVICE::Start()

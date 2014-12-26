@@ -1,7 +1,7 @@
 #ifndef STORAGE_VMSC_SERVICE_H_
 #define STORAGE_VMSC_SERVICE_H_
 
-#include "../util/udp_service.h"
+#include "udp_service.h"
 #include "stream_manager.h"
 
 namespace storage

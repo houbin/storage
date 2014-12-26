@@ -1,12 +1,14 @@
 #include "stream_info.h"
+#include <string.h>
+
 namespace storage
 {
 
-StreamInfo(char *stream_type, 
-           char *sid, 
-           char *protocol, 
+StreamInfo::StreamInfo(char *stream_type,
+           char *sid,
+           char *protocol,
            bool main_stream,
-           bool sub_stream, 
+           bool sub_stream,
            char *main_stream_rstp_addr, 
            char *sub_stream_rstp_addr, 
            char *ip,
@@ -33,7 +35,7 @@ StreamInfo(char *stream_type,
     channelcnt_ = channelcnt;
     channel_id_ = channel_id;
     memcpy(user_name_, user_name, sizeof(user_name_));
-    memcpy(user_passwd_. user_passwd, sizeof(user_passwd_));
+    memcpy(user_passwd_, user_passwd, sizeof(user_passwd_));
     memcpy(stream_server_ip_, stream_server_ip, sizeof(stream_server_ip_));
     stream_server_port_ = stream_server_port;
     stream_server_channel_id_ = stream_server_channel_id;
@@ -51,9 +53,9 @@ bool StreamInfo::operator<(const StreamInfo &info) const
     }
 }
 
-void StreamInfo::PrintToLogFile()
+void StreamInfo::PrintToLogFile(Logger *logger)
 {
-    Log(logger_, "stream_info prints: stream_type: %s, sid: %s, protocol: %s, main_stream: %d, sub_stream: %d, \
+    Log(logger, "stream_info prints: stream_type: %s, sid: %s, protocol: %s, main_stream: %d, sub_stream: %d, \
                 main_stream_rstp_addr: %s, sub_stream_rstp_addr: %s, ip: %s, port: %s, name: %s, channelcnt: %d, channel_id: %d, \
                 user_name: %s, user_passwd: %s, stream_server_ip: %s, stream_server_port: %d, stream_server_channel_id: %d",
                 stream_type_,

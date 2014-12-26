@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "stream_manager.h"
 #include "errcode.h"
 #include "../util/mutex.h"
@@ -14,7 +15,8 @@ StreamManager::StreamManager(Logger *logger)
 : logger_(logger), 
   mutex_("StreamManager::mutex_"),
   stop_(false),
-  request_mutex_("StreamManager::request_mutex_")
+  request_mutex_("StreamManager::request_mutex_"),
+  prerecord_thread(this)
 {
 
 }
@@ -39,10 +41,8 @@ int32_t StreamManager::EnqueueRecordRequest(StreamInfo &stream_info)
 StreamInfo StreamManager::DequeueRecordRequest()
 {
     StreamInfo stream_info;
-    Log(logger_, "RemoveRecordRequest")
+    Log(logger_, "RemoveRecordRequest");
 
-    assert(!record_requests_.empty());
-    
     if (!record_requests_.empty())
     {
         set<StreamInfo>::iterator iter = record_requests_.begin();
@@ -58,14 +58,14 @@ void StreamManager::PrerecordEntry()
     request_mutex_.Lock();
     Log(logger_, "PrerecordEntry");
 
-    while(!stop)
+    while(!stop_)
     {
-        while(!unrecorded_streams.empty())
+        while(!record_requests_.empty())
         {
             StreamInfo stream_info = DequeueRecordRequest();
             request_mutex_.Unlock();
 
-            stream_info.PrintToLogFile();
+            stream_info.PrintToLogFile(logger_);
 /*
             int fd = socket(AF_INET, SOCK_DGRAM, 0);
             if (fd < 0)

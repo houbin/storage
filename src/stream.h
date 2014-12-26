@@ -1,9 +1,13 @@
 #ifndef STORAGE_STREAM_H_
 #define STORAGE_STREAM_H_
 
+#include <map>
+#include <set>
 #include "stream_types.h"
-#include "stream_addr.h"
+#include "stream_info.h"
+#include "record_file.h"
 
+using namespace std;
 namespace storage
 {
 
@@ -26,7 +30,7 @@ private:
     // no copying
     void operator=(Stream &);
 public:
-    Stream() : stream_id_(0), write_offset_(0), write_buffer_(NULL), read_offset_(0), record_write_count_(0), read_buffer_(NULL) { }
+    Stream() : mutex_("Stream"), stream_id_(0), write_offset_(0), write_buffer_(NULL), read_offset_(0), read_buffer_(NULL) { }
 
     int32_t Write(Frame frame);
 };

@@ -1,7 +1,7 @@
 #ifndef STORAGE_DISCOVERY_H_
 #define STORAGE_DISCOVERY_H_
 
-#include "../util/udp_service.h"
+#include "udp_service.h"
 
 using namespace util;
 

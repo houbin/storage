@@ -7,7 +7,7 @@ namespace util {
 class Mutex
 {
 private:
-    const char *name;
+    const char *name_;
     pthread_mutex_t m_;
 
     // no copying
@@ -15,7 +15,7 @@ private:
     void operator=(const Mutex &);
 
 public:
-    Mutex();
+    Mutex(const char *name);
     ~Mutex();
 
     void Lock();

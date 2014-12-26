@@ -3,10 +3,11 @@
 
 #include <stdbool.h>
 #include <netinet/in.h>
-#include "thread.h"
-#include "logger.h"
+#include "../util/thread.h"
+#include "../util/logger.h"
 #include "grpc_userdef.h"
 
+using namespace util;
 namespace storage
 {
 
@@ -18,6 +19,7 @@ private:
     struct sockaddr_in recv_addr_;
     struct sockaddr_in send_addr_;
     bool if_use_recv_addr_to_send_;
+    bool if_broadcast_;
     bool done_;
 
 public:

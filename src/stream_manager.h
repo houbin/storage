@@ -4,9 +4,13 @@
 #include <stdint.h>
 #include <map>
 #include <set>
+#include "../util/mutex.h"
 #include "../util/cond.h"
+#include "../util/thread.h"
 #include "stream.h"
-#include "stream_addr.h"
+#include "stream_info.h"
+
+using namespace util;
 
 namespace storage {
 
@@ -20,7 +24,7 @@ private:
 
     Mutex request_mutex_;
     Cond request_cond_; 
-    set<StreamInfo> unrecorded_streams;
+    set<StreamInfo> record_requests_;
 
     struct PreRecordThread : public Thread
     {
@@ -39,7 +43,7 @@ public:
     StreamManager(Logger *logger);
 
     int32_t EnqueueRecordRequest(StreamInfo &stream_info);
-    int32_t DequeueRecordRequest(StreamInfo &stream_info);
+    StreamInfo DequeueRecordRequest();
 
     void PrerecordEntry();
 };
