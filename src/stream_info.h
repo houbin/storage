@@ -28,8 +28,8 @@ private:
     int  stream_server_port_;
     int stream_server_channel_id_;
 
-    StreamInfo(const StreamInfo& );
-    void operator=(const StreamInfo& );
+    StreamInfo(const StreamInfo&);
+    void operator=(const StreamInfo&);
 public:
     StreamInfo(char *stream_type, 
                char *sid, 

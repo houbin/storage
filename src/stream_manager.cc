@@ -1,63 +1,89 @@
 #include "stream_manager.h"
 #include "errcode.h"
 #include "../util/mutex.h"
+#include "../grpc/grpc.h"
+#include "../grpc/storage_json.h"
+#include "grpc_userdef.h"
+
+using namespace util;
 
 namespace storage
 {
 
-StreamInfoSet::StreamInfoSet(Logger *logger)
-: logger_(logger), mutex_("StreamInfoSet::mutex_")
+StreamManager::StreamManager(Logger *logger) 
+: logger_(logger), 
+  mutex_("StreamManager::mutex_"),
+  stop_(false),
+  request_mutex_("StreamManager::request_mutex_")
 {
-    
+
 }
 
-int32_t StreamInfoSet::Add(StreamInfo *stream_info)
+int32_t StreamManager::EnqueueRecordRequest(StreamInfo &stream_info)
 {
-    Log(logger_, "add stream, sid is %s", stream_info->sid);
+    Log(logger_, "AddRecordRequest");
 
-    Mutex::Locker locker(mutex_);
-    set<StreamInfo>::iterator iter = record_requests_.find(*stream_info);
+    Mutex::Locker locker(request_mutex_);
+
+    set<StreamInfo>::iterator iter = record_requests_.find(stream_info);
     if (iter != record_requests_.end())
     {
         record_requests_.erase(iter);
     }
 
-    record_requests_.insert(*stream_info);
+    record_requests_.insert(stream_info);
+    request_cond_.Signal();
     return 0;
 }
 
-int32_t StreamInfoSet::Remove(StreamInfo *stream_info)
+StreamInfo StreamManager::DequeueRecordRequest()
 {
-    Log(logger_, "remove stream, sid is %s", stream_info_.sid);
+    StreamInfo stream_info;
+    Log(logger_, "RemoveRecordRequest")
 
-    Mutex::Locker locker(mutex_);
-    set<StreamInfo>::iterator iter = record_requests_.find(*stream_info);
-    if (iter != record_requests_.end())
+    assert(!record_requests_.empty());
+    
+    if (!record_requests_.empty())
     {
+        set<StreamInfo>::iterator iter = record_requests_.begin();
+        stream_info = *iter;
         record_requests_.erase(iter);
     }
-
-    return 0;
-}
-
-StreamManager::StreamManager(Logger *logger)
-: logger_(logger), mutex_("StreamManager::mutex_")
-{
     
+    return stream_info;
 }
 
-int32_t StreamManager::AddRecordRequest(StreamInfo &stream_info)
+void StreamManager::PrerecordEntry()
 {
-    int32_t ret = 0;
-    ret = unrecorded_streams.Add(stream_info);
-    if (ret != 0)
+    request_mutex_.Lock();
+    Log(logger_, "PrerecordEntry");
+
+    while(!stop)
     {
-        return ret;
+        while(!unrecorded_streams.empty())
+        {
+            StreamInfo stream_info = DequeueRecordRequest();
+            request_mutex_.Unlock();
+
+            stream_info.PrintToLogFile();
+/*
+            int fd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (fd < 0)
+            {
+                Log(logger_, "create socket error, error is %s", strerror(errno));
+                return -errno;
+            }
+
+            grpcInitParam_t init_param;
+            UserDefInfo user_info;
+            user_info.logger = this->logger_;
+            memcpy(&(user_info.send_addr), &(stream_info.))
+*/
+            
+        }
+        
     }
-
-    
 }
 
-
-
 }
+

@@ -13,7 +13,7 @@ namespace storage
 class Discovery : public UDP_SERVICE
 {
 public:
-    Discovery(Logger *logger, struct sockaddr_in &in_addr, struct sockaddr_in *out_addr)
+    Discovery(Logger *logger, struct sockaddr_in &in_addr, struct sockaddr_in &out_addr)
     : UDP_SERVICE(logger, in_addr, out_addr) { }
 };
 

@@ -13,10 +13,9 @@ private:
     StreamManager *stream_manager_;
 
 public:
-    VmscService(Logger *logger, struct sockaddr_in &in_addr, StreamManager *stream_manager);
+    VmscService(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr, StreamManager *stream_manager);
     
-    int32_t AddRecordRequest(StreamInfo &stream_info);
-    int32_t RemoveRecordRequest(StreamInfo &stream_info);
+    int32_t EnqueueRecordRequest(StreamInfo &stream_info);
 };
 }
 

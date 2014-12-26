@@ -27,8 +27,8 @@ int main(int argc, char *argv[])
     int opt;
     int32_t ret;
     string config_file;
-    struct sockaddr_in in_addr = {0}; // in_addr 在主函数中复用，但是discovery_out_addr不能复用
-    struct sockaddr_in discovery_out_addr = {0};
+    struct sockaddr_in in_addr = {0};
+    struct sockaddr_in out_addr = {0};
 
     struct option longopts[] = {
         {"config", 1, NULL, 'c'},
@@ -81,22 +81,23 @@ int main(int argc, char *argv[])
 #define DISCOVERY_RECV_PORT 9001
 #define DISCOVERY_SEND_PORT 9002
     memset(&in_addr, 0, sizeof(struct sockaddr_in));
-    memset(&discovery_out_addr, 0, sizeof(struct sockaddr_in));
+    memset(&out_addr, 0, sizeof(struct sockaddr_in));
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(DISCOVERY_RECV_PORT);
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    discovery_out_addr.sin_family = AF_INET;
-    discovery_out_addr.sin_port = htons(DISCOVERY_SEND_PORT);
-    discovery_out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-    Discovery discovery(logger, in_addr, &discovery_out_addr);
+    out_addr.sin_family = AF_INET;
+    out_addr.sin_port = htons(DISCOVERY_SEND_PORT);
+    out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    Discovery discovery(logger, in_addr, out_addr);
 
 #define VMSCSERVICE_RECV_PORT 9003
     StreamManager stream_manager(logger);
     memset(&in_addr, 0, sizeof(struct sockaddr_in));
+    memset(&out_addr, 0, sizeof(struct sockadd_in)); /* 使用全0的out_addr，内部处理为sendto到recv的addr */
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(VMSCSERVICE_RECV_PORT);
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    VmscService vmsc_service(logger, in_addr, &stream_manager);
+    VmscService vmsc_service(logger, in_addr, out_addr, &stream_manager);
 
     /* bind */
     discovery.Bind();
