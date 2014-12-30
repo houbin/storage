@@ -92,7 +92,8 @@ int main(int argc, char *argv[])
     Discovery discovery(logger, in_addr, out_addr);
 
 #define VMSCSERVICE_RECV_PORT 9003
-    StreamManager stream_manager(logger);
+    StreamManager stream_manager(logger, 512);
+    stream_manager.Start();
     memset(&in_addr, 0, sizeof(struct sockaddr_in));
     memset(&out_addr, 0, sizeof(struct sockaddr_in)); /* 使用全0的out_addr，内部处理为sendto到recv的addr */
     in_addr.sin_family = AF_INET;
@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
     /* wait for join */
     discovery.Join();
     vmsc_service.Join();
+    stream_manager.Wait();
 
     delete config_option;
     

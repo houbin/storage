@@ -3,6 +3,9 @@
 
 #include <errno.h>
 
+#define safe_free(ptr) do{if(ptr){free(ptr);ptr = NULL;}}while(0)
+
+
 #define OK                          0
 
 #define ERR_SELF_DEFINE_START       2000
@@ -14,6 +17,7 @@
 #define ERR_MALLOC_FAILED           2006
 #define ERR_ENTRY_NOT_FOUND         2007
 
-#define ERR_CREATE_SOCKET            2008
+#define ERR_CREATE_SOCKET           2008
+#define ERR_TIMEOUT                 2009
 
 #endif

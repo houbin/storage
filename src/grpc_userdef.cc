@@ -5,6 +5,7 @@
 #include <poll.h>
 #include "grpc_userdef.h"
 
+
 namespace storage
 {
 
@@ -12,6 +13,7 @@ int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout)
 {
     int fd = 0;
     int ret = 0;
+    int timeout_milliseconds = 0;
     struct pollfd pfd;
     Logger *logger = NULL;
     bool if_use_recv_addr_to_send = false;
@@ -22,14 +24,28 @@ int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout)
     if_use_recv_addr_to_send = user_info->if_use_recv_addr_to_send;
 
     Log(logger, "calling poll");
+
+    if (timeout == NULL)
+    {
+        timeout_milliseconds = -1;
+    }
+    else
+    {
+        timeout_milliseconds = *timeout;
+    }
     
     pfd.fd = fd;
     pfd.events = POLLIN | POLLERR | POLLNVAL | POLLHUP;
-    ret = poll(&pfd, 1, -1);
+    ret = poll(&pfd, 1, timeout_milliseconds);
     if (ret < 0)
     {
         Log(logger, "poll error - %s", strerror(errno));
         return -errno;
+    }
+    else if (ret == 0)
+    {
+        Log(logger, "poll timeout");
+        return -ERR_TIMEOUT;
     }
 
     Log(logger, "poll got %d, pfd.revents is %d", pfd.revents);
@@ -40,12 +56,23 @@ int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout)
         return -1;
     }
 
+again:
     int addr_len = sizeof(user_info->recv_addr);
     ret = recvfrom(fd, buffer, len, 0, (struct sockaddr *)&(user_info->recv_addr), (socklen_t *)&addr_len);
     if (ret < 0)
     {
+        if (errno == EAGAIN || errno == EINTR)
+        {
+            goto again;
+        }
+
         Log(logger, "recvfrom error - %s", strerror(errno));
         return -errno;
+    }
+    else if (ret == 0)
+    {
+        /* peer have a orderly shutdown */
+        return -1;
     }
 
     if (if_use_recv_addr_to_send)
@@ -74,10 +101,16 @@ int SendUdp(grpc_t *grpc, void *buffer, int len)
 
     Log(logger, "SendResponse start");
 
+again:
     addr_len = sizeof(user_info->send_addr);
     ret = sendto(fd, buffer, len, 0, (struct sockaddr *)&(user_info->send_addr), addr_len);
     if (ret < 0)
     {
+        if (errno == EAGAIN)
+        {
+            goto again;
+        }
+
         Log(logger, "sendto error - %s", strerror(errno));
         return -errno;
     }
@@ -86,4 +119,5 @@ int SendUdp(grpc_t *grpc, void *buffer, int len)
 }
 
 }
+
 

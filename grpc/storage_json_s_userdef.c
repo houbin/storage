@@ -165,6 +165,7 @@ int USERDEF_storage_json_channel_add(grpc_t *grpc, PARAM_REQ_storage_json_channe
                                req->channels[i].passwd,
                                req->channels[i].streamserverip,
                                req->channels[i].streamserverport,
+                               0,
                                0); 
         
         vmsc_service->EnqueueRecordRequest(stream_info);

@@ -11,7 +11,7 @@ namespace storage
 
 class StreamInfo
 {
-private:
+public:
     char stream_type_[32];
     char sid_[16]; // 云视通id or 设备的id
     char protocol_[16];
@@ -29,9 +29,10 @@ private:
     char stream_server_ip_[16];
     int  stream_server_port_;
     int stream_server_channel_id_;
+    int stream_server_data_services_port_;
 
-public:
     StreamInfo() {}
+
     StreamInfo(char *stream_type, 
                char *sid, 
                char *protocol, 
