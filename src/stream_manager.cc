@@ -248,18 +248,14 @@ void StreamManager::PreRecordEntry()
             FillStreamServiceReqParam(&req, stream_info);
 
             PARAM_RESP_storage_json_stream_get_service resp;
-            CLIENT_REQ_storage_json_stream_get_service(grpc, &req);
-            
-            if (0 == grpc_c_recv_timeout(grpc, timeout_milliseconds))
+
+            ret = CLIENT_storage_json_stream_get_service(grpc, &req, &resp);
+            if (ret == 0)
             {
-                ret = CLIENT_RESP_storage_json_stream_get_service(grpc, &resp);
-                if (ret == 0)
-                {
-                    Log(logger_, "get stream server service channel id %d", resp.channelid);
-                    stream_info.stream_server_channel_id_ = resp.channelid;
-                    stream_info.stream_server_data_services_port_ = atoi(resp.port);
-                    EnqueueRecordingStream(stream_info);
-                }
+                Log(logger_, "get stream server service channel id %d", resp.channelid);
+                stream_info.stream_server_channel_id_ = resp.channelid;
+                stream_info.stream_server_data_services_port_ = atoi(resp.port);
+                EnqueueRecordingStream(stream_info);
             }
 
             /* ignore the situation that get stream services failed */

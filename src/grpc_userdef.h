@@ -25,7 +25,7 @@ typedef struct user_define_info
     void *parent;
 }UserDefInfo;
 
-int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout);
+int RecvUdp(grpc_t *grpc, void *buffer, int len, int timeout);
 int SendUdp(grpc_t *grpc, void *buffer, int len);
 
 }

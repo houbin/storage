@@ -20,10 +20,11 @@ private:
     struct sockaddr_in send_addr_;
     bool if_use_recv_addr_to_send_;
     bool if_broadcast_;
+    int recv_timeout_milliseconds_;
     bool done_;
 
 public:
-    UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr);
+    UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr, int recv_timeout_milliseconds = -1);
 
     int32_t Bind();
     int32_t Start();

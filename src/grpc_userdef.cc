@@ -9,11 +9,10 @@
 namespace storage
 {
 
-int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout)
+int RecvUdp(grpc_t *grpc, void *buffer, int len, int timeout_milliseconds)
 {
     int fd = 0;
     int ret = 0;
-    int timeout_milliseconds = 0;
     struct pollfd pfd;
     Logger *logger = NULL;
     bool if_use_recv_addr_to_send = false;
@@ -25,15 +24,6 @@ int RecvUdp(grpc_t *grpc, void *buffer, int len, int *timeout)
 
     Log(logger, "calling poll");
 
-    if (timeout == NULL)
-    {
-        timeout_milliseconds = -1;
-    }
-    else
-    {
-        timeout_milliseconds = *timeout;
-    }
-    
     pfd.fd = fd;
     pfd.events = POLLIN | POLLERR | POLLNVAL | POLLHUP;
     ret = poll(&pfd, 1, timeout_milliseconds);
@@ -68,11 +58,6 @@ again:
 
         Log(logger, "recvfrom error - %s", strerror(errno));
         return -errno;
-    }
-    else if (ret == 0)
-    {
-        /* peer have a orderly shutdown */
-        return -1;
     }
 
     if (if_use_recv_addr_to_send)
@@ -115,6 +100,7 @@ again:
         return -errno;
     }
 
+    Log(logger, "return %d", ret);
     return ret;
 }
 

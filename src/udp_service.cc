@@ -12,8 +12,8 @@
 namespace storage
 {
 
-UDP_SERVICE::UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr)
-: if_use_recv_addr_to_send_(false), if_broadcast_(false)
+UDP_SERVICE::UDP_SERVICE(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr, int recv_timeout_milliseconds)
+: if_use_recv_addr_to_send_(false), if_broadcast_(false), recv_timeout_milliseconds_(recv_timeout_milliseconds)
 {
     logger_ = logger;
     memcpy(&recv_addr_, &recv_addr, sizeof(recv_addr_));
@@ -105,6 +105,7 @@ void *UDP_SERVICE::Entry()
     grpc_t *grpc = grpc_new();
     grpc_init(grpc, &init_param);
     grpc_s_account_clear(grpc);
+    grpc->timeout_milliseconds = this->recv_timeout_milliseconds_;
 
     Log(logger_, "entry start");
 

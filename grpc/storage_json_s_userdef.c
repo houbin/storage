@@ -319,6 +319,14 @@ int USERDEF_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_REQ_storage_jso
     int ret = 0;
     IF_INFO if_info = {0};
     char buffer[MAX_STR_LEN + 1] = {0};
+    UserDefInfo *user_info = grpc->userdef;
+    assert(user_info != NULL);
+    assert(user_info->logger != NULL);
+    Logger *logger = NULL;
+    
+    logger = user_info->logger;
+
+    Log(logger, "discovery get device info");
 
     ret = USERDEF_storage_json_get_first_up_interface(&if_info);
     if (ret < 0)

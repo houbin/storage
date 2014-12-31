@@ -106,7 +106,7 @@ typedef struct{
 	 *	在Server端时，其值为Null。
 	 *	其单位为毫秒
 	 */
-	int (*recv)(struct _grpc_t *grpc, void *buffer, int len, int *sumTimeoutms);
+	int (*recv)(struct _grpc_t *grpc, void *buffer, int len, int sumTimeoutms);
 }grpcNetFunc_t;
 
 /**
@@ -156,6 +156,7 @@ typedef struct _grpc_t{
 	PRIVATE grpcUser_t userClient; //用于登陆，client.level无效
 	PRIVATE grpcUser_t userServer[32];//server用于验证
 	PRIVATE int userCnt; //server端用于验证的用户数
+    int timeout_milliseconds; // 用于recv时的等待超时, 负数为永远等待; 0为立即返回; 正数为等待若干秒
 }grpc_t;
 
 /**
