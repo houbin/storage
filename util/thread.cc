@@ -15,6 +15,11 @@ Thread::Thread()
 
 }
 
+Thread::~Thread()
+{
+
+}
+
 bool Thread::IsStarted() const
 {
     return (thread_id_ != 0);

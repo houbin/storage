@@ -74,10 +74,10 @@ bool StreamInfo::operator<(const StreamInfo &info) const
 
 void StreamInfo::PrintToLogFile(Logger *logger)
 {
-    Log(logger, "stream_info prints: stream_type: %s, sid: %s, protocol: %s, main_stream: %d, sub_stream: %d, \
-                main_stream_rstp_addr: %s, sub_stream_rstp_addr: %s, ip: %s, port: %s, name: %s, channelcnt: %d, channel_id: %d, \
-                user_name: %s, user_passwd: %s, stream_server_ip: %s, stream_server_port: %d, stream_server_channel_id: %d, \
-                stream_server_data_services_port_: %d",
+    Log(logger, "stream_info prints: stream_type: %s, sid: %s, protocol: %s, main_stream: %d, sub_stream: %d, "
+                "main_stream_rstp_addr: %s, sub_stream_rstp_addr: %s, ip: %s, port: %s, name: %s, channelcnt: %d, channel_id: %d, "
+                "user_name: %s, user_passwd: %s, stream_server_ip: %s, stream_server_port: %d, stream_server_channel_id: %d, "
+                "stream_server_data_services_port_: %d",
                 stream_type_,
                 sid_,
                 protocol_,

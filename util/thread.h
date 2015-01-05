@@ -12,6 +12,7 @@ private:
     pthread_t thread_id_;
 public:
     Thread();
+    virtual ~Thread();
 
     bool IsStarted() const;
     void Create(size_t stack_size = 0);

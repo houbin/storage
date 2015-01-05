@@ -112,6 +112,8 @@ int32_t StreamManager::EnqueueRecordingStream(StreamInfo &stream_info)
     /* TODO: save stream_info -> stream_id to db */
 
     recording_streams_.insert(make_pair(stream_info, free_id));
+    stream_info.PrintToLogFile(logger_);
+    Log(logger_, "free_id is %d", free_id);
     recording_cond_.Signal();
 
     return 0;
@@ -147,6 +149,8 @@ int32_t StreamManager::FreeStreamServiceReq(PARAM_REQ_storage_json_stream_get_se
 
 int32_t StreamManager::FillStreamServiceReqParam(PARAM_REQ_storage_json_stream_get_service *req, StreamInfo &stream_info)
 {
+    Log(logger_, "FillStreamServiceReqParam");
+
     memcpy(req->type, stream_info.stream_type_, sizeof(stream_info.stream_type_));
     memcpy(req->sid, stream_info.sid_, sizeof(stream_info.sid_));
     memcpy(req->protocol, stream_info.protocol_, sizeof(stream_info.protocol_));
@@ -168,7 +172,6 @@ void StreamManager::PreRecordEntry()
     int ret = 0;
     int optval = 1;
     int fd = -1;
-    int timeout_milliseconds = 5000;
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0)
@@ -210,9 +213,10 @@ void StreamManager::PreRecordEntry()
                 continue;
             }
 
-            /* stream_server_ip为空，则直接放入recording_streams */
+            /* stream_server_ip为空，则直接放入recording_streams_ */
             if (strlen(stream_info.stream_server_ip_) == 0)
             {
+                Log(logger_, "stream_info.stream_server_ip is NULL, enqueue to recording streams");
                 EnqueueRecordingStream(stream_info);
                 request_mutex_.Lock();
                 continue;
@@ -243,6 +247,7 @@ void StreamManager::PreRecordEntry()
             init_param.fptr_net.send = SendUdp;
 
             grpc_init(grpc, &init_param);
+            grpc->timeout_milliseconds = 5000;
 
             /* fill */
             FillStreamServiceReqParam(&req, stream_info);
@@ -250,12 +255,17 @@ void StreamManager::PreRecordEntry()
             PARAM_RESP_storage_json_stream_get_service resp;
 
             ret = CLIENT_storage_json_stream_get_service(grpc, &req, &resp);
-            if (ret == 0)
+            if ((ret == 0) && (resp.port != NULL))
             {
-                Log(logger_, "get stream server service channel id %d", resp.channelid);
+                Log(logger_, "get stream server service channel id %d, resp.port is %s", resp.channelid, resp.port);
+
                 stream_info.stream_server_channel_id_ = resp.channelid;
                 stream_info.stream_server_data_services_port_ = atoi(resp.port);
                 EnqueueRecordingStream(stream_info);
+            }
+            else
+            {
+                Log(logger_, "get stream server service error, ret is %d, resp.port is %p", ret, resp.port);
             }
 
             /* ignore the situation that get stream services failed */
@@ -293,6 +303,8 @@ void StreamManager::RecordingEntry()
             StreamInfo stream_info = iter->first;
             uint32_t stream_id = iter->second;
 
+            Log(logger_, "stream_id is %d", stream_id);
+            recording_streams_.erase(iter);
             recording_mutex_.Unlock();
 
             /* TODO recording stream to disk */
