@@ -333,14 +333,14 @@ int USERDEF_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_REQ_storage_jso
     {
         resp->sid = grpc_strdup(grpc, "N000000000000");
         resp->ip = grpc_strdup(grpc, "0.0.0.0");
-        resp->port = grpc_strdup(grpc, "0000");
+        resp->port = 0000;
     }
     else
     {
         snprintf(buffer, MAX_STR_LEN, "%c%s", 'N', if_info.mac);
         resp->sid = grpc_strdup(grpc, buffer);
         resp->ip = grpc_strdup(grpc, if_info.ip);
-        resp->port = grpc_strdup(grpc, "0000");
+        resp->port = 0000;
     }
 
     resp->type = grpc_strdup(grpc, "storage");
