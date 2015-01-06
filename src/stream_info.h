@@ -20,7 +20,7 @@ public:
     char main_stream_rstp_addr_[64];
     char sub_stream_rstp_addr_[64];
     char ip_[16]; //ipc
-    char port_[8]; // ipc
+    int port_; // ipc
     char name_[64]; // ipc
     int channelcnt_;
     int channel_id_;
@@ -41,7 +41,7 @@ public:
                char *main_stream_rstp_addr, 
                char *sub_stream_rstp_addr, 
                char *ip, 
-               char *port, 
+               int port, 
                char *name, 
                int channelcnt,
                int channel_id, 

@@ -129,8 +129,6 @@ int32_t StreamManager::MallocStreamServiceReq(PARAM_REQ_storage_json_stream_get_
     req->mainstream = (char *)malloc(sizeof(stream_info.main_stream_rstp_addr_));
     req->substream = (char *)malloc(sizeof(stream_info.sub_stream_rstp_addr_));
     req->ip = (char *)malloc(sizeof(stream_info.ip_));
-    req->port = (char *)malloc(sizeof(stream_info.port_));
-
     return 0;
 }
 
@@ -142,7 +140,6 @@ int32_t StreamManager::FreeStreamServiceReq(PARAM_REQ_storage_json_stream_get_se
     safe_free(req->mainstream);
     safe_free(req->substream);
     safe_free(req->ip);
-    safe_free(req->port);
 
     return 0;
 }
@@ -159,7 +156,7 @@ int32_t StreamManager::FillStreamServiceReqParam(PARAM_REQ_storage_json_stream_g
     memcpy(req->mainstream, stream_info.main_stream_rstp_addr_, sizeof(stream_info.main_stream_rstp_addr_));
     memcpy(req->substream, stream_info.sub_stream_rstp_addr_, sizeof(stream_info.sub_stream_rstp_addr_));
     memcpy(req->ip, stream_info.ip_, sizeof(stream_info.ip_));
-    memcpy(req->port, stream_info.port_, sizeof(stream_info.port_));
+    req_->port = stream_info.port_;
     req->channelcnt = stream_info.channelcnt_;
     req->channelid = stream_info.channel_id_;
     
@@ -255,17 +252,17 @@ void StreamManager::PreRecordEntry()
             PARAM_RESP_storage_json_stream_get_service resp;
 
             ret = CLIENT_storage_json_stream_get_service(grpc, &req, &resp);
-            if ((ret == 0) && (resp.port != NULL))
+            if (ret == 0)
             {
-                Log(logger_, "get stream server service channel id %d, resp.port is %s", resp.channelid, resp.port);
+                Log(logger_, "get stream server service channel id %d, resp.port is %d", resp.channelid, resp.port);
 
                 stream_info.stream_server_channel_id_ = resp.channelid;
-                stream_info.stream_server_data_services_port_ = atoi(resp.port);
+                stream_info.stream_server_data_services_port_ = resp.port;
                 EnqueueRecordingStream(stream_info);
             }
             else
             {
-                Log(logger_, "get stream server service error, ret is %d, resp.port is %p", ret, resp.port);
+                Log(logger_, "get stream server service error, ret is %d", ret);
             }
 
             /* ignore the situation that get stream services failed */
