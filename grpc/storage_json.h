@@ -103,7 +103,7 @@ typedef struct{
 		char *mainstream; //rtsp://127.0.0.1/live0.264
 		char *substream; //rtsp://127.0.0.1/live1.264
 		char *ip; //127.0.0.1
-		char *port; //9101
+		int port;
 		int channelcnt;
 		int channelid;
 		char *name; //admin
@@ -132,7 +132,7 @@ typedef struct{
 		char *mainstream; //rtsp://127.0.0.1/live0.264
 		char *substream; //rtsp://127.0.0.1/live1.264
 		char *ip; //127.0.0.1
-		char *port; //9101
+		int port;
 		int channelcnt;
 		int channelid;
 		char *name; //admin
@@ -181,7 +181,7 @@ typedef struct{
 	char *mainstream; //rtsp://127.0.0.1/live0.264
 	char *substream; //rtsp://127.0.0.1/live1.264
 	char *ip; //127.0.0.1
-	char *port; //9101
+	int port;
 	int channelcnt;
 	int channelid;
 	char *name; //admin
@@ -210,7 +210,7 @@ typedef struct{
 	char *type; //IPC/DVR/NVR
 	char *sid; //A361/N65465413
 	char *ip; //127.0.0.1
-	char *port; //9101
+	int port;
 	int channelcnt;
 } PARAM_RESP_storage_json_broadcast_discovery;
 int SERVER_storage_json_broadcast_discovery(grpc_t *grpc);
@@ -456,7 +456,7 @@ typedef struct{
 	char *mainstream; //rtsp://127.0.0.1/live0.264
 	char *substream; //rtsp://127.0.0.1/live1.264
 	char *ip; //127.0.0.1
-	char *port; //9101
+	int port;
 	int channelcnt;
 	int channelid;
 } PARAM_REQ_storage_json_stream_get_service;
@@ -466,7 +466,7 @@ typedef struct{
 	char *protocol; //cloudsee/rtsp/onvif
 	char *url; //rtsp://127.0.0.1/live0.264
 	char *ip; //127.0.0.1
-	char *port; //9101
+	int port;
 	int channelid;
 } PARAM_RESP_storage_json_stream_get_service;
 int SERVER_storage_json_stream_get_service(grpc_t *grpc);

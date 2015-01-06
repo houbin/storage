@@ -406,7 +406,7 @@ int CLIENT_RESP_storage_json_channel_get(grpc_t *grpc, PARAM_RESP_storage_json_c
                                     (*resp).channels[i1].mainstream = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "mainstream"));
                                     (*resp).channels[i1].substream = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "substream"));
                                     (*resp).channels[i1].ip = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "ip"));
-                                    (*resp).channels[i1].port = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "port"));
+									(*resp).channels[i1].port = cJSON_GetObjectValueInt(item, "port");
                                     (*resp).channels[i1].channelcnt = cJSON_GetObjectValueInt(item, "channelcnt");
                                     (*resp).channels[i1].channelid = cJSON_GetObjectValueInt(item, "channelid");
                                     (*resp).channels[i1].name = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "name"));
@@ -490,10 +490,7 @@ int SERVER_storage_json_channel_get(grpc_t *grpc)
                 {
                     cJSON_AddStringToObject(item, "ip", resp.channels[i1].ip);
                 }
-                if (resp.channels[i1].port)
-                {
-                    cJSON_AddStringToObject(item, "port", resp.channels[i1].port);
-                }
+				cJSON_AddNumberToObject(item, "port", resp.channels[i1].port);
                 cJSON_AddNumberToObject(item, "channelcnt", resp.channels[i1].channelcnt);
                 cJSON_AddNumberToObject(item, "channelid", resp.channels[i1].channelid);
                 if (resp.channels[i1].name)
@@ -559,10 +556,7 @@ int CLIENT_REQ_storage_json_channel_add(grpc_t *grpc, PARAM_REQ_storage_json_cha
                 {
                     cJSON_AddStringToObject(item, "ip", (*req).channels[i1].ip);
                 }
-                if ((*req).channels[i1].port)
-                {
-                    cJSON_AddStringToObject(item, "port", (*req).channels[i1].port);
-                }
+				cJSON_AddNumberToObject(item, "port", (*req).channels[i1].port);
                 cJSON_AddNumberToObject(item, "channelcnt", (*req).channels[i1].channelcnt);
                 cJSON_AddNumberToObject(item, "channelid", (*req).channels[i1].channelid);
                 if ((*req).channels[i1].name)
@@ -647,7 +641,7 @@ int SERVER_storage_json_channel_add(grpc_t *grpc)
                                     req.channels[i1].mainstream = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "mainstream"));
                                     req.channels[i1].substream = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "substream"));
                                     req.channels[i1].ip = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "ip"));
-                                    req.channels[i1].port = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "port"));
+									req.channels[i1].port = cJSON_GetObjectValueInt(item, "port");
                                     req.channels[i1].channelcnt = cJSON_GetObjectValueInt(item, "channelcnt");
                                     req.channels[i1].channelid = cJSON_GetObjectValueInt(item, "channelid");
                                     req.channels[i1].name = grpc_strdup(grpc, cJSON_GetObjectValueString(item, "name"));
@@ -780,10 +774,7 @@ int CLIENT_REQ_storage_json_channel_modify(grpc_t *grpc, PARAM_REQ_storage_json_
         {
             cJSON_AddStringToObject(param, "ip", (*req).ip);
         }
-        if ((*req).port)
-        {
-            cJSON_AddStringToObject(param, "port", (*req).port);
-        }
+		cJSON_AddNumberToObject(param, "port", (*req).port);
         cJSON_AddNumberToObject(param, "channelcnt", (*req).channelcnt);
         cJSON_AddNumberToObject(param, "channelid", (*req).channelid);
         if ((*req).name)
@@ -850,7 +841,7 @@ int SERVER_storage_json_channel_modify(grpc_t *grpc)
             req.mainstream = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "mainstream"));
             req.substream = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "substream"));
             req.ip = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "ip"));
-            req.port = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "port"));
+			req.port = cJSON_GetObjectValueInt(param, "port");
             req.channelcnt = cJSON_GetObjectValueInt(param, "channelcnt");
             req.channelid = cJSON_GetObjectValueInt(param, "channelid");
             req.name = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "name"));
@@ -890,7 +881,7 @@ int CLIENT_RESP_storage_json_broadcast_discovery(grpc_t *grpc, PARAM_RESP_storag
             (*resp).type = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "type"));
             (*resp).sid = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "sid"));
             (*resp).ip = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "ip"));
-            (*resp).port = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "port"));
+			(*resp).port = cJSON_GetObjectValueInt(result, "port");
             (*resp).channelcnt = cJSON_GetObjectValueInt(result, "channelcnt");
         }
     }
@@ -940,10 +931,7 @@ int SERVER_storage_json_broadcast_discovery(grpc_t *grpc)
         {
             cJSON_AddStringToObject(result, "ip", resp.ip);
         }
-        if (resp.port)
-        {
-            cJSON_AddStringToObject(result, "port", resp.port);
-        }
+		cJSON_AddNumberToObject(result, "port", resp.port);
         cJSON_AddNumberToObject(result, "channelcnt", resp.channelcnt);
     }
     return 0;
@@ -1965,10 +1953,7 @@ int CLIENT_REQ_storage_json_stream_get_service(grpc_t *grpc, PARAM_REQ_storage_j
         {
             cJSON_AddStringToObject(param, "ip", (*req).ip);
         }
-        if ((*req).port)
-        {
-            cJSON_AddStringToObject(param, "port", (*req).port);
-        }
+		cJSON_AddNumberToObject(param, "port", (*req).port);
         cJSON_AddNumberToObject(param, "channelcnt", (*req).channelcnt);
         cJSON_AddNumberToObject(param, "channelid", (*req).channelid);
     }
@@ -1991,7 +1976,7 @@ int CLIENT_RESP_storage_json_stream_get_service(grpc_t *grpc, PARAM_RESP_storage
             (*resp).protocol = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "protocol"));
             (*resp).url = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "url"));
             (*resp).ip = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "ip"));
-            (*resp).port = grpc_strdup(grpc, cJSON_GetObjectValueString(result, "port"));
+			(*resp).port = cJSON_GetObjectValueInt(result, "port");
             (*resp).channelid = cJSON_GetObjectValueInt(result, "channelid");
         }
     }
@@ -2034,7 +2019,7 @@ int SERVER_storage_json_stream_get_service(grpc_t *grpc)
             req.mainstream = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "mainstream"));
             req.substream = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "substream"));
             req.ip = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "ip"));
-            req.port = grpc_strdup(grpc, cJSON_GetObjectValueString(param, "port"));
+			req.port = cJSON_GetObjectValueInt(param, "port");
             req.channelcnt = cJSON_GetObjectValueInt(param, "channelcnt");
             req.channelid = cJSON_GetObjectValueInt(param, "channelid");
         }
@@ -2062,10 +2047,7 @@ int SERVER_storage_json_stream_get_service(grpc_t *grpc)
         {
             cJSON_AddStringToObject(result, "ip", resp.ip);
         }
-        if (resp.port)
-        {
-            cJSON_AddStringToObject(result, "port", resp.port);
-        }
+		cJSON_AddNumberToObject(result, "port", resp.port);
         cJSON_AddNumberToObject(result, "channelid", resp.channelid);
     }
     return 0;
