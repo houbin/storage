@@ -1,8 +1,9 @@
 #ifndef STORAGE_VMSC_SERVICE_H_
 #define STORAGE_VMSC_SERVICE_H_
 
+#include "../util/mutex.h"
 #include "udp_service.h"
-#include "stream_manager.h"
+#include "stream_server_client.h"
 
 namespace storage
 {
@@ -10,12 +11,14 @@ namespace storage
 class VmscService : public UDP_SERVICE
 {
 private:
-    StreamManager *stream_manager_;
+    Mutex mutex_;
+    uint64_t seq_;
+    StreamServerClient *stream_server_client_;
 
 public:
-    VmscService(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr, StreamManager *stream_manager);
+    VmscService(Logger *logger, struct sockaddr_in &recv_addr, struct sockaddr_in &send_addr, StreamServerClient *stream_server_client);
     
-    int32_t EnqueueRecordRequest(StreamInfo &stream_info);
+    int32_t EnqueueRecordRequest(StreamInfo *stream_info);
 };
 }
 

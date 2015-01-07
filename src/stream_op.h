@@ -15,17 +15,16 @@ class StreamOp
 {
 private:
     uint64_t op_seq_;
-    StreamInfo stream_info_;
+    StreamInfo *stream_info_;
     StreamOpType stream_op_type_;
     
     // no copying allowed
     StreamOp(const StreamOp&);
     void operator=(const StreamOp&);
 public:
-    StreamOP(uint64_t op_seq_, StreamInfo &stream_info, StreamOpType stream_op_type)
-    : op_seq_(op_seq), stream_op_type_(stream_op_type)
+    StreamOP(uint64_t op_seq_, StreamInfo *stream_info, StreamOpType stream_op_type)
+    : op_seq_(op_seq), stream_info_(stream_info), stream_op_type_(stream_op_type)
     {
-        stream_info_ = stream_info;
     }
 };
 

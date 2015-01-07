@@ -149,24 +149,24 @@ int USERDEF_storage_json_channel_add(grpc_t *grpc, PARAM_REQ_storage_json_channe
     for (i = 0; i < channels; i++)
     {
         char ipc_name[] = "temp";
-        StreamInfo stream_info(req->channels[i].type, 
-                               req->channels[i].sid,
-                               req->channels[i].protocol,
-                               req->channels[i].bMainStream,
-                               req->channels[i].bSubStream,
-                               req->channels[i].mainstream,
-                               req->channels[i].substream,
-                               req->channels[i].ip,
-                               req->channels[i].port,
-                               ipc_name, //TODO 需要把此字段加到json文件中, 用于表示IPC的名字
-                               req->channels[i].channelcnt,
-                               req->channels[i].channelid,
-                               req->channels[i].name,
-                               req->channels[i].passwd,
-                               req->channels[i].streamserverip,
-                               req->channels[i].streamserverport,
-                               0,
-                               0); 
+        StreamInfo *stream_info = new StreamInfo(req->channels[i].type, 
+                                                 req->channels[i].sid,
+                                                 req->channels[i].protocol,
+                                                 req->channels[i].bMainStream,
+                                                 req->channels[i].bSubStream,
+                                                 req->channels[i].mainstream,
+                                                 req->channels[i].substream,
+                                                 req->channels[i].ip,
+                                                 req->channels[i].port,
+                                                 ipc_name, //TODO 需要把此字段加到json文件中, 用于表示IPC的名字
+                                                 req->channels[i].channelcnt,
+                                                 req->channels[i].channelid,
+                                                 req->channels[i].name,
+                                                 req->channels[i].passwd,
+                                                 req->channels[i].streamserverip,
+                                                 req->channels[i].streamserverport,
+                                                 0,
+                                                 0); 
         
         vmsc_service->EnqueueRecordRequest(stream_info);
     }
