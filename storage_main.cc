@@ -12,6 +12,7 @@
 #include "src/vmsc_service.h"
 #include "src/stream_manager.h"
 #include "src/udp_service.h"
+#include "src/stream_op_handler.h"
 
 using namespace std;
 using namespace util;
@@ -22,6 +23,9 @@ void Usage(char *arg)
     fprintf(stderr, "%s: -c [config file]\n", arg);
     return;
 }
+
+StreamOpHandler *stream_op_handler = NULL;
+Logger *logger = NULL;
 
 int main(int argc, char *argv[])
 {
@@ -71,7 +75,6 @@ int main(int argc, char *argv[])
     config_option->Init();
 
     string log_dir(config_option->log_dir_);
-    Logger *logger = NULL;
     ret = NewLogger(log_dir.c_str(), &logger);
     if (ret != OK)
     {
@@ -91,15 +94,18 @@ int main(int argc, char *argv[])
     out_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
     Discovery discovery(logger, in_addr, out_addr);
 
+    stream_op_handler = new StreamOpHandler(logger);
+
 #define VMSCSERVICE_RECV_PORT 9003
-    StreamManager stream_manager(logger, 512);
-    stream_manager.Start();
     memset(&in_addr, 0, sizeof(struct sockaddr_in));
     memset(&out_addr, 0, sizeof(struct sockaddr_in)); /* 使用全0的out_addr，内部处理为sendto到recv的addr */
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(VMSCSERVICE_RECV_PORT);
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    VmscService vmsc_service(logger, in_addr, out_addr, &stream_manager);
+    VmscService vmsc_service(logger, in_addr, out_addr, &stream_op_handler);
+    
+    /* init */
+    stream_op_handler->Init();
 
     /* bind */
     discovery.Bind();
@@ -108,13 +114,16 @@ int main(int argc, char *argv[])
     /* thread start */
     discovery.Start();
     vmsc_service.Start();
+    stream_op_handler->Start();
+
 
     /* wait for join */
     discovery.Join();
     vmsc_service.Join();
-    stream_manager.Wait();
+    stream_op_handler->Join();
 
     delete config_option;
+    delete stream_op_handler;
     
     return 0;
 }

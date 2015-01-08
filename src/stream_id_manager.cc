@@ -3,9 +3,8 @@
 namespace storage
 {
 
-int32_t StreamIdManager::ApplyForFreeId()
+int32_t StreamIdManager::ApplyForFreeId(uint64_t *stream_id)
 {
-    int free_id;
     Mutex::Locker locker(lock_);
 
     free_id = bitmap_.get_free_bit();
@@ -16,8 +15,9 @@ int32_t StreamIdManager::ApplyForFreeId()
     }
 
     bitmap_.set(free_id);
+    *stream_id = free_id;
 
-    return free_id;
+    return 0;
 }
 
 int32_t StreamIdManager::ReleaseId(uint32_t id)

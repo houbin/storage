@@ -14,6 +14,8 @@ StreamServerClient::StreamServerClient(Logger *logger, StreamManager *stream_man
 
 int32_t StreamServerClient::EnqueueStreamOp(StreamOp *stream_op)
 {
+    Mutex::Locker lock(mutex_);
+
     if (stop_)
     {
         Log(logger_, "have been stopped");
@@ -22,8 +24,6 @@ int32_t StreamServerClient::EnqueueStreamOp(StreamOp *stream_op)
         
         return 0;
     }
-
-    Mutex::Locker lock(mutex_);
 
     stream_op_queue_.push_back(stream_op);
     

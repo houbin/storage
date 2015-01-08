@@ -24,8 +24,8 @@ public:
 
     }
 
-    int32_t ApplyForFreeId();
-    int32_t ReleaseId(uint32_t id);
+    int32_t ApplyForFreeId(uint64_t *stream_id);
+    int32_t ReleaseId(uint32_t stream_id);
 };
 
 }

@@ -5,8 +5,8 @@
 #include "../util/mutex.h"
 #include "../util/cond.h"
 #include "../util/logger.h"
-#include "stream_manager.h"
 #include "stream_op.h"
+#include "stream_op_handler.h"
 
 using namespace std;
 
