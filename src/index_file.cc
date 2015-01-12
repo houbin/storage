@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "index_file.h"
+#include "../util/coding.h"
 
 namespace storage
 {
@@ -36,11 +37,43 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 
 int32_t IndexFile::Init(StreamTransferClientManager *transfer_client_manager)
 {
+    size_t ret;
     uint32_t record_file_section_size = 0;
+    struct RecordFileInfo *record_file_info = NULL;
 
     assert(transfer_client_manager != NULL);
 
-    record_file_section_size = file_counts_ * 
+    record_file_section_size = file_counts_ * sizeof(struct RecordFileInfo);
+    record_file_info = (struct RecordFileInfo *)malloc(record_file_section_size);
+    assert(record_file_info != NULL);
+
+    ret = fread((void*)record_file_info, 32, file_counts, index_file_);
+    assert(ret == file_counts);
+
+    int i = 0;
+    for (i = 0; i < file_counts; i++)
+    {
+        uint32_t length;
+        uint32_t expected_crc;
+        uint32_t actual_crc;
+        
+        char *temp = record_file_info[i];
+
+        length = DecodeFixed32(temp);
+        if (length == 0)
+        {
+            /* not used */
+            continue;
+        }
+        expected_crc = DecodeFixed32(temp + 4);
+        actual_crc = crc32c::Value(temp+8, length);
+        assert(expected_crc == actual_crc);
+        
+
+
+    }
+
+
 
     
 }
