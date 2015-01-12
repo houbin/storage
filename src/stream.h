@@ -21,9 +21,6 @@ private:
     uint16_t write_offset_;
     char *write_buffer_; // 写缓冲区
 
-    uint16_t read_offset_;
-    char *read_buffer_;  // 读缓冲区
-
     uint16_t file_write_count_;
     map<uint64_t, RecordFile> record_file_; // 以时间为key，对数据文件进行排序
 

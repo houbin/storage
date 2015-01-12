@@ -13,9 +13,9 @@ using namespace util;
 namespace storage
 {
 
-StreamOpHandler::StreamManager(Logger *logger)
+StreamOpHandler::StreamManager(Logger *logger, StreamTransferClientManager *client_manager)
 : logger_(logger), mutex_("StreamOpHandler::Lock"),
-  stream_id_manager_(logger_, MAX_STREAM_NUMBERS), stop_(false)
+  stream_id_manager_(logger_, MAX_STREAM_NUMBERS), client_manager_(client_manager), stop_(false)
 {
 
 }
@@ -32,7 +32,7 @@ int32_t StreamOpHandler::EnqueueStreamOp(StreamOp *stream_op)
     {
         safe_free(stream_op->stream_info);
         safe_free(stream_op);
-        return;
+        return 0;
     }
 
     stream_op_queue_.push_back(stream_op);
@@ -79,17 +79,11 @@ int32_t StreamOpHandler::HandleStreamAdd(StreamInfo *stream_info)
 
     Log(logger_, "stream id is %"PRIu64"", stream_id);
 
-    /* adjust stream_transfer_clients_ */
+    /* adjust stream transfer client manager */
     {
-        map<uint64_t, StreamTransferClient*>::iterator iter = stream_transfer_clients_.find(stream_id);
-        if (iter == stream_transfer_clients_.end())
-        {
-            StreamTransferClient *stream_transfer_client = new StreamTransferClient();
-            assert(stream_transfer_client != NULL);
-
-            stream_transfer_clients_.insert(make_pair(stream_id, stream_transfer_client));
-            stream_transfer_client.Start();
-        }
+        StreamTransferClient *transfer_client = new StreamTransferClient();
+        assert(stream_transfer_client != NULL);
+        StreamTransferClientManager.Insert(stream_id, transfer_client);
     }
 
     Log(logger_, "handle stream add end");
@@ -123,44 +117,11 @@ int32_t StreamOpHandler::HandleStreamDel(StreamInfo *stream_info)
 
     /* adjust stream_transfer_clients_ */
     {
-        map<uint64_t, StreamTransferClient*>::iterator iter = stream_transfer_clients_.find(stream_id);
-        if (iter != stream_transfer_clients_.end())
-        {
-            StreamTransferClient  *stream_transfer_client = iter->second;
-            assert(stream_transfer_client != NULL);
-
-            stream_transfer_client->Stop();
-            stream_transfer_client->Wait();
-
-            delete stream_transfer_client;
-            stream_transfer_clients_.erase(iter);
-        }
+        client_manager_.Erase(stream_id);
     }
 
     Log(logger_, "handle stream del end");
     return 0;
-}
-
-void StreamOpHandler::Init()
-{
-    int ret;
-
-    Log(logger_, "init");
-
-    ret = JVC_InitSDK(-1);
-    assert(ret == 0);
-
-    JVC_RegisterCallBack(YST_ClientConnectCallBack,
-                         YST_ClientNormalDataCallBack,
-                         YST_ClientCheckResultCallBack,
-                         YST_ClientChatDataCallBack,
-                         YST_ClientTextDataCallBack,
-                         YST_ClientDownloadCallBack,
-                         YST_ClientPlayDataCallBack
-                         );
-
-    JVC_EnableLog(TRUE);
-    return;
 }
 
 void StreamOpHandler::Start()
@@ -184,10 +145,17 @@ void *StreamOpHandler::Entry()
         while (!stream_op_queue_.empty())
         {
             StreamOp *stream_op = DequeueStreamOp();
-            mutex_.unlock();
 
             assert (stream_op != NULL);
             assert(stream_op->stream_info != NULL);
+            if (stop_)
+            {
+                safe_free(stream_op->stream_info);
+                safe_free(stream_op);
+                continue;
+            }
+
+            mutex_.Unlock();
 
             switch (stream_op->stream_op_type)
             {
@@ -228,8 +196,6 @@ void StreamOpHandler::Stop()
     stop_ = true;
     cond.Signal();
     mutex_.Unlock();
-
-    JVC_ReleaseSDK();
 
     return;
 }

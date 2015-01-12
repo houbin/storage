@@ -12,6 +12,7 @@
 #include "stream_id_manager.h"
 #include "../grpc/storage_json.h"
 #include "stream_op.h"
+#include "stream_transfer_client_manager.h"
 
 using namespace util;
 
@@ -30,14 +31,14 @@ private:
     
     deque<StreamOp> stream_op_queue_;
     map<StreamInfo, uint64_t> stream_infos_;
-    map<uint64_t, StreamTransferClient*> stream_transfer_clients_;
+    StreamTransferClientManager *client_manager_;
 
     StreamIdManager stream_id_manager_;
     
     bool stop_;
 
 public:
-    StreamOpHandler(Logger *logger);
+    StreamOpHandler(Logger *logger, StreamTransferClientManager *client_manager);
 
     int32_t EnqueueStreamOp(StreamOp *stream_op);
     StreamOp DequeStreamOp();
@@ -45,7 +46,6 @@ public:
     int32_t HandleStreamAdd(StreamInfo *stream_info);
     int32_t HandleStreamDel(StreamInfo *stream_info);
 
-    void Init();
     void Start();
     void *Entry();
     void Stop();

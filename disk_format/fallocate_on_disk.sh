@@ -3,6 +3,7 @@
 
 mount_dir=/jovision
 index_file_name=index
+file_count_name=file_count
 
 disk=$1
 
@@ -25,10 +26,15 @@ done
 
 echo "start to fallocate index file"
 #fallocate index file
-file_use_bytes=$(echo "512 + 24 + 256 * 20 + 256 * 16" | bc)
+file_use_bytes=$(echo "32 + 256 * 32" | bc)
 index_file_size=$(echo "${file_use_bytes} * ${file_count}" | bc)
 echo "index file size is ${index_file_size}"
 fallocate -l ${index_file_size} ${mount_dir}/${disk}/${index_file_name}
+
+dd if=/dev/zero of=${mount_dir}/${disk}/${index_file_name} seek=0 bs=32 count=${file_count} conv=notrunc
+
+echo ${file_count} > ${mount_dir}/${disk}/${file_count_name}
+
 echo "end fallocate index file"
 
 echo "${disk} fallocate last file: ${file_name}"

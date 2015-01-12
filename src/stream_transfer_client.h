@@ -3,13 +3,17 @@
 
 #include <stdbool.h>
 #include "../util/logger.h"
+#include "../util/utime.h"
 #include "stream_info.h"
+#include "record_file.h"
 
 class StreamTransferClient
 {
 private:
     Logger *logger;
     StreamInfo stream_info_;
+
+    map<UTime, RecordFile> record_file_map_;
 
 public:
     StreamTransferClient(Logger *logger, StreamInfo &stream_info);

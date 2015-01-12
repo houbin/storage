@@ -1,0 +1,12 @@
+整个存储模块的数据流设计如下
+
+                         网络                                  
+vms client            --------->           storage
+                                           vmsc service
+stream server         <---------           stream server client
+stream server         --------->           stream server client         
+                                           op handler
+stream server         <---------           stream transfer client
+stream server         --------->           stream transfer client
+                                           
+                           

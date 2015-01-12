@@ -55,11 +55,25 @@ void YST_ClientConnectCallBack(int nLocalChannel, unsigned char uchType, char *p
     return;
 }
 
-void YST_ClientNormalDataCallBack(int nLocalChannel, unsigned char uchType, unsigned char *pBuffer, int nSize, nWidth, int nHeight)
+void YST_ClientNormalDataCallBack(int nLocalChannel, unsigned char uchType, unsigned char *pBuffer, int nSize, int nWidth, int nHeight)
 {
+    int32_t ret;
     Log(logger, "enter yst client normal data callback");
+    
+    uint32_t stream_id = (uint64_t)nLocalChannel;
 
-    stream_op_handler.find
+    StreamTransferClient *transfer_client = NULL;
+    ret = transfer_client_manager.find(stream_id, &transfer_client);
+    if (ret < 0)
+    {
+        free(pBuffer);
+        return;
+    }
+
+    transfer_client->
+
+
+    
 
     return;
 }

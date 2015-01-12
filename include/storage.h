@@ -6,6 +6,7 @@
 
 extern Logger *logger;
 extern StreamOpHandler *stream_op_handler;
+extern StreamTransferClientManager *transfer_client_manager;
 
 #endif
 
