@@ -26,12 +26,12 @@ done
 
 echo "start to fallocate index file"
 #fallocate index file
-file_use_bytes=$(echo "32 + 256 * 32" | bc)
+file_use_bytes=$(echo "52 + 256 * 32" | bc)
 index_file_size=$(echo "${file_use_bytes} * ${file_count}" | bc)
 echo "index file size is ${index_file_size}"
 fallocate -l ${index_file_size} ${mount_dir}/${disk}/${index_file_name}
 
-dd if=/dev/zero of=${mount_dir}/${disk}/${index_file_name} seek=0 bs=32 count=${file_count} conv=notrunc
+dd if=/dev/zero of=${mount_dir}/${disk}/${index_file_name} seek=0 bs=52 count=${file_count} conv=notrunc
 
 echo ${file_count} > ${mount_dir}/${disk}/${file_count_name}
 

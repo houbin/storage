@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "index_file.h"
+#include "record_file.h"
 #include "../util/coding.h"
 
 namespace storage
@@ -35,47 +36,90 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     Log(logger, "%s file count %d", base_name_.c_str(), file_counts_);
 }
 
-int32_t IndexFile::Init(StreamTransferClientManager *transfer_client_manager)
+int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
+{
+    char *temp = NULL;
+
+    assert(buffer != NULL);
+    assert(record_file != NULL);
+
+    Log(logger_, "analyze one entry");
+
+    temp = buffer;
+    record_file->stream_id_ = DecodeFixed32(temp);
+    temp += 4;
+    record_file->locked_ = temp;
+    temp += 1;
+    record_file->used_ = temp;
+    temp += 1;
+    record_file->record_fragment_counts_ = temp | ((temp + 1) << 8);
+    temp += 2;
+    record_file->start_time.tv_sec = DecodeFixed32(temp);
+    temp += 4;
+    record_file->start_time.tv_nsec = DecodeFixed32(temp);
+    temp += 4;
+    record_file->i_frame_start_time_.tv_sec = DecodeFixed32(temp);
+    temp += 4;
+    record_file->i_frame_end_time_.tv_nsec = DecodeFixed32(temp);
+    temp += 4;
+    record_file->record_offset_ = DecodeFixed32(temp);
+
+    return 0;
+}
+
+int32_t IndexFile::AnalyzeAll(StreamTransferClientManager *transfer_client_manager, FreeFileTable *free_file_table)
 {
     size_t ret;
     uint32_t record_file_section_size = 0;
+    uint32_t record_file_info_length = 0;
     struct RecordFileInfo *record_file_info = NULL;
 
     assert(transfer_client_manager != NULL);
+    assert(free_file_table != NULL);
 
-    record_file_section_size = file_counts_ * sizeof(struct RecordFileInfo);
-    record_file_info = (struct RecordFileInfo *)malloc(record_file_section_size);
-    assert(record_file_info != NULL);
+    record_file_info_length = sizeof(struct RecordFileInfo);
+    record_file_section_size = file_counts_ * record_file_info_length;
+    record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
+    assert(record_file_info_buffer != NULL);
 
-    ret = fread((void*)record_file_info, 32, file_counts, index_file_);
+    ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts, index_file_);
     assert(ret == file_counts);
 
     int i = 0;
     for (i = 0; i < file_counts; i++)
     {
-        uint32_t length;
-        uint32_t expected_crc;
-        uint32_t actual_crc;
-        
-        char *temp = record_file_info[i];
+        char *temp = (char *)(record_file_info_buffer[i]);
 
-        length = DecodeFixed32(temp);
+        RecordFile *record_file = new RecordFile(base_name_, i);
+        assert(record_file != NULL);
+
+        uint32_t length = DecodeFixed32(temp);
+        temp += 4;
+
         if (length == 0)
         {
             /* not used */
+            free_file_table.Put(record_file);
             continue;
         }
-        expected_crc = DecodeFixed32(temp + 4);
-        actual_crc = crc32c::Value(temp+8, length);
+
+        uint32_t expected_crc = DecodeFixed32(temp);
+        temp += 4;
+        uint32_t actual_crc = crc32c::Value(temp, length);
         assert(expected_crc == actual_crc);
-        
+        temp += 4;
+        AnalyzeOneEntry(temp, record_file);
 
-
+        uint32_t stream_id = record_file->stream_id_;
+        StreamTransferClient *transfer_client;
+        int32_t ret = transfer_client_manager->Find(stream_id, &transfer_client);
+        assert(ret == 0);
+        ret = transfer_client->Insert(record_file);
+        assert(ret == 0);
     }
 
-
-
-    
+    Log(logger_, "analyze all entry end");
+    return 0;
 }
 
 IndexFile::~IndexFile()
@@ -83,19 +127,27 @@ IndexFile::~IndexFile()
     fclose(index_file_);
 }
 
-IndexFileManager::IndexFileManager(Logger *logger, StreamTransferClientManager *client_transfer_manager)
-: logger_(logger), shutdown_(false), transfer_client_manager_(transfer_client_manager)
+IndexFileManager::IndexFileManager(Logger *logger, StreamTransferClientManager *client_transfer_manager, FreeFileTable *free_file_table)
+: logger_(logger), shutdown_(false), transfer_client_manager_(transfer_client_manager), free_file_table_(free_file_table)
 {
 
 }
 
 int32_t IndexFileManager::Init()
 {
-    DIR *dp;
-    struct dirent *entry;
+
+    ScanAllIndexFile();
+    AnalyzeAllIndexFile();
+    return 0;
+}
+
+int32_t IndexFileManager::ScanAllIndexFile()
+{
+    DIR *dp = NULL;
+    struct dirent *entry = NULL;
     struct stat statbuf;
 
-    Log(logger_, "init");
+    Log(logger_, "scan all index file");
 
     dp = opendir("/jovision");
     assert(dp != NULL);
@@ -125,15 +177,24 @@ int32_t IndexFileManager::Init()
     }
 
     closedir(dp);
+    Log(logger_, "scan all index file end");
+
+    return 0;
+}
+
+int32_t IndexFileManager::AnalyzeAllIndexFile()
+{
+    Log(logger_, "analyze all index file");
 
     map<string, IndexFile*>::iterator iter = index_file_map_.begin();
     for(iter; iter != index_file_map_.end(); iter++)
     {
         IndexFile *index_file = iter->second;
 
-        index_file->Init(transfer_client_manager_);
+        index_file->Analyze(transfer_client_manager_, free_file_table_);
     }
 
+    Log(logger_, "analyze all index file end");
 
     return 0;
 }

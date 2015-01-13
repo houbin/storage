@@ -13,7 +13,7 @@ private:
     Logger *logger;
     StreamInfo stream_info_;
 
-    map<UTime, RecordFile> record_file_map_;
+    map<UTime, RecordFile*> record_file_map_;
 
 public:
     StreamTransferClient(Logger *logger, StreamInfo &stream_info);
@@ -21,6 +21,8 @@ public:
     int32_t Start();
     void Stop();
     void Wait();
+
+    int32_t Insert(RecordFile *record_file);
 };
 
 #endif
