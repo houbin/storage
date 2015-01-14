@@ -40,6 +40,14 @@ struct RecordFragmentInfo
 }; // 32 bytes
 #pragma pack()
 
+struct IndexFileOp
+{
+    string index_file_base_name;
+    uint32_t offset;
+    uint32_t length;
+    char *buffer;
+};
+
 class IndexFile
 {
 private:
@@ -47,13 +55,38 @@ private:
 
     string base_name_;
     FILE *index_file_;
+    Mutex mutex_;
+    Cond cond_;
     uint32_t file_counts_;
+
+    deque<struct IndexFileOp*> op_queue_;
+    bool stop_;
+
+    struct WriteThread : public Thread
+    {
+        IndexFile *index_file;
+        WriteThread(IndexFile *index_file): index_file_(index_file) {}
+        void *entry()
+        {
+            index_file_->WriteEntry();
+            return 0;
+        }
+        
+    } write_thread_;
 
 public:
     IndexFile(Logger *logger, string base_name);
-    ~IndexFile();
 
-    int32_t Analyze(StreamTransferClientManager *client_transfer_manager, FreeFileTable *free_file_table);
+    char *GetBaseName();
+
+    int32_t AnalyzeAllEntry(StreamTransferClientManager *client_transfer_manager, FreeFileTable *free_file_table);
+    int32_t AnalyzeOneEntry(RecordFile *record_file);
+
+    int32_t EnqueueOp(struct IndexFileOp *index_file_op);
+    int32_t DequeueOp(struct IndexFileOp **index_file_op);
+    int32_t WriteEntry();
+
+    int32_t Shutdown();
 };
 
 class IndexFileManager
@@ -63,8 +96,6 @@ private:
 
     map<string, IndexFile*> index_file_map_;
 
-    bool shutdown_;
-    
     StreamTransferClientManager *transfer_client_manager_;
     FreeFileTable *free_file_table_;
 

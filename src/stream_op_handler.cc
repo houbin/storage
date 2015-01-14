@@ -77,7 +77,7 @@ int32_t StreamOpHandler::HandleStreamAdd(StreamInfo *stream_info)
         }
     }
 
-    Log(logger_, "stream id is %"PRIu64"", stream_id);
+    Log(logger_, "stream id is %d", stream_id);
 
     /* adjust stream transfer client manager */
     {

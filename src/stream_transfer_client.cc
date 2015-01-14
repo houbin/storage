@@ -41,4 +41,14 @@ void StreamTransferClient::Wait()
     return;
 }
 
+int32_t Insert(RecordFile *record_file)
+{
+  
+    Log(logger_, "insert record file");
+
+    assert(record_file != NULL);
+
+
+}
+
 }

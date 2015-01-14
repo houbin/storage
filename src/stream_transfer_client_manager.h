@@ -26,6 +26,8 @@ public:
     int32_t Find(uint32_t stream_id, StreamTransferClient *transfer_client);
     int32_t Insert(uint32_t stream_id, StreamTransferClient *transfer_client);
     int32_t Erase(uint32_t stream_id);
+
+    int32_t RecycleOneRecordFile(RecordFile *record_file);
 };
 
 #endif

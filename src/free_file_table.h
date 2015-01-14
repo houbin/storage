@@ -31,6 +31,9 @@ public:
 
     int32_t Put(RecordFile *record_file);
     int32_t Get(RecrodFile **record_file);
+
+    int32_t Recycle();
+    int32_t Shutdown();
 };
 
 }

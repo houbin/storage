@@ -84,9 +84,6 @@ int main(int argc, char *argv[])
         assert(ret != 0);
     }
 
-    IndexFileManager index_file_manager(logger);
-    index_file_manager.Init();
-
     /* discovery */
 #define DISCOVERY_RECV_PORT 9001
 #define DISCOVERY_SEND_PORT 9002
@@ -105,6 +102,11 @@ int main(int argc, char *argv[])
     assert(transfer_client_manager != NULL);
     transfer_client_manager->Init();
 
+    FreeFileTable free_file_table(transfer_client_manager);
+
+    IndexFileManager index_file_manager(logger, transfer_client_manager, free_file_table);
+    index_file_manager.Init();
+
     /* stream op handle */
     stream_op_handler = new StreamOpHandler(logger, transfer_client_manager);
 
@@ -117,7 +119,6 @@ int main(int argc, char *argv[])
     in_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     VmscService vmsc_service(logger, in_addr, out_addr, &stream_op_handler);
     
-
     /* bind */
     discovery.Bind();
     vmsc_service.Bind();
@@ -133,6 +134,7 @@ int main(int argc, char *argv[])
     stream_op_handler->Join();
 
     /* shutdown */
+    free_file_table.Shutdown();
     transfer_client_manager->Shutdown();
     index_file_manager.Shutdown();
 

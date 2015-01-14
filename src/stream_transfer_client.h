@@ -11,6 +11,7 @@ class StreamTransferClient
 {
 private:
     Logger *logger;
+    Mutex *mutex_;
     StreamInfo stream_info_;
 
     map<UTime, RecordFile*> record_file_map_;

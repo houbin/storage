@@ -16,15 +16,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     Log(logger_, "put record file, ptr is %p", record_file);
 
     Mutex::Locker lock(mutex_);
-
-    if(stop_)
-    {
-        delete record_file;
-        return 0;
-    }
-
     free_file_queue_.push_back(record_file);
-    cond.Signal();
 
     return 0;
 }
@@ -50,6 +42,15 @@ int32_t FreeFileTable::Get(RecordFile **record_file)
     free_file_queue_.pop_front();
 
     return 0;
+}
+
+int32_t FreeFileTable::Shutdown()
+{
+    Log(logger_, "shutdown");
+
+    Mutex::Locker lock(mutex_);
+    stop_ = true;
+    
 }
 
 }

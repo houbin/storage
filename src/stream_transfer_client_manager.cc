@@ -59,7 +59,6 @@ int32_t StreamTransferClientManager::Shutdown()
 int32_t StreamTransferClientManager::Find(uint64_t stream_id, StreamTransferClient **transfer_client)
 {
     Mutex::Locker lock(mutex_);
-
     Log(logger_, "find stream %d", stream_id);
 
     map<uint64_t, StreamTransferClient*>::iterator iter = transfer_clients_.find(stream_id);

@@ -30,7 +30,7 @@ private:
     Cond cond_;
     
     deque<StreamOp> stream_op_queue_;
-    map<StreamInfo, uint64_t> stream_infos_;
+    map<StreamInfo, uint32_t> stream_infos_;
     StreamTransferClientManager *client_manager_;
 
     StreamIdManager stream_id_manager_;

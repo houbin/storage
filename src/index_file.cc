@@ -3,6 +3,8 @@
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "index_file.h"
 #include "record_file.h"
 #include "../util/coding.h"
@@ -11,10 +13,10 @@ namespace storage
 {
 
 IndexFile::IndexFile(Logger *logger, string base_name)
-: logger_(logger), base_name_(base_name)
+: logger_(logger), mutex_("IndexFile::locker"), base_name_(base_name), stop_(false)
 {
     int ret = 0;
-    string file_path;
+    string file_count_path;
     FILE *file_count_handle = NULL;
 
     file_path = base_name + "index";
@@ -34,6 +36,11 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     file_counts_ = atoi(file_count_str);
 
     Log(logger, "%s file count %d", base_name_.c_str(), file_counts_);
+}
+
+char *IndexFile::GetBaseName()
+{
+    return base_name_.c_str();
 }
 
 int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
@@ -67,7 +74,7 @@ int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
     return 0;
 }
 
-int32_t IndexFile::AnalyzeAll(StreamTransferClientManager *transfer_client_manager, FreeFileTable *free_file_table)
+int32_t IndexFile::AnalyzeAllEntry(StreamTransferClientManager *transfer_client_manager, FreeFileTable *free_file_table)
 {
     size_t ret;
     uint32_t record_file_section_size = 0;
@@ -118,13 +125,102 @@ int32_t IndexFile::AnalyzeAll(StreamTransferClientManager *transfer_client_manag
         assert(ret == 0);
     }
 
+    /* 启动写线程 */
+    write_thread_.Create();
+
     Log(logger_, "analyze all entry end");
     return 0;
 }
 
-IndexFile::~IndexFile()
+int32_t IndexFile::EnqueueOp(struct IndexFileOp *index_file_op)
 {
-    fclose(index_file_);
+    assert(index_file_op != NULL);
+    Log(logger_, "enqueue op %p", index_file_op);
+
+    Mutex::Locker lock(mutex_);
+    if (stop_)
+    {
+        Log(logger_, "should not go here");
+        delete index_file_op;
+        return 0;
+    }
+
+    op_queue_.push_back(index_file_op);
+    cond_.Signal();
+
+    return 0;
+}
+
+int32_t IndexFile::DequeueOp(struct IndexFileOp **index_file_op)
+{
+    assert(index_file_op != NULL);
+    Log(logger_, "dequeue op");
+
+    deque<struct IndexFileOp*>::iterator iter = op_queue_.begin();
+    *index_file_op = *iter;
+    op_queue_.erase(iter);
+
+    return 0;
+}
+
+int32_t IndexFile::WriteEntry()
+{
+    int32_t ret;
+
+    Log(logger_, "index file write entry");
+    mutex_.Lock();
+
+    while(true)
+    {
+        while(!op_queue_.empty())
+        {
+            struct IndexFileOp *op;
+            ret = DequeueOp(&op);
+            assert(ret == 0);
+            assert(op->buffer);
+
+            mutex_.Unlock();
+
+            ret = lseek(fd_, op->offset, SEEK_SET);
+            assert(ret == op->offset);
+            ret = write(fd, op->buffer, op->length);
+            assert(ret == op->length);
+
+            mutex_.Lock();
+        }
+
+        if (stop_)
+        {
+            break;
+        }
+        
+        cond_.Wait(mutex_);
+    }
+
+    mutex_.Unlock();
+    Log(logger_, "index file write entry end");
+
+    return 0;
+}
+
+int32_t IndexFile::Shutdown()
+{
+    Log(logger_, "shutdown");
+
+    mutex_.Lock();
+    stop_ = true;
+    cond_.Signal();
+    mutex_.Unlock();
+
+    write_thread_.Join();
+
+    if (index_file_ != NULL);
+    {
+        fclose(index_file_);
+        index_file_ = NULL;
+    }
+
+    return 0;
 }
 
 IndexFileManager::IndexFileManager(Logger *logger, StreamTransferClientManager *client_transfer_manager, FreeFileTable *free_file_table)
@@ -190,8 +286,7 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
     for(iter; iter != index_file_map_.end(); iter++)
     {
         IndexFile *index_file = iter->second;
-
-        index_file->Analyze(transfer_client_manager_, free_file_table_);
+        index_file->AnalyzeAllEntry(transfer_client_manager_, free_file_table_);
     }
 
     Log(logger_, "analyze all index file end");
@@ -202,10 +297,6 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
 int32_t IndexFileManager::Find(string base_name, IndexFile *index_file)
 {
     Log(logger_, "find index file %s", base_name.c_str());
-    if (shutdown_)
-    {
-        return -1;
-    }
 
     map<string, IndexFile*>::iterator iter = index_file_map_.find(base_name);
     if (iter == index_file_map_.end())
@@ -219,9 +310,9 @@ int32_t IndexFileManager::Find(string base_name, IndexFile *index_file)
     return 0;
 }
 
+/* 调用shutdown时，保证之后没有人调用Find函数刷新索引文件 */
 int32_t IndexFileManager::Shutdown()
 {
-    shutdown_ = true;
     Log(logger_, "shutdown");
     
     map<string, IndexFile*>::iterator iter = index_file_map_.begin();
@@ -229,10 +320,15 @@ int32_t IndexFileManager::Shutdown()
     {
         IndexFile *index_file;
         index_file = iter->second;
+
+        Log(logger_, "shutdown index file %p, base_name is %s", index_file, index_file.GetBaseName());
         
         index_file_map_.erase(iter);
+        index_file->Shutdown();
         delete index_file;
     }
+
+    Log(logger_, "shutdown end");
 
     return 0;
 }
