@@ -63,17 +63,15 @@ void YST_ClientNormalDataCallBack(int nLocalChannel, unsigned char uchType, unsi
     uint32_t stream_id = (uint64_t)nLocalChannel;
 
     StreamTransferClient *transfer_client = NULL;
-    ret = transfer_client_manager.find(stream_id, &transfer_client);
+    ret = transfer_client_manager->find(stream_id, &transfer_client);
     if (ret < 0)
     {
+        Log(logger_, "not find stream id %d, free data", stream_id);
         free(pBuffer);
         return;
     }
 
-    transfer_client->
-
-
-    
+    transfer_client->Store(uchType, pBuffer, nSize, nWidth, nHeight);
 
     return;
 }

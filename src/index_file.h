@@ -21,6 +21,8 @@ struct RecordFileInfo
     bool used;
     uint16_t record_fragment_counts;
     UTime start_time;
+    uint32_t start_frame_offset_;
+
     UTime end_time;
     UTime i_frame_start_time;
     UTime i_frame_end_time;
@@ -46,6 +48,10 @@ struct IndexFileOp
     uint32_t offset;
     uint32_t length;
     char *buffer;
+
+    IndexFileOp(string name, uint32_t o, uint32_t l, char *buf)
+    : index_file_base_name(name), offset(o), length(l), buffer(buf)
+    {}
 };
 
 class IndexFile
@@ -86,6 +92,8 @@ public:
     int32_t DequeueOp(struct IndexFileOp **index_file_op);
     int32_t WriteEntry();
 
+    int32_t DoOneOp(struct IndexFileOp *op);
+    int32_t DoAllOps();
     int32_t Shutdown();
 };
 
@@ -93,11 +101,14 @@ class IndexFileManager
 {
 private:
     Logger *logger_;
+    Mutex mutex_;
 
     map<string, IndexFile*> index_file_map_;
 
     StreamTransferClientManager *transfer_client_manager_;
     FreeFileTable *free_file_table_;
+
+    bool stop_;
 
 public:
     IndexFileManager(Logger *logger, StreamTransferClientManager *transfer_client_manager, FreeFileTable *free_file_table);
@@ -106,7 +117,7 @@ public:
     int32_t AnalyzeAllIndexFile();
 
     int32_t Init();
-    int32_t Find(string base_name, IndexFile *index_file);
+    int32_t Find(string base_name, IndexFile **index_file);
     int32_t Shutdown();
 };
 

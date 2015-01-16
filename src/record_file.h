@@ -20,6 +20,7 @@ public:
 
     uint16_t record_fragment_count_;
     UTime start_time_;
+    uint32_t start_frame_offset_;
     UTime end_time_; 
     UTime i_frame_start_time_;
     UTime i_frame_end_time_;
@@ -28,8 +29,9 @@ public:
 
     RecordFile(string base_name, uint32_t number);
 
-    /* 将该录像文件对应的索引段清零 */
-    int32_t ClearIndex();
+    /* 1. 将该录像文件对应的索引文件中的描述段清零 */
+    /* 2. 清零内存中的数据*/
+    int32_t Clear();
 };
 
 

@@ -19,17 +19,23 @@ void SafeTimer::Init()
 void SafeTimer::Shutdown()
 {
     Log(logger_, "shutdown");
+
+    mutex_.Lock();
     if (thread_ != NULL)
     {
-        CancelAllEvents();
-        stopping_ = true;
+        /* 先关掉定时器处理线程 */
+        stop_ = true;
         cond_.Signal();
-        lock_.Unlock();
+        mutex_.Unlock();
         thread_->Join();
-        lock_.Lock();
         delete thread_;
         thread_ = NULL;
+
+        /* 然后处理定时器队列中的event */
+        DoAllEvents();
     }
+
+    return;
 }
 
 typedef std::multimap<UTime, Context*> scheduled_map_t;
@@ -39,8 +45,8 @@ void SafeTimer::TimerThread()
 {
     Log(logger_, "TimerThread starting");
 
-    lock_.Lock();
-    while (!stopping_)
+    mutex_.Lock();
+    while (!stop_)
     {
         UTime t = GetClockNow();
 
@@ -52,30 +58,40 @@ void SafeTimer::TimerThread()
                 break;
 
             Context *callback = iter->second;
-
             events_.erase(callback);
             schedule_.erase(iter);
 
+            mutex_.Unlock();
+
             Log(logger_, "TimerThread executing %p", callback);
             callback->Complete(0);
+
+            mutex_.Lock();
+        }
+
+        if (stop_)
+        {
+            break;
         }
 
         Log(logger_, "TimerThread going to sleep");
 
         if(schedule_.empty())
         {
-            cond_.Wait(lock_);
+            cond_.Wait(mutex_);
         }
         else
         {
-            cond_.WaitUtil(lock_, schedule_.begin()->first);
+            cond_.WaitUtil(mutex_, schedule_.begin()->first);
         }
 
         Log(logger_, "TimerThread awake");
     }
 
     Log(logger_, "TimerThread exiting");
-    lock_.Unlock();
+    mutex_.Unlock();
+
+    return;
 }
 
 void SafeTimer::AddEventAfter(double seconds, Context *callback)
@@ -93,6 +109,13 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
     Log(logger_, "AddEventAfter %d.%d -> %p", t.tv_sec, t.tv_nsec, callback);
 
+    Mutex::Locker lock(mutex_);
+    if (stop_)
+    {
+        delete callback;
+        return;
+    }
+
     scheduled_map_t::value_type s_val(t, callback);
     scheduled_map_t::iterator i = schedule_.insert(s_val);
 
@@ -109,8 +132,34 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
     return;
 }
 
+void SafeTimer::DoAllEvents()
+{
+    Log(logger_, "do all events");
+
+    mutex_.Lock();
+    while (!schedule_.empty())
+    {
+        scheduled_map_t::iterator iter = schedule_.begin();
+        Context *ct = iter->second;
+        assert(ct != NULL);
+        events_.erase(ct);
+        schedule_.erase(iter);
+
+        mutex_.Unlock();
+        ct->Complete(0);
+        mutex_.Lock();
+    }
+
+    mutex_.Unlock();
+
+    return;
+}
+
 bool SafeTimer::CancelEvent(Context *callback)
 {
+    Log(logger_, "cancle event %p", callback);
+
+    Mutex::Locker lock(mutex_);
     map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
     if (p == events_.end())
     {
@@ -134,6 +183,9 @@ bool SafeTimer::CancelEvent(Context *callback)
 
 bool SafeTimer::CancelAllEvents()
 {
+    Log(logger_, "cancle all events");
+
+    Mutex::Locker lock(mutex_);
     while(!events_.empty())
     {
         map<Context*, multimap<UTime, Context*>::iterator>::iterator p = events_.begin();

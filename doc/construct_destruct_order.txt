@@ -1,0 +1,23 @@
+1. 初始化顺序
+ConfigOption
+Logger
+Discovery
+StreamTransferClientManager
+FreeFileTable
+IndexFileManager
+
+StreamOpHandler
+VmscClient
+
+2. 停止顺序
+Discovery
+VmscClient
+StreamOpHandler
+
+//定时器是在manager中，所以需要先关掉定时器，然后再关闭FreeFileTable
+TransferClientManager 
+FreeFileTable
+IndexFileManager
+
+Logger
+ConfigOption

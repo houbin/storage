@@ -19,7 +19,6 @@ using namespace util;
 namespace storage {
 
 #define BUFFER_LENGTH (1 * 1024 * 1024)
-#define MAX_STREAM_NUMBERS 512
 
 class StreamOpHandler: public Thread
 {
@@ -30,11 +29,8 @@ private:
     Cond cond_;
     
     deque<StreamOp> stream_op_queue_;
-    map<StreamInfo, uint32_t> stream_infos_;
     StreamTransferClientManager *client_manager_;
 
-    StreamIdManager stream_id_manager_;
-    
     bool stop_;
 
 public:

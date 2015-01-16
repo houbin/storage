@@ -14,8 +14,7 @@ namespace storage
 {
 
 StreamOpHandler::StreamManager(Logger *logger, StreamTransferClientManager *client_manager)
-: logger_(logger), mutex_("StreamOpHandler::Lock"),
-  stream_id_manager_(logger_, MAX_STREAM_NUMBERS), client_manager_(client_manager), stop_(false)
+: logger_(logger), mutex_("StreamOpHandler::Lock"), client_manager_(client_manager), stop_(false)
 {
 
 }
@@ -59,68 +58,22 @@ int32_t StreamOpHandler::HandleStreamAdd(StreamInfo *stream_info)
     int32_t ret;
     uint64_t stream_id = 0;
 
-    /* adjust stream_infos_ */
-    {
-        map<StreamInfo, uint64_t>::iterator iter = stream_infos_.find(stream_info);
-        if (iter != stream_infos_.end())
-        {
-            stream_id = iter->second;
-        }
-        else
-        {
-            ret = stream_id_manager_.ApplyForFreeId(&stream_id);
-            assert(ret == 0);
-            
-            // TODO store <stream_info, stream_id> to db
-            
-            stream_infos_.insert(make_pair(*stream_info, stream_id));
-        }
-    }
+    assert(stream_info != NULL);
+    Log(logger_, "handle stream add, stream_info is %p", stream_info);
 
-    Log(logger_, "stream id is %d", stream_id);
-
-    /* adjust stream transfer client manager */
-    {
-        StreamTransferClient *transfer_client = new StreamTransferClient();
-        assert(stream_transfer_client != NULL);
-        StreamTransferClientManager.Insert(stream_id, transfer_client);
-    }
-
-    Log(logger_, "handle stream add end");
+    client_manager_.Insert(stream_info);
 
     return 0;
 }
 
 int32_t StreamOpHandler::HandleStreamDel(StreamInfo *stream_info)
 {
-    int32_t ret;
-    uint64_t stream_id;
+    assert(stream_info != NULL);
+    Log(logger_, "handle stream del, stream_info is %p", stream_info);
 
-    Log(logger_, "handle stream del");
+    int32_t ret = client_manager_.Remove(stream_info);
+    assert(ret == 0);
 
-    /* adjust stream_infos_ */
-    {
-        map<StreamInfo, uint64_t>::iterator iter = stream_infos_.find(*stream_info);
-        if (iter != stream_infos_.end())
-        {
-            stream_id = iter->second;
-            stream_infos_.erase(iter);
-        }
-        else
-        {
-            Log(logger_, "not find this stream, stream sid is %d", stream_info->sid_);
-            return 0;
-        }
-    }
-
-    Log(logger_, "stream id is %"PRIu64"", stream_id);
-
-    /* adjust stream_transfer_clients_ */
-    {
-        client_manager_.Erase(stream_id);
-    }
-
-    Log(logger_, "handle stream del end");
     return 0;
 }
 
@@ -171,7 +124,6 @@ void *StreamOpHandler::Entry()
                     assert("error stream op" != NULL);
             }
 
-            safe_free(stream_op->stream_info);
             safe_free(stream_op);
             assert(ret == 0);
             mutex_.Lock();
@@ -187,6 +139,8 @@ void *StreamOpHandler::Entry()
 
     mutex_.Unlock();
     
+    Log(logger_, "entry end");
+
     return 0;
 }
 

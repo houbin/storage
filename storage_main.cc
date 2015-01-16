@@ -26,6 +26,7 @@ void Usage(char *arg)
 }
 
 StreamOpHandler *stream_op_handler = NULL;
+IndexFileManager *index_file_manager = NULL;
 StreamTransferClientManager *transfer_client_manager = NULL;
 Logger *logger = NULL;
 
@@ -104,8 +105,8 @@ int main(int argc, char *argv[])
 
     FreeFileTable free_file_table(transfer_client_manager);
 
-    IndexFileManager index_file_manager(logger, transfer_client_manager, free_file_table);
-    index_file_manager.Init();
+    index_file_manager = new IndexFileManager(logger, transfer_client_manager, free_file_table);
+    index_file_manager->Init();
 
     /* stream op handle */
     stream_op_handler = new StreamOpHandler(logger, transfer_client_manager);
@@ -136,7 +137,7 @@ int main(int argc, char *argv[])
     /* shutdown */
     free_file_table.Shutdown();
     transfer_client_manager->Shutdown();
-    index_file_manager.Shutdown();
+    index_file_manager->Shutdown();
 
     delete config_option;
     delete stream_op_handler;
