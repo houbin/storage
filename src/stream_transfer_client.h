@@ -6,6 +6,11 @@
 #include "../util/utime.h"
 #include "stream_info.h"
 #include "record_file.h"
+#include "../include/JVNSDKDef.h"
+#include "../include/JvCDefines.h"
+
+namespace storage
+{
 
 /* client分为三个状态
  * 1. start。当vms client添加录像配置，client进入start状态。
@@ -13,6 +18,8 @@
  * 3. shutdown。当对应stream的录像文件已经被回收完毕，则需要把此stream对应的client删掉.
  *
  * */
+
+const static uint32_t start_code = 1234567890;
 class StreamTransferClient
 {
 private:
@@ -25,6 +32,9 @@ private:
 
     unsigned char *write_buffer_;
     uint32_t write_offset_;
+
+    unsigned char *header_; // 用于存放到i帧的头部
+    int header_size_;
 
 public:
     StreamTransferClient(Logger *logger, StreamInfo &stream_info);
@@ -42,5 +52,7 @@ public:
 
     int32_t Store(unsigned char type, unsigned char *buffer, int size, int width, int height);
 };
+
+}
 
 #endif

@@ -4,13 +4,15 @@
 #include "../include/JvClient.h"
 #include "yst_userdef.h"
 #include "stream_info.h"
+#include "../include/JVNSDKDef.h"
+#include "../include/JvCDefines.h"
 
 const static int kWriteCacheSize = 1024 * 1024;
 namespace storage
 {
 
 StreamTransferClient::StreamTransferClient(Logger *logger)
-: logger_(logger), mutex_(StreamTransferClient::Locker), stop_(false), write_offset_(0)
+: logger_(logger), mutex_(StreamTransferClient::Locker), stop_(false), write_offset_(0), header(NULL), size(0)
 {
     write_buffer_= (unsigned char *)malloc(kWriteCacheSize);
     assert(write_buffer_ != NULL);
@@ -132,12 +134,50 @@ int32_t RecycleExpiredRecordFiles(list<RecordFile*> &expired_file_list, UTime ex
     return 0;
 }
 
+/* 自定义帧格式
+ * 1. 帧描述格式。  start_code + UTime + 帧类型 + 长度 + 帧描述信息
+ * 2. i帧格式。     (帧描述格式) + (start_code + UTime + 帧类型 + 帧数据长度 + 帧数据)
+ * 2. B帧格式。     start_code + UTime + 帧类型 + 帧数据长度 + 帧数据
+ * */
 int32_t Store(unsigned char type, unsigned char *buffer, int size, int width, int height)
 {
+    unsigned char *data = NULL;
     Log(logger_, "store, type %d, buffer %p, size %d, width %d, height %d", 
         type, buffer, width, height);
 
+    data = (unsigned char *)malloc(size);
+    assert(data != NULL);
+    memcpy(data, buffer, size);
 
+    Mutex::Locker lock(mutex_);
+    switch (type)
+    {
+        case JVN_DATA_O:
+            Log(logger_, "type is JVN_DATA_O");
+
+            free(header_);
+            header = NULL;
+            size = 0;
+
+            header_ = data;
+            header_size_ = size;
+            break;
+
+        case JVN_DATA_I:
+            Log(logger_, "type is JVN_DATA_I");
+
+            uint32_t header_data_size = sizeof(start_code) + sizeof(UTime) + 1 + sizeof(int) + header_size_;
+            uint32_t frame_data_size = sizeof(start_code) + sizeof(UTime) + 1 + sizeof(int) + size;
+
+            Log(logger_, "header data size is %d, frame data size is %d", header_data_size, frame_data_size);
+
+
+
+            
+
+
+    }
+    
 }
 
 }
