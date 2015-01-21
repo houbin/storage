@@ -17,11 +17,8 @@ private:
     Logger *logger_;
     Mutex mutex_;
 
-    map<uint32_t, StreamTransferClient*> transfer_clients_;
-    map<StreamInfo, uint32_t> stream_id_map_;
-
-    uint32_t next_apply_stream_id_;
-    uint32_t active_client_counts_;
+    /* stream info -> client */
+    map<string, StreamTransferClient*> transfer_clients_;
 
     bool shutdown_;
 
@@ -33,11 +30,13 @@ public:
     int32_t Init();
     int32_t Shutdown();
     
-    int32_t Insert(StreamInfo *stream_info);
-    int32_t Erase(StreamInfo *stream_info);
+    int32_t Insert(string key_info);
+    int32_t Erase(string key_info);
 
-    int32_t Find(uint32_t stream_id, StreamTransferClient **transfer_client);
+    int32_t Find(string key_info, StreamTransferClient **transfer_client);
     int32_t RecycleRecordFiles(list<RecordFile*> &free_file_list, bool force_recycle);
+
+    int32_t Open(string key_info, int flags);
 };
 
 #endif

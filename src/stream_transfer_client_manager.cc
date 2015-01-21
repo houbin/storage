@@ -17,19 +17,6 @@ int32_t StreamTransferClientManager::Init()
 {
     Log(logger_, "init");
 
-    ret = JVC_InitSDK(-1);
-    assert(ret == 0);
-
-    JVC_RegisterCallBack(YST_ClientConnectCallBack,
-                         YST_ClientNormalDataCallBack,
-                         YST_ClientCheckResultCallBack,
-                         YST_ClientChatDataCallBack,
-                         YST_ClientTextDataCallBack,
-                         YST_ClientDownloadCallBack,
-                         YST_ClientPlayDataCallBack
-                         );
-
-    JVC_EnableLog(TRUE);
     timer.Init();
     return 0;
 }
@@ -43,177 +30,64 @@ int32_t StreamTransferClientManager::Shutdown()
     
     while(!transfer_clients_.empty())
     {
-        map<uint32_t, StreamTransferClient*>::iterator iter = transfer_clients_.begin();
+        map<string, StreamTransferClient*>::iterator iter = transfer_clients_.begin();
         StreamTransferClient *transfer_client = iter->second;
-        assert(transfer_client == NULL);
-        if (!transfer_client->IsStop())
-        {
-            transfer_client->Stop();
-        }
+        assert(transfer_client != NULL);
         transfer_client->Shutdown();
         transfer_clients_.erase(iter);
         delete transfer_client;
     }
 
-    JVC_ReleaseSDK();
     timer.Shutdown();
 
     return 0;
 }
 
-int32_t StreamTransferClientManager::Insert(StreamInfo *stream_info)
+int32_t StreamTransferClientManager::Find(string key_info, StreamTransferClient **transfer_client)
 {
-    uint32_t stream_id;
-
-    assert(stream_info != NULL);
-    Log(logger_, "insert stream info, stream info is %p", stream_info);
-
-    StreamInfo temp = *stream_info;
-    delete stream_info;
-    stream_info = NULL;
-
-    Mutex::Locker lock(mutex_);
-    if (shutdown_)
-    {
-        return 0;
-    }
-
-    if (active_client_counts_ >= MAX_RECORD_STREAM_COUNTS)
-    {
-        return -ERR_REACH_MAX_STREAM;
-    }
-
-    {
-        map<StreamInfo, uint32_t>::iterator iter = stream_id_map_.find(temp);
-        if (iter != stream_id_map_.end())
-        {
-            Log(logger_, "find stream info, stream_id is %d", iter->second);
-            stream_id = iter->second;
-        }
-        else
-        {
-            /* find a unused stream id */
-            map<uint32_t, StreamTransferClient*>::iterator iter = transfer_clients_.find(next_apply_stream_id_);
-            while (iter != transfer_clients_.end())
-            {
-                next_apply_stream_id_++;
-                iter = transfer_clients_.find(next_apply_stream_id_);
-            }
-
-            stream_id = next_apply_stream_id_++;
-            stream_id_map_.insert(make_pair(temp, stream_id));
-            
-            // TODO 存放 stream_info -> stream id到db中，状态设置为active
-            Log(logger_, "apply stream id %d", stream_id);
-        }
-    }
-    
-    {
-        map<uint32_t, StreamTransferClient*>::iterator iter = transfer_clients_.find(stream_id);
-        if (iter != transfer_clients_.end())
-        {
-            Log(logger_, "find stream id %d in transfer clients", stream_id);
-            StreamTransferClient *transfer_client = iter->second;
-            assert(transfer_client != NULL);
-            if (transfer_client->IsStop())
-            {
-                transfer_client->Start();
-                active_client_counts_++;
-            }
-        }
-        else
-        {
-            Log(logger, "not find stream id %d in transfer clients", stream_id);
-            StreamTransferClient *transfer_client = new StreamTransferClient(logger_, temp);
-            assert(transfer_client != NULL);
-            transfer_clients_.insert(make_pair(stream_id, transfer_client));
-            transfer_client->Start();
-            active_client_counts_++;
-        }
-    }
-
-    {
-        // TODO store config to db
-    }
-
-    Log(logger_, "insert stream info, stream info is %p, stream id is %d", stream_info, stream_id);
-
-    return 0;
-}
-
-int32_t StreamTransferClientManager::Remove(StreamInfo *stream_info)
-{
-    StreamTransferClient *transfer_client = NULL;
-    uint32_t stream_id;
-
-    assert(stream_info != NULL);
-    Log(logger_, "remove stream info %p", stream_info);
-
-    StreamInfo temp = *stream_info;
-    delete stream_info;
-    stream_info = NULL;
-
-    Mutex::Locker lock(mutex_);
-    if (shutdown_)
-    {
-        return 0;
-    }
-
-    {
-        map<StreamInfo, uint32_t>::iterator iter = stream_id_map_.find(temp);
-        if (iter != stream_id_map_.end())
-        {
-            // 设置 stream info -> stream id 在db中配置为inactive
-            stream_id = iter->second; 
-        }
-        else
-        {
-            return 0;
-        }
-    }
-
-    {
-        map<uint32_t, StreamTransferClient*>::iterator iter = transfer_clients_.find(stream_id);
-        if (iter != transfer_clients_.end())
-        {
-            Log(logger_, "find stream info %p, stream id %d, stop it", stream_info, stream_id);
-            transfer_client = iter->second;
-            transfer_client->Stop();
-            active_client_counts_--;
-        }
-        else
-        {
-            Log(logger_, "find stream info %p, stream id %d", stream_info, stream_id);
-        }
-    }
-
-    Log(logger_, "erase stream %d end", stream_id);
-
-    return 0;
-}
-
-int32_t StreamTransferClientManager::Find(uint64_t stream_id, StreamTransferClient **transfer_client)
-{
-    Log(logger_, "find stream %d", stream_id);
+    Log(logger_, "find stream info %s", key_info.c_str());
 
     Mutex::Locker lock(mutex_);
 
     if(shutdown_)
     {
         Log(logger_, "should't come here");
-        return 0;
+        return -ERR_SHUTDOWN;
     }
 
-    map<uint64_t, StreamTransferClient*>::iterator iter = transfer_clients_.find(stream_id);
+    map<string, StreamTransferClient*>::iterator iter = transfer_clients_.find(key_info);
     if (iter == transfer_clients_.end())
     {
-        Log(logger_, "can't find stream %d", stream_id);
-        return -1;
+        Log(logger_, "can't find stream %s", key_info.c_str());
+        return -ERR_RECODE_NOT_FOUND;
     }
 
     *transfer_client = iter->second;
-    Log(logger_, "find stream %d end", stream_id);
+    Log(logger_, "find stream %s end", key_info.c_str());
 
+    return 0;
+}
+
+int32_t StreamTransferClientManager::Erase(string key_info)
+{
+    StreamTransferClient *client = NULL;
+    Log(logger_, "Erase stream, stream info is %p", key_info);
+
+    map<string, StreamTransferClient*>::iterator iter = transfer_clients_.find(key_info);
+    if (iter != transfer_clients_.end())
+    {
+        Log(logger_, "find stream info %p, stream id %d, erase it", stream_info, stream_id);
+        client = iter->second;
+        client->Stop();
+        delete client;
+
+        transfer_clients_.erase(iter);
+    }
+    else
+    {
+        Log(logger_, "not find stream , and stream info is %p", key_info.c_str());
+    }
+    
     return 0;
 }
 
@@ -223,7 +97,7 @@ int32_t RecycleRecordFiles(list<RecordFile*> &free_file_list, bool force_recycle
     int32_t ret;
     Log(logger_, "recycle record file");
 
-    Mutex::Locker lock(mutex_);
+    mutex_.Lock();
 
     UTime now = GetClockNow();
     UTime hold_time(10 * 24 * 3600, 0);
@@ -241,8 +115,6 @@ int32_t RecycleRecordFiles(list<RecordFile*> &free_file_list, bool force_recycle
 
         if (transfer_client->ShouldShutdown())
         {
-            //TODO 删除db中stream info -> stream id的配置
-            //
             map<uint32_t, StreamTransferClient*>::iterator to_erase = iter;
             iter++;
             transfer_clients_.erase(to_erase);
@@ -262,6 +134,34 @@ int32_t RecycleRecordFiles(list<RecordFile*> &free_file_list, bool force_recycle
     }
 
     // TODO: 带有强制回收标志，需要强制回收视频流数个文件
+
+    return 0;
+}
+
+int32_t StreamTransferClientManager::Open(string key_info, int flags)
+{
+    Log(logger_, "open, key info is %s, flags is %d", key_info.c_str(), flags);
+
+    Mutex::Locker lock(mutex_);
+
+    map<string, StreamTransferClient*>::iterator iter = transfer_clients_.find(key_info);
+    if (iter == transfer_clients_.end())
+    {
+        StreamTransferClient *transfer_client = new StreamTransferClient(logger_, temp);
+        assert(transfer_client != NULL);
+
+        pair<map<string, StreamTransferClient*>::iterator, bool> ret;
+        ret = transfer_clients_.insert(make_pair(key_info, transfer_client));
+        assert(ret->second == false);
+        transfer_client->Start();
+
+        iter = ret->first;
+    }
+
+    if (flags == 0)
+    {
+        /* TODO */
+    }
 
     return 0;
 }

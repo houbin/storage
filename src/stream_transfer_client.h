@@ -20,6 +20,15 @@ namespace storage
  * */
 
 const static uint32_t start_code = 1234567890;
+
+typedef struct WRITE_OP
+{
+    UTime stamp;        // 帧时间
+    char type;          // 帧类型
+    uint32_t size;      // 帧数据长度
+    char *buffer;       // 帧数据
+}WriteOp;
+
 class StreamTransferClient
 {
 private:
@@ -30,8 +39,16 @@ private:
     map<UTime, RecordFile*> record_file_map_;
     bool stop_;
 
-    unsigned char *write_buffer_;
-    uint32_t write_offset_;
+    Mutex write_mutex_;
+    Cond write_cond_;
+    deque<WriteOp> write_queue_;
+
+    class Writer : public Thread
+    {
+        StreamTransferClient *parent;
+
+
+    };
 
     unsigned char *header_; // 用于存放到i帧的头部
     int header_size_;

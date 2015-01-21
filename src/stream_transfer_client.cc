@@ -171,6 +171,13 @@ int32_t Store(unsigned char type, unsigned char *buffer, int size, int width, in
 
             Log(logger_, "header data size is %d, frame data size is %d", header_data_size, frame_data_size);
 
+            /* 存储header数据 */
+            if (write_offset_ + header_data_size > )
+
+
+
+
+
 
 
             
