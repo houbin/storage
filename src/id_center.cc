@@ -1,16 +1,16 @@
-#include "id_map.h"
+#include "id_center.h"
 #include "config_opts.h"
 
 namespace storage
 {
 
-IdMap::IdManager(Logger *logger)
-: logger_(logger), mutex_("IdMap::lock"), next_id_(0)
+IdCenter::IdManager(Logger *logger)
+: logger_(logger), mutex_("IdCenter::lock"), next_id_(0)
 {
 
 }
 
-int32_t IdMap::ApplyForId(string key_info, int flags, uint32_t *id)
+int32_t IdCenter::ApplyForId(string key_info, int flags, uint32_t *id)
 {
     Log(logger_, "apply for id, stream info is %s, size is %d", stream_info, size);
     assert(flags == 0 || flags == 1);
@@ -47,7 +47,7 @@ int32_t IdMap::ApplyForId(string key_info, int flags, uint32_t *id)
     return 0;
 }
 
-int32_t IdMap::ReleaseId(uint32_t id)
+int32_t IdCenter::ReleaseId(uint32_t id)
 {
     Log(logger_, "release id, id is %d")
 
@@ -74,7 +74,7 @@ int32_t IdMap::ReleaseId(uint32_t id)
     return 0;
 }
 
-int32_t IdMap::GetStreamInfoFromId(uint32_t id, string &key_info)
+int32_t IdCenter::GetStreamInfoFromId(uint32_t id, string &key_info)
 {
     Log(logger_, "get stream info from id %d", id);
 

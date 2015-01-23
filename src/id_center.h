@@ -8,7 +8,7 @@
 namespace storage
 {
 
-class IdMap
+class IdCenter
 {
 private:
     Logger *logger_;
@@ -20,7 +20,7 @@ private:
     map<string, uint32_t> write_key_info_;
 
 public:
-    IdMap(Logger *logger);
+    IdCenter(Logger *logger);
 
     int32_t ApplyForId(string key_info, int flags, uint32_t *id);
     int32_t ReleaseId(uint32_t id);
