@@ -10,7 +10,6 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <assert.h>
-#include "errcode.h"
 
 namespace util {
 

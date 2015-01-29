@@ -22,5 +22,9 @@
 #define ERR_SHUTDOWN                2012
 
 #define ERR_ITEM_NOT_FOUND          3000
+#define ERR_REACH_WRITE_THREHOLD    3001
+#define ERR_REACH_READ_THREHOLD     3002
+#define ERR_RECORD_WRITE_OFFSET_ZERO 3003
+
 
 #endif

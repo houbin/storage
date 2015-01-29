@@ -1,24 +1,21 @@
 #include <assert.h>
 #include "../util/logger.h"
 #include "../include/storage_api.h"
-#include "stream_transfer_client_manager.h"
 #include "config_opts.h"
 #include "free_file_table.h"
 #include "index_file.h"
 #include "storage.h"
-#include "../util/errcode.h"
+#include "store_client_center.h"
 
 using namespace util;
 using namespace storage;
 using namespace std;
 
 Logger *logger = NULL;
-IdMap *id_map = NULL;
-StreamTransferClientManager *transfer_client_manager = NULL;
+IdCenter *id_center = NULL;
+StoreClientCenter *store_client_center = NULL;
 FreeFileTable *free_file_table = NULL;
 IndexFileManager *index_file_manager = NULL;
-
-uint32_t next_alloc_stream_id = 0;
 
 extern "C"
 {
@@ -30,17 +27,16 @@ void storage_init()
     ret = NewLogger(log_dir, &logger);
     assert(ret != 0);
 
-    id_map = new IdMap(logger);
-    assert(id_map != NULL);
+    id_center = new IdCenter(logger);
+    assert(id_center != NULL);
 
-    transfer_client_manager = new StreamTransferClientManager(logger);
-    assert(transfer_client_manager != NULL);
-    transfer_client_manager->Init();
+    store_client_center = new StoreClientCenter(logger);
+    assert(store_client_center != NULL);
 
-    free_file_table = new FreeFileTable(transfer_client_manager);
+    free_file_table = new FreeFileTable();
     assert(free_file_table != NULL);
 
-    index_file_manager = new IndexFileManager(logger, transfer_client_manager, free_file_table);
+    index_file_manager = new IndexFileManager(logger);
     assert(index_file_manager != NULL);
 
     return;
@@ -54,16 +50,6 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     int32_t ret;
     string key_info(stream_info);
 
-    if (flags == 0)
-    {
-        ret = transfer_client_manager->Find(key_info);
-        if (ret != 0)
-        {
-            /* 读视频数据时，没有找到视频流，返回失败 */
-            return ret;
-        }
-    }
-
     ret = id_map.ApplyForFreeId(key_info, id);
     if (ret != 0)
     {
@@ -71,7 +57,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     }
 
     /* 准备读或写数据结构 */
-    ret = transfer_client_manager->Open(key_info, flags);
+    ret = store_client_center->OpenStoreClient(flags, id, key_info);
     if (ret != 0)
     {
         return ret;
@@ -80,9 +66,31 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     return 0;
 }
 
-int32_t storage_write(const uint32_t id, FRAGMENT_INFO_T *frame_info)
+int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info)
 {
+    return store_client_center->WriteFrame(id, frame_info);
+}
 
+void storage_close(const uint32_t id);
+{
+    uint32_t ret;
+    int flag;
+    
+    ret = id_center->GetFlag(id, flag);
+    if (ret != 0)
+    {
+        return;
+    }
+
+    ret = id_center->ReleaseId(id);
+    if (ret != 0)
+    {
+        return;
+    }
+
+    store_client_center->CloseStoreClient(id, flag);
+
+    return;
 }
 
 }

@@ -19,7 +19,7 @@ class SafeTimer
 {
 private:
     Logger *logger_;
-    Mutex mutex_;
+    Mutex &mutex_;
     Cond cond_;
     SafeTimerThread *thread_;
 
@@ -29,7 +29,7 @@ private:
     map<Context*, multimap<UTime, Context*>::iterator> events_;
 
 public:
-    SafeTimer(Logger *logger) : logger_(logger), mutex_("SafeTimer::Lock"), thread_(NULL), stop_(false) { }
+    SafeTimer(Logger *logger, Mutex &mutex) : logger_(logger), mutex_(mutex), thread_(NULL), stop_(false) { }
     ~SafeTimer() { assert(thread_ == NULL); }
 
     void Init();
@@ -40,6 +40,7 @@ public:
     void AddEventAfter(double seconds, Context *callback);
     void AddEventAt(UTime when, Context *callback);
 
+    void DoEvent(Context *callback);
     void DoAllEvents();
     bool CancelEvent(Context *callback);
     bool CancelAllEvents();

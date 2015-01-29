@@ -20,10 +20,10 @@ void SafeTimer::Shutdown()
 {
     Log(logger_, "shutdown");
 
-    mutex_.Lock();
     if (thread_ != NULL)
     {
         /* 先关掉定时器处理线程 */
+        mutex_.Lock();
         stop_ = true;
         cond_.Signal();
         mutex_.Unlock();
@@ -32,7 +32,9 @@ void SafeTimer::Shutdown()
         thread_ = NULL;
 
         /* 然后处理定时器队列中的event */
+        mutex_.Lock();
         DoAllEvents();
+        mutex_.Unlock();
     }
 
     return;
@@ -61,12 +63,12 @@ void SafeTimer::TimerThread()
             events_.erase(callback);
             schedule_.erase(iter);
 
-            mutex_.Unlock();
+            //mutex_.Unlock();
 
             Log(logger_, "TimerThread executing %p", callback);
             callback->Complete(0);
 
-            mutex_.Lock();
+            //mutex_.Lock();
         }
 
         if (stop_)
@@ -109,7 +111,6 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
     Log(logger_, "AddEventAfter %d.%d -> %p", t.tv_sec, t.tv_nsec, callback);
 
-    Mutex::Locker lock(mutex_);
     if (stop_)
     {
         delete callback;
@@ -132,11 +133,32 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
     return;
 }
 
+void SafeTimer::DoEvent(Context *callback)
+{
+    Log(logger_, "do event, callback is %p", callback);
+
+    map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
+    if (p == events_.end())
+    {
+        Log(logger_, "CancelEvents %p not found", callback);
+        return false;
+    }
+
+    Log(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
+    Context *ct = p->first;
+
+    events_.erase(p);
+    schedule_.erase(p->second);
+    
+    ct->Complete(-1);
+
+    return;
+}
+
 void SafeTimer::DoAllEvents()
 {
     Log(logger_, "do all events");
 
-    mutex_.Lock();
     while (!schedule_.empty())
     {
         scheduled_map_t::iterator iter = schedule_.begin();
@@ -150,8 +172,6 @@ void SafeTimer::DoAllEvents()
         mutex_.Lock();
     }
 
-    mutex_.Unlock();
-
     return;
 }
 
@@ -159,7 +179,6 @@ bool SafeTimer::CancelEvent(Context *callback)
 {
     Log(logger_, "cancle event %p", callback);
 
-    Mutex::Locker lock(mutex_);
     map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
     if (p == events_.end())
     {
@@ -185,7 +204,6 @@ bool SafeTimer::CancelAllEvents()
 {
     Log(logger_, "cancle all events");
 
-    Mutex::Locker lock(mutex_);
     while(!events_.empty())
     {
         map<Context*, multimap<UTime, Context*>::iterator>::iterator p = events_.begin();

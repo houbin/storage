@@ -20,6 +20,11 @@ public:
         pthread_rwlock_init(&rwlock_, NULL);
     }
 
+    ~RDLocker()
+    {
+        pthread_rwlock_destroy();
+    }
+
     void GetReadLock()
     {
         pthread_rwlock_rdlock();

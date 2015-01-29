@@ -1,10 +1,11 @@
 #include "id_center.h"
+#include "../include/errcode.h"
 #include "config_opts.h"
 
 namespace storage
 {
 
-IdCenter::IdManager(Logger *logger)
+IdCenter::IdCenter(Logger *logger)
 : logger_(logger), mutex_("IdCenter::lock"), next_id_(0)
 {
 
@@ -12,30 +13,48 @@ IdCenter::IdManager(Logger *logger)
 
 int32_t IdCenter::ApplyForId(string key_info, int flags, uint32_t *id)
 {
-    Log(logger_, "apply for id, stream info is %s, size is %d", stream_info, size);
+    Log(logger_, "apply for id, stream info is %s, flags is %d", key_info.c_str(), flags);
     assert(flags == 0 || flags == 1);
 
     Mutex::Locker lock(mutex_);
 
     if (flags == 1)
     {
+        /* write legal judgement */
         map<string, uint32_t>::iterator iter = write_key_info_.find(key_info);
         if (iter != write_key_info_.end())
         {
             Log(logger_, "write operation, key info exist, key info is %s", key_info.c_str());
             return -ERR_DOUBLE_WRITE;
         }
-    }
 
-    map<uint32_t, string>::iterator iter = id_map_.find(next_id_);
-    while(iter != id_map_.end())
+        uint32_t write_counts = write_key_info_.size();
+        if (write_counts >= MAX_STREAM_COUNTS)
+        {
+            return -ERR_REACH_WRITE_THREHOLD;
+        }
+    }
+    else
     {
-        next_id_++;
-        iter = id_map_.find(next_id_);
+        /* read legal judgement */
+        uint32_t read_counts = read_id_map_.size();
+        if (read_counts >= MAX_READ_STREAM_COUNTS)
+        {
+            return -ERR_REACH_READ_THREHOLD;
+        }
     }
 
-    *id = next_id_;
-    next_id_++;
+    /* get id */
+    while(true)
+    {
+        map<uint32_t, string>::iterator iter = id_map_.find(next_id_);
+        *id = next_id_;
+        next_id_ = (next_id_ + 1) % MAX_STREAM_COUNTS;
+        if (iter == id_map_.end())
+        {
+            break;
+        }
+    }
 
     id_map_.insert(make_pair(*id, key_info));
 
@@ -43,13 +62,17 @@ int32_t IdCenter::ApplyForId(string key_info, int flags, uint32_t *id)
     {
         write_key_info_.insert(make_pair(key_info, *id));
     }
+    else
+    {
+        read_id_map_.insert(make_pair(*id, key_info));
+    }
 
     return 0;
 }
 
 int32_t IdCenter::ReleaseId(uint32_t id)
 {
-    Log(logger_, "release id, id is %d")
+    Log(logger_, "release id, id is %d");
 
     Mutex::Locker lock(mutex_);
 
@@ -62,6 +85,12 @@ int32_t IdCenter::ReleaseId(uint32_t id)
         if (key_info_iter != write_key_info_.end())
         {
             write_key_info_.erase(key_info_iter);
+        }
+
+        map<uint32_t, string>::iterator read_iter = read_id_map_.find(id);
+        if (read_iter != read_id_map_.end())
+        {
+            read_id_map_.erase(read_iter);
         }
         
         id_map_.erase(iter);
@@ -90,6 +119,29 @@ int32_t IdCenter::GetStreamInfoFromId(uint32_t id, string &key_info)
     {
         Log(logger_, "not find id %d", id);
         return -ERR_ITEM_NOT_FOUND;
+    }
+
+    return 0;
+}
+
+int32_t IdCenter::GetFlag(uint32_t id, int &flag)
+{
+    Log(logger_, "get flag, id is %d", id);
+
+    map<uint32_t, string>::iterator iter = id_map_.find(id);
+    if (iter == id_map_.end())
+    {
+        return -ERR_ITEM_NOT_FOUND;
+    }
+
+    map<uint32_t, string>::iterator read_iter = read_id_map_.find(id);
+    if (read_iter != read_id_map_.end())
+    {
+        flag = 0;
+    }
+    else
+    {
+        flag = 1;
     }
 
     return 0;

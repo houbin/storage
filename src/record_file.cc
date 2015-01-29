@@ -5,25 +5,28 @@
 #include "record_file.h"
 #include "index_file.h"
 #include "../util/clock.h"
+#include "../util/coding.h"
+
+using namespace util;
 
 namespace storage
 {
 
-RecordFile::RecordFile(string base_name, uint32_t number)
-: base_name_(base_name), number_(number), locked_(false),
-used_(false), record_fragment_count_(0), start_time_(0), end_time_(0), record_offset_(0)
+RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
+: logger_(logger), base_name_(base_name), number_(number), locked_(false),
+state_(kCleared), record_fragment_count_(0), start_time_(0), end_time_(0), record_offset_(0)
 {
 
 }
 
-int32_t RecordFile::Clear()
+int32_t RecordFile::ClearIndex()
 {
     int ret;
     uint32_t offset;
     uint32_t length;
     string index_file;
 
-    Log(logger_, "clear index");
+    Log(logger_, "clear index, base_name is %s, number is %d", base_name_.c_str(), number_);
 
     offset = number_ * sizeof(struct RecordFileInfo);
     length = sizeof(struct RecordFileInfo);
@@ -31,6 +34,7 @@ int32_t RecordFile::Clear()
     memset(record_file_info, 0, sizeof(struct RecordFileInfo));
 
     Struct IndexFileOp *op = new struct IndexFileOp(base_name_, offset, record_file_info);
+    assert
 
     IndexFile *index_file;
     ret = index_file_manager->Find(base_name_, &index_file);
@@ -39,10 +43,17 @@ int32_t RecordFile::Clear()
     ret = index_file->EnqueueOp(op);
     assert(ret == 0);
 
+}
+
+int32_t RecordFile::Clear()
+{
+
+    Log(logger_, "clear index");
+
     /* 清零内存中的数据 */
     this->stream_info_.clear();
     this->locked_ = false;
-    this->used_ = false;
+    this->state_= kCleared;
     this->record_fragment_count_ = 0;
     UTime temp(0, 0);
     this->start_time_ = temp;
@@ -50,6 +61,113 @@ int32_t RecordFile::Clear()
     this->i_frame_start_time_ = temp;
     this->i_frame_end_time_ = temp;
     this->record_offset_ = 0;
+
+    return 0;
+}
+
+int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
+{
+    Log(logger_, "encode record file info index");
+
+    struct RecordFileInfo record_file_info;
+    char *temp = record_file_info_buffer;
+
+    uint32_t length = record_file_info_length - sizeof(record_file_info.length) - sizeof(record_file_info.crc);
+    EncodeFixed32(temp, length);
+    temp += sizeof(record_file_info.length);
+    temp += sizeof(record_file_info.crc);
+
+    char *crc_start = temp;
+
+    memcpy(temp, stream_info_.c_str(), stream_info_.length());
+    temp += sizeof(record_file_info.stream_info);
+
+    *temp = locked_;
+    temp += sizeof(record_file_info.locked);
+
+    *temp = state_;
+    temp += sizeof(record_file_info.state);
+
+    *temp = record_fragment_count_ & 0xff;
+    *(temp+1) = record_fragment_count_ >> 8
+    temp += sizeof(record_file_info.record_fragment_counts);
+
+    EncodeFixed32(temp, start_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, start_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, end_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, end_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, i_frame_start_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, i_frame_start_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, i_frame_end_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, i_frame_end_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, record_offset_);
+    temp += 4;
+
+    uint32_t crc = crc32c::Value(crc_start, length);
+    EncodeFixed32(crc_start - 4, crc);
+
+    return 0;
+}
+
+int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uint32_t record_frag_info_length)
+{
+    Log(logger_, "encode record frag info index");
+
+    struct RecordFragmentInfo record_frag_info;
+    char *temp = record_frag_info_buffer;
+    
+    uint32_t length = record_frag_info_length - sizeof(record_frag_info.length) - sizeof(record_frag_info.crc);
+    temp += sizeof(record_frag_info.length);
+    temp += sizeof(record_frag_info.crc);
+
+    char *crc_start = temp;
+
+    EncodeFixed32(temp, start_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, start_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, end_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, end_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, i_frame_start_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, i_frame_start_time_.tv_nsec);
+    temp += 4;
+
+    EncodeFixed32(temp, i_frame_end_time_.tv_sec);
+    temp += 4;
+    EncodeFixed32(temp, i_frame_end_time_.tv_nsec);
+    temp += 4;
+
+    uint32_t crc = crc32c::Value(crc_start, length);
+    EncodeFixed32(crc_start - 4, crc);
+
+    return 0;
+}
+
+int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_file_info_length, char *record_frag_info_buffer,
+                                uint32_t record_frag_info_length, uint32_t *record_frag_number)
+{
+    Log(logger_, "build index");
+
+    EncodeRecordFileInfoIndex(record_file_info_buffer, record_file_info_length);
+    EncodeRecordFragInfoIndex(record_frag_info_buffer, record_frag_info_length);
+    *record_frag_number = record_fragment_count_;
 
     return 0;
 }
@@ -75,10 +193,10 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
     ret = write(fd, buffer.c_str(), length);
     assert(ret == length);
 
-    if (!used_)
+    if (state_ == kReadOnly)
     {
-        used_ = true;
-        record_fragment_count_ = 1;
+        state_ = kWriting;
+        record_fragment_count_ += 1;
     }
 
     /* update times */
@@ -103,6 +221,19 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
     }
 
     record_offset_ += length;
+
+    return 0;
+}
+
+int32_t RecordFile::FinishWrite()
+{
+    Log(logger_, "finish write");
+    
+    if (fd_ > 0)
+    {
+        close(fd_);
+    }
+    state_ = kReadOnly;
 
     return 0;
 }

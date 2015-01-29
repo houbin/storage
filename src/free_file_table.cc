@@ -3,8 +3,8 @@
 namespace storage
 {
 
-FreeFileTable::FreeFileTable(Logger *logger, StreamTransferClientManager *transfer_client_manager)
-: logger_(logger), mutex_(FreeFileTable::Lock), transfer_client_manager_(transfer_client_manager), stop_(false)
+FreeFileTable::FreeFileTable(Logger *logger)
+: logger_(logger), mutex_("FreeFileTable::Lock"), stop_(false)
 {
 
 }
@@ -12,7 +12,6 @@ FreeFileTable::FreeFileTable(Logger *logger, StreamTransferClientManager *transf
 int32_t FreeFileTable::Get(RecordFile **record_file)
 {
     assert(record_file != NULL);
-
     Log(logger_, "get record file");
 
     Mutex::Locker lock(mutex_);
@@ -27,24 +26,18 @@ int32_t FreeFileTable::Get(RecordFile **record_file)
     return 0;
 }
 
-#define FREE_FILE_RECYCLE_SECONDS (24*3600)
-int32_t FreeFileTable::Recycle()
+int32_t FreeFileTable::Put(RecordFile *record_file)
 {
-    list<RecordFile*> free_file_list;
-    
-    transfer_client_manager_->RecycleRecordFiles(free_file_list, false);
+    assert(record_file != NULL);
+    Log(logger_, "put record file %p", record_file);
 
-    mutex_.Lock();
-    while (!free_file_list.empty())
+    Mutex::Locker lock(mutex_);
+    if (stop_)
     {
-        RecordFile *record_file = free_file_list.front();
-        assert(record_file != NULL);
-        free_file_list.pop_front();
-        free_file_queue_.push_back(record_file);
+        return -1;
     }
-    mutex_.Unlock();
 
-    transfer_client_manager_->timer.AddEventAfter(FREE_FILE_RECYCLE_SECONDS, new C_Recycle(this));
+    free_file_queue_.push_back(record_file);
 
     return 0;
 }
