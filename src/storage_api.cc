@@ -60,6 +60,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     ret = store_client_center->OpenStoreClient(flags, id, key_info);
     if (ret != 0)
     {
+        id_map.ReleaseId(id);
         return ret;
     }
 
@@ -82,12 +83,7 @@ void storage_close(const uint32_t id);
         return;
     }
 
-    ret = id_center->ReleaseId(id);
-    if (ret != 0)
-    {
-        return;
-    }
-
+    id_center->ReleaseId(id);
     store_client_center->CloseStoreClient(id, flag);
 
     return;

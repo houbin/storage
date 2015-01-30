@@ -138,6 +138,29 @@ public:
     int32_t CloseRead(uint32_t id);
 };
 
+typedef struct recycle_item
+{
+    RecordFile *record_file;
+    StoreClient *store_client;
+}RecycleItem;
+
+class C_Recycle : public Context
+{
+    StoreClientCenter *store_client_center_;
+
+    C_Recycle(StoreClientCenter *store_client_center)
+    : store_client_center_(store_client_center)
+    {
+    
+    }
+
+    void Finish(int r)
+    {
+        store_client_center_->Recycle();
+        return;
+    }
+}
+
 class StoreClientCenter
 {
 private:
@@ -145,11 +168,11 @@ private:
 
     /* only used for add or delete client */
     RWLock rwlock_;
-
-    /* use id as index */
-    vector<StoreClient*> clients_;
-
+    vector<StoreClient*> clients_; // 以操作id为下标，用于快速查找对应的client
     map<string, StoreClient*> client_search_map_;
+    
+    Mutex recycle_mutex_;
+    deque<RecycleItem> recycle_queue_;
 
 public:
     Mutex timer_lock;
@@ -163,6 +186,10 @@ public:
     int32_t CloseStoreClient(uint32_t id, int flag);
 
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
+
+    int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
+    int32_t StartRecycle();
+    int32_t Recycle();
 };
 
 }

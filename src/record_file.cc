@@ -65,6 +65,24 @@ int32_t RecordFile::Clear()
     return 0;
 }
 
+int32_t RecordFile::CheckRecycle()
+{
+    Log(logger_, "check recycle");
+
+    if (locked_)
+    {
+        return false;
+    }
+
+    if (state_ == kWriting)
+    {
+        return false;
+    }
+    
+
+
+}
+
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
 {
     Log(logger_, "encode record file info index");

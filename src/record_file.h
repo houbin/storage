@@ -46,6 +46,8 @@ public:
     int32_t ClearMemInfo();
     int32_t Clear();
 
+    bool CheckRecycle();
+
     int32_t EncodeRecordFileInfoIndex(char * record_file_buffer, uint32_t record_file_length);
     int32_t EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uint32_t record_frag_info_length);
     int32_t BuildIndex(char *record_file_buffer, uint32_t record_file_length, char *record_frag_info_buffer,

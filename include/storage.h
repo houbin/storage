@@ -2,11 +2,12 @@
 #define STORAGE_H_
 
 #include "logger.h"
-#include "../src/stream_op_handler.h"
 
 extern Logger *logger;
-extern StreamOpHandler *stream_op_handler;
-extern StreamTransferClientManager *transfer_client_manager;
+extern IdCenter *id_center;
+extern StoreClientCenter *store_client_center;
+extern FreeFileTable *free_file_table;
+extern IndexFileManager *index_file_manager;
 
 #endif
 

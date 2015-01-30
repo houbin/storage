@@ -585,10 +585,14 @@ int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
     ret = free_file_table->Get(&free_file);
     assert(ret == 0 && free_file != NULL);
 
+    /* used to record read */
     free_file->stream_info_ = stream_info_;
     free_file->start_time_ = time;
-
     ret = record_file_map_->PushBackRecordFile(time, free_file);
+    assert(ret == 0);
+
+    /* used to recycle */
+    ret = store_client_center->AddToRecycleQueue(this, record_file);
     assert(ret == 0);
 
     *record_file = free_file;
@@ -623,8 +627,8 @@ int32_t StoreClient::CloseRead(uint32_t id)
 //              store client center 
 // ======================================================= //
 StoreClientCenter::StoreClientCenter(Logger *logger, IdCenter *id_center)
-: logger_(logger), rwlock_("StoreClientCenter::RWLock"), timer_lock("StoreClientCenter::timer_lock"),
-    timer(logger_, timer_lock)
+: logger_(logger), rwlock_("StoreClientCenter::RWLock"), recycle_mutex_("StoreClientCenter::RecycleMutex"),
+timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 {
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
@@ -655,8 +659,8 @@ int32_t OpenStoreClient(int flag, uint32_t id, string &stream_info)
             client = new StoreClient(logger_, stream_info);
             assert(client != NULL);
 
-            clients_[id] = client;
             RWLock::WRLocker lock(rwlock_);
+            clients_[id] = client;
             client_search_map_.insert(make_pair(stream_info, client));
         }
 
@@ -747,6 +751,52 @@ int32_t StoreClientCenter::WriteFrame(uint32_t id, FRAME_INFO_T *frame)
     }
 
     return client->EnqueueFrame(frame);
+}
+
+int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)
+{
+    assert(store_client != NULL);
+    assert(record_file != NULL);
+    Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+
+    Mutex::Locker lock(recycle_mutex_);
+    RecycleItem recycle_item;
+    recycle_item.store_client = store_client;
+    recycle_item.record_file = record_file;
+
+    recycle_queue_.push_back(recycle_item);
+
+    return 0;
+}
+
+int32_t StoreClientCenter::StartRecycle()
+{
+    Log(logger_, "start to recycle");
+
+    Mutex::Locker lock(timer_lock);
+    C_Recycle *recycle_event = new C_Recycle(this);
+    assert(recycle_event != NULL);
+    timer.AddEventAfter(0, recycle_event);
+
+    return 0;
+}
+
+int32_t StoreClientCenter::Recycle()
+{
+    Log(logger_, "recycle");
+
+    Mutex::Locker lock(recycle_mutex_);
+    dequeue<RecycleItem>::iterator iter = recycle_queue_.begin();
+    for (iter; iter != recycle_queue_.end(); iter++)
+    {
+        RecycleItem recycle_item = *iter;
+        RecordFile *record_file = recycle_item.record_file;
+        assert(record_file != NULL);
+    
+
+    }
+
+
 }
 
 }

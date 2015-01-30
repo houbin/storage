@@ -95,11 +95,8 @@ int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
     return 0;
 }
 
-int32_t IndexFile::AnalyzeAllEntry(StreamTransferClientManager *transfer_client_manager, FreeFileTable *free_file_table)
+int32_t IndexFile::AnalyzeAllEntry()
 {
-    assert(transfer_client_manager != NULL);
-    assert(free_file_table != NULL);
-
     size_t ret;
     uint32_t record_file_section_size = 0;
     uint32_t record_file_info_length = 0;
@@ -233,7 +230,7 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
     for(iter; iter != index_file_map_.end(); iter++)
     {
         IndexFile *index_file = iter->second;
-        index_file->AnalyzeAllEntry(transfer_client_manager_, free_file_table_);
+        index_file->AnalyzeAllEntry();
     }
 
     Log(logger_, "analyze all index file end");

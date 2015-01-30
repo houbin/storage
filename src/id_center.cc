@@ -128,6 +128,7 @@ int32_t IdCenter::GetFlag(uint32_t id, int &flag)
 {
     Log(logger_, "get flag, id is %d", id);
 
+    Mutex::Locker lock(mutex_);
     map<uint32_t, string>::iterator iter = id_map_.find(id);
     if (iter == id_map_.end())
     {
@@ -143,6 +144,14 @@ int32_t IdCenter::GetFlag(uint32_t id, int &flag)
     {
         flag = 1;
     }
+
+    return 0;
+}
+
+int32_t IdCenter::GetWriteCounts(uint32_t *write_counts)
+{
+    Mutex::Locker lock(mutex_);
+    *write_counts = write_key_info_.size();
 
     return 0;
 }
