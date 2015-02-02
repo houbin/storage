@@ -57,7 +57,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     }
 
     /* 准备读或写数据结构 */
-    ret = store_client_center->OpenStoreClient(flags, id, key_info);
+    ret = store_client_center->OpenStoreClient(flags, *id, key_info);
     if (ret != 0)
     {
         id_map.ReleaseId(id);
@@ -70,6 +70,17 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
 int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info)
 {
     return store_client_center->WriteFrame(id, frame_info);
+}
+
+int32_t storage_seek(const uint32_t id, const UTIME_T *stamp)
+{
+    UTime time_stamp(stamp->seconds, stamp->nseconds);
+    return store_client_center->SeekRead(id, time_stamp);
+}
+
+int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info)
+{
+    return 0;
 }
 
 void storage_close(const uint32_t id);

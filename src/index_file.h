@@ -74,7 +74,7 @@ private:
     bool stop_;
 
 public:
-    IndexFileManager(Logger *logger)
+    IndexFileManager(Logger *logger);
 
     int32_t ScanAllIndexFile();
     int32_t AnalyzeAllIndexFile();

@@ -4,6 +4,7 @@
 #include <string>
 #include "../util/logger.h"
 #include "../util/mutex.h"
+#include "../include/storage_api.h"
 
 namespace storage
 {
@@ -52,8 +53,10 @@ public:
                             uint32_t record_frag_info_length, uint32_t *record_frag_number);
 
     int32_t Append(string &buffer, uint32_t length, BufferTimes &times);
-
     int32_t FinishWrite();
+
+    int32_t DecodeHeader(char *header, FRAME_INFO_T *frame);
+    int32_t GetStampOffset(UTime &stamp, uint32_t *offset);
 };
 
 

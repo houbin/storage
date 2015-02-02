@@ -14,7 +14,7 @@ RecordFileMap::RecordFileMap(Logger *logger)
 
 }
 
-int32_t RecordFileMap::GetRecordFile(UTime time, RecordFile **record_file)
+int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "get record file time %d.%d", time.tv_sec, time.tv_nsec);
@@ -171,13 +171,25 @@ int32_t RecordWriter::EncodeHeader(char *header, FRAME_INFO_T *frame)
 {
     assert(header != NULL && frame != NULL);
     Log(logger_, "encode header, header is %p, frame is %p", header, frame);
+    char *temp = header;
 
-    EncodeFixed32(header, kMagicCode);
-    EncodeFixed32(header, frame->type);
-    EncodeFixed32(header, frame->frame_time.seconds);
-    EncodeFixed32(header, frame->frame_time.nseconds);
-    EncodeFixed64(header, frame->stamp);
-    EncodeFixed32(header, frame->size);
+    EncodeFixed32(temp, kMagicCode);
+    temp += 4;
+
+    EncodeFixed32(temp, frame->type);
+    temp += 4;
+
+    EncodeFixed32(temp, frame->frame_time.seconds);
+    temp += 4;
+
+    EncodeFixed32(temp, frame->frame_time.nseconds);
+    temp += 4;
+
+    EncodeFixed64(temp, frame->stamp);
+    temp += 8;
+
+    EncodeFixed32(temp, frame->size);
+    temp += 4;
 
     return 0;
 }
@@ -540,10 +552,40 @@ void RecordWriter::Stop()
 }
 
 // ======================================================= //
+//                  record reader
+// ======================================================= //
+RecordReader::RecordReader(StoreClient *store_client)
+: store_client_(store_client), record_file_(NULL), read_offset_(0)
+{
+
+}
+
+int32_t RecordReader::Seek(UTime &stamp)
+{
+    int32_t ret;
+    uint32_t read_offset = 0;
+    RecordFile *record_file = NULL;
+    
+    ret = store_client_->GetRecordFile(stamp, &record_file);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    record_file_ = record_file;
+    ret = record_file_->GetStampOffset(stamp, &offset);
+    assert(ret == 0);
+    read_offset_ = offset;
+
+    return 0;
+}
+
+// ======================================================= //
 //                  store client
 // ======================================================= //
 StoreClient::StoreClient(Logger *logger, string stream_info)
-: logger_(logger), stream_info_(stream_info), record_file_map_(logger_), writer(logger_, this)
+: logger_(logger), stream_info_(stream_info), record_file_map_(logger_), 
+    writer(logger_, this), reader_mutex_("StoreClient::read_mutex_")
 {
 
 }
@@ -560,7 +602,29 @@ int32_t StoreClient::OpenWrite(uint32_t id)
 int32_t StoreClient::OpenRead(uint32_t id)
 {
     Log(logger_, "open read, id is %d", id);
-    
+    pair<map<uint32_t, RecordReader>::iterator, bool> ret;
+
+    Mutex::Locker lock(reader_mutex_);
+    RecordReader record_reader(this);
+    ret = record_readers_.insert(make_pair(id, record_reader));
+    assert(ret->second == true);
+
+    return 0;
+}
+
+int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
+{
+    Log(logger_, "seek read id, id is %d", id);
+
+    reader_mutex_.Lock();
+    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    assert(iter != record_readers_.end());
+    RecordReader record_reader = iter->second;
+    reader_mutex_.Unlock();
+
+    ret = record_reader->Seek(stamp);
+    assert(ret == 0);
+
     return 0;
 }
 
@@ -626,6 +690,13 @@ int32_t StoreClient::GetLastRecordFile(RecordFile **record_file)
     return record_file_map_->GetLastRecordFile(record_file);
 }
 
+int32_t StoreClient::GetRecordFile(UTime &stamp, RecordFile **record_file)
+{
+    Log(logger_, "get record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
+    
+    return record_file_map_->GetRecordFile(stamp, record_file);
+}
+
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
 {
     Log(logger_, "recycle record file, record file is %p");
@@ -660,7 +731,7 @@ timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
 
-int32_t OpenStoreClient(int flag, uint32_t id, string &stream_info)
+int32_t StoreClientCenter::OpenStoreClient(int flag, uint32_t id, string &stream_info)
 {
     assert(flags == 0 || flags == 1);
 
@@ -780,6 +851,23 @@ int32_t StoreClientCenter::WriteFrame(uint32_t id, FRAME_INFO_T *frame)
     return client->EnqueueFrame(frame);
 }
 
+int32_t StoreClientCenter::SeekRead(uint32_t id, UTime &stamp)
+{
+    assert(stamp != NULL);
+    Log(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
+
+    int32_t ret;
+    StoreClient *client = NULL;
+
+    ret = GetStoreClient(id, &client);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    return client->SeekRead(id, stamp);
+}
+
 int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)
 {
     assert(store_client != NULL);
@@ -835,6 +923,11 @@ int32_t StoreClientCenter::Recycle()
 
         ret = store_client->RecycleRecordFile(record_file);
         assert(ret == 0);
+
+        if (store_client->Empty())
+        {
+            ret = store_client
+        }
 
         deque<RecycleItem>::iterator del_iter = iter;
         iter++;

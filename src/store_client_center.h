@@ -45,7 +45,7 @@ private:
 
 public:
     RecordFileMap(Logger logger);
-    int32_t GetRecordFile(UTime time, RecordFile **record_file);
+    int32_t GetRecordFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PushBackRecordFile(UTime time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
@@ -114,6 +114,19 @@ public:
     void Stop();
 };
 
+class RecordReader
+{
+private:
+    StoreClient *store_client_;
+    RecordFile *record_file_;
+    uint32_t read_offset_;
+
+public:
+    RecordReader(StoreClient *store_client);
+    int32_t Seek(UTime &stamp);
+    int32_t ReadFrame(FRAME_INFO_T *frame_info);
+};
+
 class StoreClient
 {
 private:
@@ -124,6 +137,9 @@ private:
 
     RecordWriter writer;
 
+    Mutex reader_mutex_;
+    map<uint32_t, RecordReader> record_readers_;
+
 public:
     StoreClient(Logger *logger, string stream_info);
 
@@ -132,10 +148,12 @@ public:
 
     int32_t GetFreeFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
+    int32_t GetRecordFile(UTime &stamp, RecordFile **record_file);
     int32_t RecycleRecordFile(RecordFile *record_file);
 
     int32_t OpenWrite(uint32_t id);
     int32_t OpenRead(uint32_t id);
+    int32_t SeekRead(uint32_t id, UTime &stamp);
 
     int32_t CloseWrite(uint32_t id);
     int32_t CloseRead(uint32_t id);
@@ -189,6 +207,7 @@ public:
     int32_t CloseStoreClient(uint32_t id, int flag);
 
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
+    int32_t SeekRead(uint32_t id, UTime &stamp);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();

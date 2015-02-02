@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "record_file.h"
 #include "index_file.h"
 #include "../util/clock.h"
@@ -13,7 +14,7 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), locked_(false),
+: logger_(logger), base_name_(base_name), number_(number), fd_(-1), locked_(false),
 state_(kCleared), record_fragment_count_(0), start_time_(0), end_time_(0), record_offset_(0)
 {
 
@@ -24,6 +25,7 @@ int32_t RecordFile::Clear()
     Log(logger_, "clear index");
 
     /* 清零内存中的数据 */
+    this->fd_ = -1;
     this->stream_info_.clear();
     this->locked_ = false;
     this->state_= kCleared;
@@ -171,12 +173,14 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
         string record_file_path(base_name_);
         record_file_path.append(buffer);
 
-        int fd = open(record_file_path.c_str(), O_WRONLY | O_SYNC);
-        assert(fd < 0);
+        fd_ = open(record_file_path.c_str(), O_RDWR);
+        assert(fd_ > 0);
+        lseek(fd_, record_offset_, SEEK_SET);
     }
     
-    ret = write(fd, buffer.c_str(), length);
+    ret = write(fd_, buffer.c_str(), length);
     assert(ret == length);
+    fdatasync(fd_);
 
     if (state_ != kWriting)
     {
@@ -217,8 +221,86 @@ int32_t RecordFile::FinishWrite()
     if (fd_ > 0)
     {
         close(fd_);
+        fd_ = -1;
     }
     state_ = kIdle;
+
+    return 0;
+}
+
+int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
+{
+    assert(header != NULL);
+    assert(frame != NULL);
+    Log(logger_, "decode header");
+    
+    char *temp = header;
+
+    uint32_t magic_code = DecodeFixed32(temp);
+    temp += 4;
+    if (magic_code != kMagicCode)
+    {
+        return -ERR_NO_MAGIC_CODE;
+    }
+
+    frame->type = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->frame_time.seconds = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->frame_time.nseconds = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->stamp = DecodeFixed64(temp);
+    temp += 8;
+
+    frame->size = DecodeFixed32(temp);
+    temp += 4;
+
+    return 0;
+}
+
+int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
+{
+    Log(logger_, "get stamp offset");
+    uint32_t ret = 0;
+    uint32_t stamp_offset = 0;
+
+    if (fd_ < -1)
+    {
+        fd_ = open(record_file_path.c_str(), O_RDWR);
+        assert(fd_ > 0);
+    }
+
+    while(stamp_offset < record_offset_)
+    {
+        char header[kHeaderSize] = {0};
+        FRAME_INFO_T frame = {0};
+        
+        ret = pread(fd_, header, kHeaderSize, stamp_offset);
+        assert(ret == kHeaderSize);
+
+        ret = DecodeHeader(header, &frame);
+        if (ret != 0)
+        {
+            return ret;
+        }
+
+        if (frame->frame_time >= stamp)
+        {
+            *offset = stamp_offset;
+            return 0;
+        }
+
+        stamp_offset += kHeaderSize;
+        stamp_offset += frame->size;
+    }
+
+    if (stamp_offset >= record_offset_)
+    {
+        assert("?" != 0);
+    }
 
     return 0;
 }
