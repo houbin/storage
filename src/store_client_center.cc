@@ -89,6 +89,24 @@ int32_t RecordFileMap::PushBackRecordFile(UTime time, RecordFile *record_file)
         assert("record file already exist" == 0);
     }
 
+    map<UTime, RecordFile*>::iterator iter = ret->first;
+    file_search_map_.insert(make_pair(record_file, iter));
+
+    return 0;
+}
+
+int32_t RecordFileMap::EraseRecordFile(RecordFile *record_file)
+{
+    Log(logger_, "erase record file, record file is %p", record_file);
+    RWLock::WRLocker locker(rwlock_);
+
+    map<RecordFile*, map<UTime, RecordFile *>::iterator>::iterator search_iter = file_search_map_.find(record_file);
+    assert(search_iter == file_search_map_.end());
+
+    map<UTime, RecordFile*>::iterator iter = search_iter->second;
+    record_file_map_.erase(iter);
+    file_search_map_.erase(search_iter);
+
     return 0;
 }
 
@@ -588,6 +606,7 @@ int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
     /* used to record read */
     free_file->stream_info_ = stream_info_;
     free_file->start_time_ = time;
+    free_file->state_ = kIdle;
     ret = record_file_map_->PushBackRecordFile(time, free_file);
     assert(ret == 0);
 
@@ -605,6 +624,14 @@ int32_t StoreClient::GetLastRecordFile(RecordFile **record_file)
     Log(logger_, "get last record file");
 
     return record_file_map_->GetLastRecordFile(record_file);
+}
+
+int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
+{
+    Log(logger_, "recycle record file, record file is %p");
+    record_file_map_.EraseRecordFile(record_file);
+
+    return 0;
 }
 
 int32_t StoreClient::CloseWrite(uint32_t id)
@@ -783,20 +810,47 @@ int32_t StoreClientCenter::StartRecycle()
 
 int32_t StoreClientCenter::Recycle()
 {
+    int recycle_count = 0;
+    int32_t ret = 0;
     Log(logger_, "recycle");
 
     Mutex::Locker lock(recycle_mutex_);
     dequeue<RecycleItem>::iterator iter = recycle_queue_.begin();
-    for (iter; iter != recycle_queue_.end(); iter++)
+    while(iter != recycle_queue_.end() 
+            && recycle_count <= kFilesPerRecycle)
     {
         RecycleItem recycle_item = *iter;
         RecordFile *record_file = recycle_item.record_file;
-        assert(record_file != NULL);
-    
+        StoreClient *store_client = recycle_item.store_client;
 
+        assert(record_file != NULL);
+        assert(store_client != NULL);
+
+        bool ifRecycle = record_file->CheckRecycle();
+        if (!ifRecycle)
+        {
+            iter++;
+            continue;
+        }
+
+        ret = store_client->RecycleRecordFile(record_file);
+        assert(ret == 0);
+
+        deque<RecycleItem>::iterator del_iter = iter;
+        iter++;
+        recycle_queue_.erase(del_iter);
+
+        /* add to free file table */
+        free_file_table->Put(record_file);
+        recycle_count++;
     }
 
+    if (iter == recycle_queue_.end())
+    {
+        Log(logger_, "recycle reached to end of recycle queue");
+    }
 
+    return 0;
 }
 
 }

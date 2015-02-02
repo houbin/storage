@@ -39,6 +39,7 @@ private:
 
     RWLock rwlock_;
     map<UTime, RecordFile*> record_file_map_;
+    map<RecordFile*, map<UTime, RecordFile*>::iterator> file_search_map_;
 
     bool stop_;
 
@@ -47,6 +48,7 @@ public:
     int32_t GetRecordFile(UTime time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PushBackRecordFile(UTime time, RecordFile *record_file);
+    int32_t EraseRecordFile(RecordFile *record_file);
 
     void Shutdown();
 };
@@ -100,7 +102,7 @@ public:
     int32_t EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame);
     int32_t UpdateBufferTimes(uint32_t type, UTime time);
     int32_t WriteBuffer(RecordFile *record_file, uint32_t write_length);
-    int32_t BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
+    int32_t BuilkReadOnlydRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
                         char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_frag_info_number);
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
@@ -130,6 +132,7 @@ public:
 
     int32_t GetFreeFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
+    int32_t RecycleRecordFile(RecordFile *record_file);
 
     int32_t OpenWrite(uint32_t id);
     int32_t OpenRead(uint32_t id);

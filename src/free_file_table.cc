@@ -1,6 +1,7 @@
 #include "free_file_table.h"
 #include "config_opts.h"
 #include "../include/storage.h"
+#include "index_file.h"
 
 namespace storage
 {
@@ -13,6 +14,7 @@ FreeFileTable::FreeFileTable(Logger *logger)
 
 int32_t FreeFileTable::Put(RecordFile *record_file)
 {
+    int32_t ret;
     assert(record_file != NULL);
     Log(logger_, "put record file %p", record_file);
 
@@ -27,7 +29,19 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 
     DiskInfo *disk_info = iter->second;
     assert(disk_info != NULL);
+
+    IndexFile *index_file = NULL;
+    ret = index_file_manager->Find(record_file->base_name_, &index_file);
+    assert(ret == 0);
+    assert(index_file != NULL);
+
+    struct RecordFileInfo record_file_info = {0};
+    int32_t write_offset = record_file->number_ * sizeof(struct RecordFileInfo);
+    index_file->Write(write_offset, &record_file_info, sizeof(struct RecordFileInfo));
+    record_file->Clear();
+
     disk_info->free_file_queue.push_back(record_file);
+    cond_.Signal();
 
     return 0;
 }
@@ -111,7 +125,6 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
 
     return 0;
 }
-
 
 int32_t FreeFileTable::Shutdown()
 {

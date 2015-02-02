@@ -61,9 +61,9 @@ int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
     temp += 1;
 
     record_file->state_ = temp;
-    if (record_file->state_ == kWriting)
+    if (record_file->state_ != kCleared)
     {
-        record_file->state_ = kReadOnly;
+        record_file->state_ = kIdle;
     }
     temp += 1;
 

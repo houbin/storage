@@ -12,8 +12,9 @@ using namespace std;
 enum RecordFileState
 {
     kCleared = 0,
-    kReadOnly = 1,  // 若record file初始化后写数据之前或者已经写完，则处于read only状态
-    kWriting = 2,     // record file有数据写入，则record file处于write状态
+    kIdle = 1,
+    kReading = 2,
+    kWriting = 3,
 };
 
 class RecordFile
@@ -40,10 +41,7 @@ public:
 
     RecordFile(string base_name, uint32_t number);
 
-    /* 1. 将该录像文件对应的索引文件中的描述段清零 */
-    /* 2. 清零内存中的数据*/
-    int32_t ClearIndex();
-    int32_t ClearMemInfo();
+    /* 清零内存中的数据*/
     int32_t Clear();
 
     bool CheckRecycle();

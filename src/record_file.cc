@@ -19,35 +19,8 @@ state_(kCleared), record_fragment_count_(0), start_time_(0), end_time_(0), recor
 
 }
 
-int32_t RecordFile::ClearIndex()
-{
-    int ret;
-    uint32_t offset;
-    uint32_t length;
-    string index_file;
-
-    Log(logger_, "clear index, base_name is %s, number is %d", base_name_.c_str(), number_);
-
-    offset = number_ * sizeof(struct RecordFileInfo);
-    length = sizeof(struct RecordFileInfo);
-    struct RecordFileInfo *record_file_info = new struct RecordFileInfo();
-    memset(record_file_info, 0, sizeof(struct RecordFileInfo));
-
-    Struct IndexFileOp *op = new struct IndexFileOp(base_name_, offset, record_file_info);
-    assert
-
-    IndexFile *index_file;
-    ret = index_file_manager->Find(base_name_, &index_file);
-    assert(ret == 0);
-    assert(index_file != NULL);
-    ret = index_file->EnqueueOp(op);
-    assert(ret == 0);
-
-}
-
 int32_t RecordFile::Clear()
 {
-
     Log(logger_, "clear index");
 
     /* 清零内存中的数据 */
@@ -65,22 +38,16 @@ int32_t RecordFile::Clear()
     return 0;
 }
 
-int32_t RecordFile::CheckRecycle()
+bool RecordFile::CheckRecycle()
 {
     Log(logger_, "check recycle");
 
-    if (locked_)
+    if (state_ != kIdle && locked_ == true)
     {
         return false;
     }
 
-    if (state_ == kWriting)
-    {
-        return false;
-    }
-    
-
-
+    return true;
 }
 
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
@@ -211,7 +178,7 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
     ret = write(fd, buffer.c_str(), length);
     assert(ret == length);
 
-    if (state_ == kReadOnly)
+    if (state_ != kWriting)
     {
         state_ = kWriting;
         record_fragment_count_ += 1;
@@ -251,7 +218,7 @@ int32_t RecordFile::FinishWrite()
     {
         close(fd_);
     }
-    state_ = kReadOnly;
+    state_ = kIdle;
 
     return 0;
 }
