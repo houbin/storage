@@ -20,6 +20,36 @@ IndexFileManager *index_file_manager = NULL;
 extern "C"
 {
 
+inline bool operator>(const UTIME_T &x, const UTIME_T &y)
+{
+    return ((x.seconds > y.seconds) || ((x.seconds == y.seconds) && (x.nseconds > y.nseconds)));
+}
+
+inline bool operator<=(const UTIME_T &x, const UTIME_T &y)
+{
+    return !(operator>(x, y));
+}
+
+inline bool operator<(const UTIME_T &x, const UTIME_T &y)
+{
+    return ((x.seconds < y.seconds) || ((x.seconds == y.seconds) && (x.nseconds < y.seconds)));
+}
+
+inline bool operator>=(const UTIME_T &x, const UTIME_T &y)
+{
+    return !(operator<(x,y));
+}
+
+inline bool operator==(const UTIME_T &x, const UTIME_T &y)
+{
+    return ((x.seconds == y.seconds) && (x.nseconds == y.nseconds));
+}
+
+inline bool operator!=(const UTIME_T &x, const UTIME_T &y)
+{
+    return !(operator==(x, y));
+}
+
 void storage_init()
 {
     int32_t ret;
@@ -80,12 +110,12 @@ int32_t storage_seek(const uint32_t id, const UTIME_T *stamp)
 
 int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info)
 {
-    return 0;
+    return store_client_center->ReadFrame(id, frame_info);
 }
 
 void storage_close(const uint32_t id);
 {
-    uint32_t ret;
+    int32_t ret;
     int flag;
     
     ret = id_center->GetFlag(id, flag);
@@ -95,7 +125,7 @@ void storage_close(const uint32_t id);
     }
 
     id_center->ReleaseId(id);
-    store_client_center->CloseStoreClient(id, flag);
+    ret = store_client_center->CloseStoreClient(id, flag);
 
     return;
 }

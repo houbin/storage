@@ -26,6 +26,7 @@
 #define ERR_REACH_READ_THREHOLD     3002
 #define ERR_RECORD_WRITE_OFFSET_ZERO 3003
 #define ERR_NO_MAGIC_CODE           3004
+#define ERR_SEEK_ERROR              3005
 
 
 #endif

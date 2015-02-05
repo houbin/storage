@@ -25,7 +25,8 @@ public:
 
     string base_name_;
     uint32_t number_; // 文件编号
-    int fd_;
+    int write_fd_;
+    int read_fd_;
 
     string stream_info_;
     bool locked_;
@@ -57,6 +58,7 @@ public:
 
     int32_t DecodeHeader(char *header, FRAME_INFO_T *frame);
     int32_t GetStampOffset(UTime &stamp, uint32_t *offset);
+    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
 };
 
 

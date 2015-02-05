@@ -65,6 +65,7 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
         {
             *record_file = disk_info->free_file_queue.front();
             disk_info->free_file_queue.pop_front();
+            
             return 0;
         }
     }

@@ -323,6 +323,7 @@ Again:
     write_index_event = new C_WriteIndexTick(store_client_, NULL);
     store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event);
 
+
     return 0;
 }
 
@@ -393,6 +394,8 @@ int32_t RecordWriter::Entry()
                 if (frame_type == JVN_DATA_I)
                 {
                     add_o_frame = true;
+                    current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
+                    current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
                 }
             }
 
@@ -479,6 +482,7 @@ int32_t RecordWriter::Entry()
             {
                 uint32_t ret;
                 RecordFile *record_file = NULL;
+
                 ret = store_client_->GetLastRecordFile(&record_file);
                 assert(ret == 0);
                 assert(record_file != NULL);
@@ -555,7 +559,7 @@ void RecordWriter::Stop()
 //                  record reader
 // ======================================================= //
 RecordReader::RecordReader(StoreClient *store_client)
-: store_client_(store_client), record_file_(NULL), read_offset_(0)
+: store_client_(store_client), record_file_(NULL), read_offset_(0), current_o_frame_(NULL)
 {
 
 }
@@ -578,6 +582,59 @@ int32_t RecordReader::Seek(UTime &stamp)
     read_offset_ = offset;
 
     return 0;
+}
+
+int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
+{
+    if (record_file_ == NULL)
+    {
+        return -ERR_SEEK_ERROR;
+    }
+
+    while(true)
+    {
+        ret = record_file_->ReadFrame(read_offset_, frame);
+        assert(ret == 0);
+
+        if (frame->type == JVN_DATA_O)
+        {
+            if (current_o_frame_ != NULL)
+            {
+                /* o frame no change */
+                if ((current_o_frame_.size == frame->size)
+                    && (memcmp(current_o_frame_.buffer, frame->buffer, frame->size)) == 0)
+                {
+                    read_offset_ += kHeaderSize;
+                    read_offset_ += frame->size;
+                    continue;
+                }
+            }
+            
+            /* o frame have change */
+            current_o_frame_.type = frame->type;
+            current_o_frame_.frame_time.seconds = frame->frame_time.seconds;
+            current_o_frame_.frame_time.nseconds = frame->frame_time.nseconds;
+            current_o_frame_.stamp = frame->stamp;
+            current_o_frame_.size = frame->size;
+            safe_free(current_o_frame_.buffer);
+            current_o_frame_.buffer = (char *)malloc(frame->size);
+            assert(current_o_frame_.buffer != NULL);
+            memcpy(current_o_frame_.buffer, frame->buffer, frame->size);
+        }
+
+        break;
+    }
+
+    /* return frame */
+    read_offset_ += kHeaderSize;
+    read_offset_ += frame->size;
+
+    return 0;
+}
+
+int32_t RecordReader::Close()
+{
+    if ()
 }
 
 // ======================================================= //
@@ -624,6 +681,32 @@ int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
 
     ret = record_reader->Seek(stamp);
     assert(ret == 0);
+
+    return 0;
+}
+
+int32_t StoreClient::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
+{
+    assert(frame != NULL);
+    Log(logger_, "read frame, id is %d", id);
+
+    int32_t ret = 0;
+    RecordReader record_reader;
+
+    read_mutex_.Lock();
+    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    if (iter == record_readers_.end())
+    {
+        return -ERR_ITEM_NOT_FOUND;
+    }
+    record_reader = iter->second;
+    read_mutex_.Unlock();
+
+    ret = record_reader.ReadFrame(frame);
+    if (ret != 0)
+    {
+        return ret;
+    }
 
     return 0;
 }
@@ -717,6 +800,16 @@ int32_t StoreClient::CloseWrite(uint32_t id)
 int32_t StoreClient::CloseRead(uint32_t id)
 {
     Log(logger_, "close read id %d");
+    int32_t ret;
+
+    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    if (iter == record_readers_.end())
+    {
+        return;
+    }
+
+    RecordReader record_reader = iter->second;
+    record_reader.Close();
 
     return 0;
 }
@@ -853,7 +946,6 @@ int32_t StoreClientCenter::WriteFrame(uint32_t id, FRAME_INFO_T *frame)
 
 int32_t StoreClientCenter::SeekRead(uint32_t id, UTime &stamp)
 {
-    assert(stamp != NULL);
     Log(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
 
     int32_t ret;
@@ -866,6 +958,23 @@ int32_t StoreClientCenter::SeekRead(uint32_t id, UTime &stamp)
     }
 
     return client->SeekRead(id, stamp);
+}
+
+int32_t StoreClientCenter::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
+{
+    assert(frame != NULL);
+    Log(logger_, "read frame, id is %d");
+
+    int32_t ret;
+    StoreClient *client = NULL;
+
+    ret = GetStoreClient(id, frame);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    return client->ReadFrame(id, frame);
 }
 
 int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)

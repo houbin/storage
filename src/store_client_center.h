@@ -46,6 +46,7 @@ private:
 public:
     RecordFileMap(Logger logger);
     int32_t GetRecordFile(UTime &time, RecordFile **record_file);
+    int32_t GetNextRecordFile(RecordFile *current_record_file, RecordFile **next_record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PushBackRecordFile(UTime time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
@@ -56,7 +57,7 @@ public:
 class C_WriteIndexTick: public Context
 {
     StoreClient *client_;
-    RecordFile *record_file_;
+    RecordFile *record_file_e
 public:
 
     C_WriteIndexTick(StoreClient *client, RecordFile *record_file)
@@ -102,12 +103,11 @@ public:
     int32_t EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame);
     int32_t UpdateBufferTimes(uint32_t type, UTime time);
     int32_t WriteBuffer(RecordFile *record_file, uint32_t write_length);
-    int32_t BuilkReadOnlydRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
+    int32_t BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
                         char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_frag_info_number);
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
     int32_t ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds);
-    int32_t CancelWriteIndexEvent();
 
     void Start();
     void Entry();
@@ -120,11 +120,13 @@ private:
     StoreClient *store_client_;
     RecordFile *record_file_;
     uint32_t read_offset_;
+    FRAME_INFO_T current_o_frame_;
 
 public:
     RecordReader(StoreClient *store_client);
     int32_t Seek(UTime &stamp);
     int32_t ReadFrame(FRAME_INFO_T *frame_info);
+    int32_t Close();
 };
 
 class StoreClient
@@ -154,6 +156,7 @@ public:
     int32_t OpenWrite(uint32_t id);
     int32_t OpenRead(uint32_t id);
     int32_t SeekRead(uint32_t id, UTime &stamp);
+    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
 
     int32_t CloseWrite(uint32_t id);
     int32_t CloseRead(uint32_t id);
@@ -208,6 +211,7 @@ public:
 
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t SeekRead(uint32_t id, UTime &stamp);
+    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();

@@ -14,7 +14,7 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), fd_(-1), locked_(false),
+: logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), locked_(false),
 state_(kCleared), record_fragment_count_(0), start_time_(0), end_time_(0), record_offset_(0)
 {
 
@@ -25,7 +25,8 @@ int32_t RecordFile::Clear()
     Log(logger_, "clear index");
 
     /* 清零内存中的数据 */
-    this->fd_ = -1;
+    this->write_fd_ = -1;
+    this->read_fd_ = -1;
     this->stream_info_.clear();
     this->locked_ = false;
     this->state_= kCleared;
@@ -121,6 +122,7 @@ int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uin
 
     char *crc_start = temp;
 
+
     EncodeFixed32(temp, start_time_.tv_sec);
     temp += 4;
     EncodeFixed32(temp, start_time_.tv_nsec);
@@ -164,8 +166,8 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
     int ret;
     Log(logger_, "write stream %s , length %d", buffer.c_str(), length);
 
-    assert(fd_ < 0);
-    if (fd_ == 0)
+    assert(write_fd_ < 0);
+    if (write_fd_ == 0)
     {
         char buffer[32] = {0};
         snprintf(buffer, 32, "record_%05d", number_);
@@ -173,14 +175,14 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
         string record_file_path(base_name_);
         record_file_path.append(buffer);
 
-        fd_ = open(record_file_path.c_str(), O_RDWR);
-        assert(fd_ > 0);
-        lseek(fd_, record_offset_, SEEK_SET);
+        write_fd_ = open(record_file_path.c_str(), O_WRONLY);
+        assert(write_fd_ > 0);
+        lseek(write_fd_, record_offset_, SEEK_SET);
     }
     
-    ret = write(fd_, buffer.c_str(), length);
+    ret = write(write_fd_, buffer.c_str(), length);
     assert(ret == length);
-    fdatasync(fd_);
+    fdatasync(write_fd_);
 
     if (state_ != kWriting)
     {
@@ -218,10 +220,10 @@ int32_t RecordFile::FinishWrite()
 {
     Log(logger_, "finish write");
     
-    if (fd_ > 0)
+    if (write_fd_ > 0)
     {
-        close(fd_);
-        fd_ = -1;
+        close(write_fd_);
+        write_fd_ = -1;
     }
     state_ = kIdle;
 
@@ -267,10 +269,10 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
     uint32_t ret = 0;
     uint32_t stamp_offset = 0;
 
-    if (fd_ < -1)
+    if (read_fd_ < 0)
     {
-        fd_ = open(record_file_path.c_str(), O_RDWR);
-        assert(fd_ > 0);
+        read_fd_ = open(record_file_path.c_str(), O_RDONLY);
+        assert(read_fd_ > 0);
     }
 
     while(stamp_offset < record_offset_)
@@ -278,7 +280,7 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
         char header[kHeaderSize] = {0};
         FRAME_INFO_T frame = {0};
         
-        ret = pread(fd_, header, kHeaderSize, stamp_offset);
+        ret = pread(read_fd_, header, kHeaderSize, stamp_offset);
         assert(ret == kHeaderSize);
 
         ret = DecodeHeader(header, &frame);
@@ -287,10 +289,13 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
             return ret;
         }
 
-        if (frame->frame_time >= stamp)
+        if (frame->type == JVN_DATA_O)
         {
-            *offset = stamp_offset;
-            return 0;
+            if (frame->frame_time >= stamp)
+            {
+                *offset = stamp_offset;
+                return 0;
+            }
         }
 
         stamp_offset += kHeaderSize;
@@ -301,6 +306,37 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
     {
         assert("?" != 0);
     }
+
+    return 0;
+}
+
+int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
+{
+    assert(frame != NULL);
+    Log(logger_, "read frame");
+
+    int ret = 0;
+    
+    if (read_fd_ < 0) 
+    {
+        read_fd_ = open(record_file_path.c_str(), O_RDONLY);
+        assert(read_fd_ > 0);
+    }
+
+    char header[kHeaderSize] = {0};
+    ret = pread(read_fd_, header, kHeaderSize, offset);
+    assert(ret == kHeaderSize);
+
+    {
+        uint32_t ret = DecodeHeader(frame, header);
+        if (ret != 0)
+        {
+            return ret;
+        }
+    }
+
+    ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
+    assert(ret == frame->size);
 
     return 0;
 }
