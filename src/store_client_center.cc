@@ -70,7 +70,7 @@ int32_t RecordFileMap::GetLastRecordFile(RecordFile **record_file)
     return 0;
 }
 
-int32_t RecordFileMap::PushBackRecordFile(UTime time, RecordFile *record_file)
+int32_t RecordFileMap::PutRecordFile(UTime time, RecordFile *record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "push back record file, time %d.%d", time.tv_sec, time.tv_nsec);
@@ -119,7 +119,8 @@ void RecordFileMap::Shutdown()
     map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
     for (iter; iter != record_file_map_.end(); iter++)
     {
-        delete iter->second;
+        RecordFile *record_file = iter->second;
+        record_file = NULL;
     }
 
     return;
@@ -555,6 +556,12 @@ void RecordWriter::Stop()
     return;
 }
 
+void RecordWriter::Shutdown()
+{
+    // TODO complete it
+    return ;
+}
+
 // ======================================================= //
 //                  record reader
 // ======================================================= //
@@ -634,7 +641,14 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 
 int32_t RecordReader::Close()
 {
-    if ()
+    safe_free(current_o_frame_.buffer);
+
+    return 0;
+}
+
+void RecordReader::Shutdown()
+{
+    return;
 }
 
 // ======================================================= //
@@ -754,7 +768,7 @@ int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
     free_file->stream_info_ = stream_info_;
     free_file->start_time_ = time;
     free_file->state_ = kIdle;
-    ret = record_file_map_->PushBackRecordFile(time, free_file);
+    ret = record_file_map_->PutRecordFile(time, free_file);
     assert(ret == 0);
 
     /* used to recycle */
@@ -780,10 +794,26 @@ int32_t StoreClient::GetRecordFile(UTime &stamp, RecordFile **record_file)
     return record_file_map_->GetRecordFile(stamp, record_file);
 }
 
+int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile **record_file)
+{
+    Log(logger_, "put record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
+
+    return record_file_map_->PutRecordFile(stamp, record_file);
+}
+
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
 {
     Log(logger_, "recycle record file, record file is %p");
     record_file_map_.EraseRecordFile(record_file);
+
+    return 0;
+}
+
+int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r)
+{
+    Log(logger_, "write record file index");
+
+    writer.WriteRecordFileIndex();
 
     return 0;
 }
@@ -793,6 +823,8 @@ int32_t StoreClient::CloseWrite(uint32_t id)
     Log(logger_, "close write id %d", id);
     
     writer.Stop();
+
+    free_file_table->Close(stream_info_);
 
     return 0;
 }
@@ -814,6 +846,15 @@ int32_t StoreClient::CloseRead(uint32_t id)
     return 0;
 }
 
+void StoreClient::Shutdown()
+{
+    writer.Shutdown();
+    reader.Shutdown();
+    record_file_map_.Shutdown();
+
+    return;
+}
+
 // ======================================================= //
 //              store client center 
 // ======================================================= //
@@ -824,7 +865,7 @@ timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
 
-int32_t StoreClientCenter::OpenStoreClient(int flag, uint32_t id, string &stream_info)
+int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
 {
     assert(flags == 0 || flags == 1);
 
@@ -898,7 +939,7 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
     return 0;
 }
 
-int32_t StoreClientCenter::CloseStoreClient(uint32_t id, int flag)
+int32_t StoreClientCenter::Close(uint32_t id, int flag)
 {
     assert(flag == 0 || flag == 1);
     Log(logger_, "close store client %d, flag is %d", id, flag);
@@ -1035,7 +1076,7 @@ int32_t StoreClientCenter::Recycle()
 
         if (store_client->Empty())
         {
-            ret = store_client
+            ret = store_client_
         }
 
         deque<RecycleItem>::iterator del_iter = iter;
@@ -1055,4 +1096,27 @@ int32_t StoreClientCenter::Recycle()
     return 0;
 }
 
+void StoreClientCenter::Shutdown()
+{
+    {
+        rwlock_.Lock();
+        vector<StoreClient*>::iterator iter = clients_.begin();
+        for (iter; iter != clients_.end(); iter++)
+        {
+            StoreClient *store_client = *iter;
+            store_client->Shutdown();
+            delete store_client;
+            store_client = NULL;
+        }
+        rwlock_.Unlock();
+    }
+
+    {
+        timer_lock.Lock();
+        timer.Shutdown();
+        timer_lock.Unlock();
+    }
 }
+
+}
+

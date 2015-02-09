@@ -156,4 +156,9 @@ int32_t IdCenter::GetWriteCounts(uint32_t *write_counts)
     return 0;
 }
 
+void IdCenter::Shutdown()
+{
+    return;
+}
+
 }

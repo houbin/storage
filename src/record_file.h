@@ -4,11 +4,13 @@
 #include <string>
 #include "../util/logger.h"
 #include "../util/mutex.h"
-#include "../include/storage_api.h"
+#include "store_types.h"
+
+using namespace std;
+using namespace util;
 
 namespace storage
 {
-using namespace std;
 
 enum RecordFileState
 {
@@ -41,7 +43,7 @@ public:
 
     uint32_t record_offset_;
 
-    RecordFile(string base_name, uint32_t number);
+    RecordFile(Logger *logger, string base_name, uint32_t number);
 
     /* 清零内存中的数据*/
     int32_t Clear();
@@ -61,6 +63,6 @@ public:
     int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
 };
 
-
 }
 #endif
+

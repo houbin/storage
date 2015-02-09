@@ -9,6 +9,9 @@
 #include "record_file.h"
 #include "../util/coding.h"
 #include "../include/storage.h"
+#include "../util/crc32c.h"
+
+using namespace util;
 
 namespace storage
 {
@@ -17,15 +20,15 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 : logger_(logger), base_name_(base_name)
 {
     int ret = 0;
-    string file_count_path;
-    FILE *file_count_handle = NULL;
 
-    file_path = base_name + "index";
+    string file_path;
+    file_path = base_name_ + "index";
     index_file_ = fopen(file_path.c_str(), "r");
     assert(index_file_ != NULL);
 
     /* read file counts */
     string file_count_path;
+    FILE *file_count_handle = NULL;
     char file_count_str[32] = {0};
     file_count_path = base_name + "file_count";
     file_count_handle = fopen(file_count_path.c_str(), "r");
@@ -39,11 +42,6 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     Log(logger, "%s file count %d", base_name_.c_str(), file_counts_);
 }
 
-char *IndexFile::GetBaseName()
-{
-    return base_name_.c_str();
-}
-
 int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
 {
     char *temp = NULL;
@@ -54,20 +52,24 @@ int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
     Log(logger_, "analyze one entry");
 
     temp = buffer;
-    memcpy(record_file->stream_info, buffer, 64);
+    char stream_info[64] = {0};
+    memcpy(stream_info, buffer, 64);
+    record_file->stream_info_.assign(stream_info);
     temp += 64;
 
-    record_file->locked_ = temp;
+    record_file->locked_ = *temp;
     temp += 1;
 
-    record_file->state_ = temp;
+    record_file->state_ = *temp;
     if (record_file->state_ != kCleared)
     {
         record_file->state_ = kIdle;
     }
     temp += 1;
 
-    record_file->record_fragment_counts_ = temp | ((temp + 1) << 8);
+    uint32_t a = *temp;
+    uint32_t b = *(temp + 1);
+    record_file->record_fragment_count_ = a | (b << 8);
     temp += 2;
 
     record_file->start_time_.tv_sec = DecodeFixed32(temp);
@@ -100,22 +102,22 @@ int32_t IndexFile::AnalyzeAllEntry()
     size_t ret;
     uint32_t record_file_section_size = 0;
     uint32_t record_file_info_length = 0;
-    struct RecordFileInfo *record_file_info = NULL;
+    struct RecordFileInfo *record_file_info_buffer = NULL;
 
     record_file_info_length = sizeof(struct RecordFileInfo);
     record_file_section_size = file_counts_ * record_file_info_length;
     record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
     assert(record_file_info_buffer != NULL);
 
-    ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts, index_file_);
-    assert(ret == file_counts);
+    ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts_, index_file_);
+    assert(ret == file_counts_);
 
-    int i = 0;
-    for (i = 0; i < file_counts; i++)
+    uint32_t i = 0;
+    for (i = 0; i < file_counts_; i++)
     {
-        char *temp = (char *)(record_file_info_buffer[i]);
+        char *temp = (char *)(&(record_file_info_buffer[i]));
 
-        RecordFile *record_file = new RecordFile(base_name_, i);
+        RecordFile *record_file = new RecordFile(logger_, base_name_, i);
         assert(record_file != NULL);
 
         uint32_t length = DecodeFixed32(temp);
@@ -124,7 +126,7 @@ int32_t IndexFile::AnalyzeAllEntry()
         if (length == 0)
         {
             /* not used */
-            free_file_table.Put(record_file);
+            free_file_table->Put(record_file);
             continue;
         }
 
@@ -135,11 +137,11 @@ int32_t IndexFile::AnalyzeAllEntry()
         temp += 4;
         AnalyzeOneEntry(temp, record_file);
 
-        string stream_info(record_file->stream_info);
-        StreamTransferClient *transfer_client;
-        int32_t ret = store_client_center->FindStoreClient(stream_info, &transfer_client);
+        string stream_info(record_file->stream_info_);
+        StoreClient *store_client = NULL;
+        int32_t ret = store_client_center->FindStoreClient(stream_info, &store_client);
         assert(ret == 0);
-        ret = transfer_client->Insert(record_file);
+        ret = store_client->PutRecordFile(record_file->start_time_, record_file);
         assert(ret == 0);
     }
 
@@ -152,8 +154,11 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
     Log(logger_, "write offset is %d, buffer is %p, length is %d", offset, buffer, length);
 
-    ret = fwrite(offset, 1, length, index_file_);
-    assert(ret == length);
+    int ret = 0;
+
+    fseek(index_file_, offset, SEEK_SET);
+    ret = fwrite(buffer, 1, length, index_file_);
+    assert((uint32_t)ret == length);
 
     return 0;
 }
@@ -168,7 +173,7 @@ int32_t IndexFile::Shutdown()
 }
 
 IndexFileManager::IndexFileManager(Logger *logger)
-: logger_(logger), mutex_(IndexFileManager::Lock), stop_(false)
+: logger_(logger), mutex_("IndexFileManager::Lock"), stop_(false)
 {
 
 }
@@ -210,9 +215,9 @@ int32_t IndexFileManager::ScanAllIndexFile()
             index_file = new IndexFile(logger_, base_name);
             assert(index_file != NULL);
 
-            index_file_map_.insert(base_name, index_file);
+            index_file_map_.insert(make_pair(base_name, index_file));
 
-            Log(logger_, "insert index file %s", base_name);
+            Log(logger_, "insert index file %s", base_name.c_str());
         }
     }
 
@@ -227,7 +232,7 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
     Log(logger_, "analyze all index file");
 
     map<string, IndexFile*>::iterator iter = index_file_map_.begin();
-    for(iter; iter != index_file_map_.end(); iter++)
+    for(; iter != index_file_map_.end(); iter++)
     {
         IndexFile *index_file = iter->second;
         index_file->AnalyzeAllEntry();
@@ -273,7 +278,6 @@ int32_t IndexFileManager::Shutdown()
         IndexFile *index_file = iter->second;
         index_file_map_.erase(iter);
 
-        Log(logger_, "shutdown index file %p, base_name is %s", index_file, index_file.GetBaseName());
         index_file->Shutdown();
         delete index_file;
     }

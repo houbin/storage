@@ -9,7 +9,7 @@
 EXECUTABLE := storage
 LIBDIR := ./lib
 LIBS := pthread grpc cJSON rt stdc++ resolv m
-INCLUDES := ./util ./include
+INCLUDES := ./util ./include ./src
 UTIL_DIR := ./util
 SRC_DIR := ./src
 
@@ -52,8 +52,8 @@ endif
 
 -include $(DEPS)
 
-$(EXECUTABLE) : $(OBJS) $(C_OBJS)
-	$(CC) $(CFLAGS) -o $(EXECUTABLE) $(OBJS) ./grpc/storage_json_c_userdef.o ./grpc/storage_json.o ./grpc/storage_json_s_userdef.o $(addprefix -L, $(LIBDIR)) $(addprefix -l, $(LIBS))
+$(EXECUTABLE) : $(OBJS)
+	$(CC) $(CFLAGS) -o $(EXECUTABLE) $(OBJS) $(addprefix -L, $(LIBDIR)) $(addprefix -l, $(LIBS))
 
 info:
 	@echo $(SRCS)

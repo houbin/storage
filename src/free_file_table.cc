@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "free_file_table.h"
 #include "config_opts.h"
 #include "../include/storage.h"
@@ -7,16 +8,18 @@ namespace storage
 {
 
 FreeFileTable::FreeFileTable(Logger *logger)
-: logger_(logger), mutex_("FreeFileTable::Lock"), stop_(false)
+: logger_(logger), mutex_("FreeFileTable::Lock")
 {
 
 }
 
 int32_t FreeFileTable::Put(RecordFile *record_file)
 {
-    int32_t ret;
     assert(record_file != NULL);
     Log(logger_, "put record file %p", record_file);
+
+    int32_t ret;
+    DiskInfo *disk_info = NULL;
 
     Mutex::Locker lock(mutex_);
 
@@ -24,10 +27,14 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
     if (iter == disk_free_file_info_.end())
     {
-        assert(0);
+        disk_info = (DiskInfo *)malloc(sizeof(DiskInfo));
+        disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
+    }
+    else
+    {
+        disk_info = iter->second;
     }
 
-    DiskInfo *disk_info = iter->second;
     assert(disk_info != NULL);
 
     IndexFile *index_file = NULL;
@@ -37,7 +44,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 
     struct RecordFileInfo record_file_info = {0};
     int32_t write_offset = record_file->number_ * sizeof(struct RecordFileInfo);
-    index_file->Write(write_offset, &record_file_info, sizeof(struct RecordFileInfo));
+    index_file->Write(write_offset, (char *)&record_file_info, sizeof(struct RecordFileInfo));
     record_file->Clear();
 
     disk_info->free_file_queue.push_back(record_file);
@@ -50,6 +57,8 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "get record file");
+
+    int32_t ret;
 
     Mutex::Locker lock(mutex_);
     map<string, string>::iterator stream_iter = stream_to_disk_map_.find(stream_info);
@@ -87,7 +96,7 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
     while (true)
     {
         map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
-        for (iter; iter != disk_free_file_info_.end(); iter++)
+        for (; iter != disk_free_file_info_.end(); iter++)
         {
             DiskInfo *disk_info = iter->second;
             assert(disk_info != NULL);
@@ -110,7 +119,7 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
 
         if (valid_disk_info == NULL)
         {
-            store_client_center->
+            store_client_center->Recycle();
             cond_.Wait(mutex_);
         }
         else
@@ -120,9 +129,41 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
     }
 
     *record_file = valid_disk_info->free_file_queue.front();
-    valid_disk_info->pop_front();
+    valid_disk_info->free_file_queue.pop_front();
 
-    stream_to_disk_map_.insert(make_pair(stream_info, iter->first));
+    map<string, string>::iterator iter = stream_to_disk_map_.find(stream_info);
+    if (iter != stream_to_disk_map_.end())
+    {
+        iter->second = disk_str;
+    }
+    else
+    {
+        stream_to_disk_map_.insert(make_pair(stream_info, disk_str));
+    }
+
+    return 0;
+}
+
+int32_t FreeFileTable::Close(string stream_info)
+{
+    Log(logger_, "close stream %s", stream_info.c_str());
+
+    string disk_base_name;
+
+    Mutex::Locker lock(mutex_);
+    map<string, string>::iterator iter = stream_to_disk_map_.find(stream_info);
+    if (iter != stream_to_disk_map_.end())
+    {
+        disk_base_name = iter->second;
+        stream_to_disk_map_.erase(iter);
+
+        map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
+        if (iter != disk_free_file_info_.end())
+        {
+            DiskInfo *disk_info = iter->second;
+            disk_info->writing_streams.erase(disk_base_name);
+        }
+    }
 
     return 0;
 }
@@ -132,12 +173,7 @@ int32_t FreeFileTable::Shutdown()
     Log(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
-    while(!free_file_queue_.empty())
-    {
-        RecordFile *record_file = free_file_queue_.front();
-        free_file_queue_.pop_front();
-        delete record_file;
-    }
+
 
     return 0;
 }

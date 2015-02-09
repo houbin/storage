@@ -29,6 +29,7 @@ public:
     }
 
     UTime() { tv_sec = 0; tv_nsec = 0;}
+    UTime(uint32_t s) { tv_sec = s; tv_nsec = 0;}
     UTime(uint32_t s, uint32_t n) { tv_sec = s; tv_nsec = n; normalize(); }
     UTime(struct timeval &time) { tv_sec = time.tv_sec; tv_nsec = (time.tv_usec * 1000); }
     UTime(struct timespec &time) { tv_sec = time.tv_sec; tv_nsec = time.tv_nsec; }

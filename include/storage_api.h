@@ -48,6 +48,7 @@ extern void storage_init();
  * 输出：   id              视频流操作id
  *          
  * 返回： 成功返回0，失败返回-1 
+S3_list_service(S3ProtocolHTTP, access_key, secret_key, host, 0, &listServiceHandler, &header_printed);
  */
 extern int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id);
 

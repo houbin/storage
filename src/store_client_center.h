@@ -9,28 +9,17 @@
 #include "../util/logger.h"
 #include "../util/thread.h"
 #include "../util/rwlock.h"
+#include "store_types.h"
 #include "config_opts.h"
 #include "id_center.h"
 #include "free_file_table.h"
+#include "record_file.h"
 
 using namespace std;
 using namespace util;
 
 namespace storage
 {
-
-typedef struct write_op_
-{
-    FRAME_INFO_T *frame_info;
-}WriteOp;
-
-typedef struct buffer_times
-{
-    UTime start_time;
-    UTime end_time;
-    UTime i_frame_start_time;
-    UTime i_frame_end_time;
-}BufferTimes;
 
 class RecordFileMap
 {
@@ -48,29 +37,14 @@ public:
     int32_t GetRecordFile(UTime &time, RecordFile **record_file);
     int32_t GetNextRecordFile(RecordFile *current_record_file, RecordFile **next_record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
-    int32_t PushBackRecordFile(UTime time, RecordFile *record_file);
+    int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
 
     void Shutdown();
 };
 
-class C_WriteIndexTick: public Context
-{
-    StoreClient *client_;
-    RecordFile *record_file_e
-public:
-
-    C_WriteIndexTick(StoreClient *client, RecordFile *record_file)
-    : client_(client), record_file_(record_file)
-    {}
-
-    void Finish(int r)
-    {
-        int32_t ret;
-        ret = client_->writer.WriteRecordFileIndex(record_file_, r);
-        return;
-    }
-};
+class StoreClient;
+class C_WriteIndexTick;
 
 class RecordWriter : public Thread
 {
@@ -110,8 +84,10 @@ public:
     int32_t ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds);
 
     void Start();
-    void Entry();
+    void *Entry();
     void Stop();
+
+    void Shutdown();
 };
 
 class RecordReader
@@ -127,6 +103,8 @@ public:
     int32_t Seek(UTime &stamp);
     int32_t ReadFrame(FRAME_INFO_T *frame_info);
     int32_t Close();
+
+    void Shutdown();
 };
 
 class StoreClient
@@ -151,7 +129,10 @@ public:
     int32_t GetFreeFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t GetRecordFile(UTime &stamp, RecordFile **record_file);
+    int32_t PutRecordFile(UTime &stamp, RecordFile *record_file);
     int32_t RecycleRecordFile(RecordFile *record_file);
+
+    int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
     int32_t OpenWrite(uint32_t id);
     int32_t OpenRead(uint32_t id);
@@ -160,6 +141,26 @@ public:
 
     int32_t CloseWrite(uint32_t id);
     int32_t CloseRead(uint32_t id);
+
+    void Shutdown();
+};
+
+class C_WriteIndexTick: public Context
+{
+    StoreClient *client_;
+    RecordFile *record_file_;
+public:
+
+    C_WriteIndexTick(StoreClient *client, RecordFile *record_file)
+    : client_(client), record_file_(record_file)
+    {}
+
+    void Finish(int r)
+    {
+        int32_t ret;
+        ret = client_->WriteRecordFileIndex(record_file_, r);
+        return;
+    }
 };
 
 typedef struct recycle_item
@@ -168,23 +169,7 @@ typedef struct recycle_item
     StoreClient *store_client;
 }RecycleItem;
 
-class C_Recycle : public Context
-{
-    StoreClientCenter *store_client_center_;
-
-    C_Recycle(StoreClientCenter *store_client_center)
-    : store_client_center_(store_client_center)
-    {
-    
-    }
-
-    void Finish(int r)
-    {
-        store_client_center_->Recycle();
-        return;
-    }
-}
-
+class C_Recycle;
 class StoreClientCenter
 {
 private:
@@ -204,10 +189,10 @@ public:
 
     StoreClientCenter(Logger *logger);
 
-    int32_t OpenStoreClient(int flags, uint32_t id, string &stream_info);
+    int32_t Open(int flags, uint32_t id, string &stream_info);
     int32_t GetStoreClient(uint32_t id, StoreClient **client);
     int32_t FindStoreClient(string stream_info, StoreClient **client);
-    int32_t CloseStoreClient(uint32_t id, int flag);
+    int32_t Close(uint32_t id, int flag);
 
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t SeekRead(uint32_t id, UTime &stamp);
@@ -216,6 +201,25 @@ public:
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();
     int32_t Recycle();
+
+    void Shutdown();
+};
+
+class C_Recycle : public Context
+{
+    StoreClientCenter *store_client_center_;
+
+    C_Recycle(StoreClientCenter *store_client_center)
+    : store_client_center_(store_client_center)
+    {
+    
+    }
+
+    void Finish(int r)
+    {
+        store_client_center_->Recycle();
+        return;
+    }
 };
 
 }

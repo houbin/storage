@@ -20,36 +20,6 @@ IndexFileManager *index_file_manager = NULL;
 extern "C"
 {
 
-inline bool operator>(const UTIME_T &x, const UTIME_T &y)
-{
-    return ((x.seconds > y.seconds) || ((x.seconds == y.seconds) && (x.nseconds > y.nseconds)));
-}
-
-inline bool operator<=(const UTIME_T &x, const UTIME_T &y)
-{
-    return !(operator>(x, y));
-}
-
-inline bool operator<(const UTIME_T &x, const UTIME_T &y)
-{
-    return ((x.seconds < y.seconds) || ((x.seconds == y.seconds) && (x.nseconds < y.seconds)));
-}
-
-inline bool operator>=(const UTIME_T &x, const UTIME_T &y)
-{
-    return !(operator<(x,y));
-}
-
-inline bool operator==(const UTIME_T &x, const UTIME_T &y)
-{
-    return ((x.seconds == y.seconds) && (x.nseconds == y.nseconds));
-}
-
-inline bool operator!=(const UTIME_T &x, const UTIME_T &y)
-{
-    return !(operator==(x, y));
-}
-
 void storage_init()
 {
     int32_t ret;
@@ -87,7 +57,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     }
 
     /* 准备读或写数据结构 */
-    ret = store_client_center->OpenStoreClient(flags, *id, key_info);
+    ret = store_client_center->Open(flags, *id, key_info);
     if (ret != 0)
     {
         id_map.ReleaseId(id);
@@ -125,8 +95,32 @@ void storage_close(const uint32_t id);
     }
 
     id_center->ReleaseId(id);
-    ret = store_client_center->CloseStoreClient(id, flag);
+    ret = store_client_center->Close(id, flag);
 
+    return;
+}
+
+void storage_shutdown()
+{
+    id_center.Shutdown();
+    delete id_center;
+    id_center = NULL;
+
+    store_client_center->Shutdown();
+    delete store_client_center;
+    store_client_center = NULL;
+
+    free_file_table->Shutdown();
+    delete free_file_table;
+    free_file_table = NULL;
+
+    index_file_manager->Shutdown();
+    delete index_file_manager;
+    index_file_manager = NULL;
+
+    delete logger;
+    logger = NULL;
+    
     return;
 }
 

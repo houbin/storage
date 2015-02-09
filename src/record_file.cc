@@ -3,10 +3,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "record_file.h"
-#include "index_file.h"
 #include "../util/clock.h"
 #include "../util/coding.h"
+#include "../util/crc32c.h"
+#include "store_types.h"
+#include "record_file.h"
+#include "index_file.h"
 
 using namespace util;
 
@@ -15,7 +17,8 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), locked_(false),
-state_(kCleared), record_fragment_count_(0), start_time_(0), end_time_(0), record_offset_(0)
+state_(kCleared), record_fragment_count_(0), start_time_(0, 0), end_time_(0, 0),
+i_frame_start_time_(0, 0), i_frame_end_time_(0, 0), record_offset_(0)
 {
 
 }
@@ -74,10 +77,10 @@ int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uin
     temp += sizeof(record_file_info.locked);
 
     *temp = state_;
-    temp += sizeof(record_file_info.state);
+    temp += sizeof(record_file_info.state_);
 
     *temp = record_fragment_count_ & 0xff;
-    *(temp+1) = record_fragment_count_ >> 8
+    *(temp+1) = record_fragment_count_ >> 8;
     temp += sizeof(record_file_info.record_fragment_counts);
 
     EncodeFixed32(temp, start_time_.tv_sec);
@@ -161,7 +164,7 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
     return 0;
 }
 
-int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
+int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
 {
     int ret;
     Log(logger_, "write stream %s , length %d", buffer.c_str(), length);
@@ -181,7 +184,7 @@ int32_t RecordFile::Append(String &buffer, uint32_t length, BufferTimes &times)
     }
     
     ret = write(write_fd_, buffer.c_str(), length);
-    assert(ret == length);
+    assert((uint32_t)ret == length);
     fdatasync(write_fd_);
 
     if (state_ != kWriting)
@@ -271,6 +274,11 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
 
     if (read_fd_ < 0)
     {
+        char buffer[32] = {0};
+        snprintf(buffer, 32, "record_%05d", number_);
+
+        string record_file_path(base_name_);
+        record_file_path.append(buffer);
         read_fd_ = open(record_file_path.c_str(), O_RDONLY);
         assert(read_fd_ > 0);
     }
@@ -289,9 +297,9 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
             return ret;
         }
 
-        if (frame->type == JVN_DATA_O)
+        if (frame.type == JVN_DATA_O)
         {
-            if (frame->frame_time >= stamp)
+            if (frame.frame_time >= stamp)
             {
                 *offset = stamp_offset;
                 return 0;
@@ -299,7 +307,7 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
         }
 
         stamp_offset += kHeaderSize;
-        stamp_offset += frame->size;
+        stamp_offset += frame.size;
     }
 
     if (stamp_offset >= record_offset_)

@@ -20,29 +20,29 @@ public:
         pthread_rwlock_init(&rwlock_, NULL);
     }
 
-    ~RDLocker()
+    ~RWLock()
     {
-        pthread_rwlock_destroy();
+        pthread_rwlock_destroy(&rwlock_);
     }
 
     void GetReadLock()
     {
-        pthread_rwlock_rdlock();
+        pthread_rwlock_rdlock(&rwlock_);
     }
 
     void PutReadLock()
     {
-        pthread_rwlock_unlock();
+        pthread_rwlock_unlock(&rwlock_);
     }
 
     void GetWriteLock()
     {
-        pthread_rwlock_wrlock();
+        pthread_rwlock_wrlock(&rwlock_);
     }
 
-    void PutWriteLock();
+    void PutWriteLock()
     {
-        pthread_rwlock_unlock();
+        pthread_rwlock_unlock(&rwlock_);
     }
 
     class RDLocker
