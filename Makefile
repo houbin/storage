@@ -23,7 +23,7 @@ $(PRG):$(OBJ)
 	$(CC) -fPIC -shared -o $@ $(OBJ) $(LIB)
 
 .SUFFIXES: .c .o .cc
-.cc.o:
+%.o : %.cc
 	$(CC) $(CC_FLAG) $(INC) -c $*.cc -o $*.o
 
 .PRONY:clean
