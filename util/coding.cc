@@ -4,7 +4,7 @@
 
 #include "coding.h"
 
-namespace storage {
+namespace util {
 
 void EncodeFixed32(char* buf, uint32_t value) {
   if (port::kLittleEndian) {
@@ -94,12 +94,12 @@ void PutVarint64(std::string* dst, uint64_t v) {
   char* ptr = EncodeVarint64(buf, v);
   dst->append(buf, ptr - buf);
 }
-
+/*
 void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
   PutVarint32(dst, value.size());
   dst->append(value.data(), value.size());
 }
-
+*/
 int VarintLength(uint64_t v) {
   int len = 1;
   while (v >= 128) {
@@ -127,7 +127,7 @@ const char* GetVarint32PtrFallback(const char* p,
   }
   return NULL;
 }
-
+/*
 bool GetVarint32(Slice* input, uint32_t* value) {
   const char* p = input->data();
   const char* limit = p + input->size();
@@ -190,5 +190,5 @@ bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
     return false;
   }
 }
-
+*/
 }  // namespace storage

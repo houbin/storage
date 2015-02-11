@@ -3,8 +3,6 @@
 
 #include <errno.h>
 
-#define safe_free(ptr) do{if(ptr){free(ptr);ptr = NULL;}}while(0)
-
 #define ERR_SELF_DEFINE_START       2000
 #define ERR_INVALID_INPUT_PARA      2001
 #define ERR_FILE_NOT_EXIST          2002

@@ -184,7 +184,7 @@ int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
     }
     
     ret = write(write_fd_, buffer.c_str(), length);
-    assert((uint32_t)ret == length);
+    assert(ret == (int)length);
     fdatasync(write_fd_);
 
     if (state_ != kWriting)
@@ -299,7 +299,8 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
 
         if (frame.type == JVN_DATA_O)
         {
-            if (frame.frame_time >= stamp)
+            UTime frame_time(frame.frame_time.seconds, frame.frame_time.nseconds);
+            if (frame_time >= stamp)
             {
                 *offset = stamp_offset;
                 return 0;
@@ -327,16 +328,21 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     
     if (read_fd_ < 0) 
     {
+        char buffer[32] = {0};
+        snprintf(buffer, 32, "record_%05d", number_);
+        string record_file_path(base_name_);
+        record_file_path.append(buffer);
+
         read_fd_ = open(record_file_path.c_str(), O_RDONLY);
         assert(read_fd_ > 0);
     }
 
     char header[kHeaderSize] = {0};
     ret = pread(read_fd_, header, kHeaderSize, offset);
-    assert(ret == kHeaderSize);
+    assert(ret == (int)kHeaderSize);
 
     {
-        uint32_t ret = DecodeHeader(frame, header);
+        uint32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
             return ret;
@@ -344,7 +350,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     }
 
     ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
-    assert(ret == frame->size);
+    assert(ret == (int)frame->size);
 
     return 0;
 }

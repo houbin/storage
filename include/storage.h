@@ -1,7 +1,7 @@
 #ifndef STORAGE_H_
 #define STORAGE_H_
 
-#include "logger.h"
+#include "../util/logger.h"
 #include "../src/id_center.h"
 #include "../src/store_client_center.h"
 #include "../src/free_file_table.h"

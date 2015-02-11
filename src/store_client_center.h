@@ -33,7 +33,9 @@ private:
     bool stop_;
 
 public:
-    RecordFileMap(Logger logger);
+    RecordFileMap(Logger *logger);
+    bool IsEmpty();
+
     int32_t GetRecordFile(UTime &time, RecordFile **record_file);
     int32_t GetNextRecordFile(RecordFile *current_record_file, RecordFile **next_record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
@@ -49,7 +51,7 @@ class C_WriteIndexTick;
 class RecordWriter : public Thread
 {
 private:
-    Logger *logger;
+    Logger *logger_;
     StoreClient *store_client_;
 
     Mutex queue_mutex_;
@@ -75,7 +77,7 @@ public:
 
     int32_t EncodeHeader(char *buffer, FRAME_INFO_T *frame);
     int32_t EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame);
-    int32_t UpdateBufferTimes(uint32_t type, UTime time);
+    int32_t UpdateBufferTimes(uint32_t type, UTime &time);
     int32_t WriteBuffer(RecordFile *record_file, uint32_t write_length);
     int32_t BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
                         char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_frag_info_number);
@@ -118,10 +120,13 @@ private:
     RecordWriter writer;
 
     Mutex reader_mutex_;
-    map<uint32_t, RecordReader> record_readers_;
+    map<uint32_t, RecordReader*> record_readers_;
 
 public:
     StoreClient(Logger *logger, string stream_info);
+
+    string GetStreamInfo();
+    bool IsRecordFileEmpty();
 
     int32_t Open(int flags, uint32_t id);
     int32_t EnqueueFrame(FRAME_INFO_T *frame);
@@ -190,9 +195,11 @@ public:
     StoreClientCenter(Logger *logger);
 
     int32_t Open(int flags, uint32_t id, string &stream_info);
+    int32_t Close(uint32_t id, int flag);
+
     int32_t GetStoreClient(uint32_t id, StoreClient **client);
     int32_t FindStoreClient(string stream_info, StoreClient **client);
-    int32_t Close(uint32_t id, int flag);
+    int32_t RemoveStoreClient(StoreClient *client);
 
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t SeekRead(uint32_t id, UTime &stamp);
@@ -207,6 +214,7 @@ public:
 
 class C_Recycle : public Context
 {
+public:
     StoreClientCenter *store_client_center_;
 
     C_Recycle(StoreClientCenter *store_client_center)

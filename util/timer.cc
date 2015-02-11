@@ -141,7 +141,7 @@ void SafeTimer::DoEvent(Context *callback)
     if (p == events_.end())
     {
         Log(logger_, "CancelEvents %p not found", callback);
-        return false;
+        return;
     }
 
     Log(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);

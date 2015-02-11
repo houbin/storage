@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "../include/errcode.h"
 
 namespace util
 {
@@ -93,7 +94,7 @@ int32_t NewLogger(const char* name, Logger **logger)
     }
 
     *logger = new Logger(f);
-    return OK;
+    return 0;
 }
 
 void LogFunc(Logger *info_log, const char* format, ...)

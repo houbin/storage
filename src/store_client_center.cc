@@ -1,7 +1,8 @@
-#include "store_client_center.h"
+#include "../include/storage.h"
 #include "../util/coding.h"
 #include "index_file.h"
-#include "../include/storage.h"
+#include "store_client_center.h"
+#include "store_types.h"
 
 namespace storage
 {
@@ -14,13 +15,26 @@ RecordFileMap::RecordFileMap(Logger *logger)
 
 }
 
+bool RecordFileMap::IsEmpty()
+{
+    Log(logger_, "is empty");
+
+    if (record_file_map_.empty())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "get record file time %d.%d", time.tv_sec, time.tv_nsec);
 
     map<UTime, RecordFile*>::iterator iter_up;
-    map<UTime, RecordFile*>::iterator iter;
 
     RWLock::RDLocker locker(rwlock_);
     if (stop_)
@@ -28,22 +42,31 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
         return -ERR_SHUTDOWN;
     }
 
-    iter_up = record_file_map_.upper_bound();
-    if (iter_up == record_file_map_.end())
-    {
-        iter = record_file_map_.rbegin();
-    }
-    else
-    {
-        iter = iter_up--;
-    }
-
-    if (iter == record_file_map_.rend())
+    if (!record_file_map_.empty())
     {
         return -ERR_ITEM_NOT_FOUND;
     }
 
-    *record_file = iter->second;
+    map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
+    assert(iter != record_file_map_.end());
+    if (iter->first > time)
+    {
+        return -ERR_ITEM_NOT_FOUND;
+    }
+
+    iter_up = record_file_map_.upper_bound(time);
+    if (iter_up == record_file_map_.end())
+    {
+        map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
+        assert(riter != record_file_map_.rend());
+        *record_file = riter->second;
+    }
+    else
+    {
+        iter_up--;
+        *record_file = iter_up->second;
+    }
+
     return 0;
 }
 
@@ -52,25 +75,23 @@ int32_t RecordFileMap::GetLastRecordFile(RecordFile **record_file)
     assert(record_file != NULL);
     Log(logger_, "get last record file");
 
-    map<UTime, RecordFile*>::iterator iter;
-
     RWLock::RDLocker locker(rwlock_);
     if (stop_)
     {
         return -ERR_SHUTDOWN;
     }
 
-    iter = record_file_map_.rbegin();
-    if (iter == record_file_map_.rend())
+    map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
+    if (riter == record_file_map_.rend())
     {
         return -ERR_ITEM_NOT_FOUND;
     }
 
-    *record_file = iter->second;
+    *record_file = riter->second;
     return 0;
 }
 
-int32_t RecordFileMap::PutRecordFile(UTime time, RecordFile *record_file)
+int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "push back record file, time %d.%d", time.tv_sec, time.tv_nsec);
@@ -84,12 +105,12 @@ int32_t RecordFileMap::PutRecordFile(UTime time, RecordFile *record_file)
     }
 
     ret = record_file_map_.insert(make_pair(time, record_file));
-    if (ret->second == false)
+    if (ret.second == false)
     {
         assert("record file already exist" == 0);
     }
 
-    map<UTime, RecordFile*>::iterator iter = ret->first;
+    map<UTime, RecordFile*>::iterator iter = ret.first;
     file_search_map_.insert(make_pair(record_file, iter));
 
     return 0;
@@ -117,7 +138,7 @@ void RecordFileMap::Shutdown()
     stop_ = true;
 
     map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
-    for (iter; iter != record_file_map_.end(); iter++)
+    for (; iter != record_file_map_.end(); iter++)
     {
         RecordFile *record_file = iter->second;
         record_file = NULL;
@@ -129,12 +150,11 @@ void RecordFileMap::Shutdown()
 // ======================================================= //
 //                  store client writer
 // ======================================================= //
-RecordWriter::Writer(Logger *logger, StoreClient *store_client)
+RecordWriter::RecordWriter(Logger *logger, StoreClient *store_client)
 : logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), current_o_frame_(NULL), 
-write_index_event_mutex_("RecordWriter::write_index_event_mutex_"), write_index_event(NULL), 
-last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), stop_(false)
+ write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), stop_(false)
 {
-    memset(buffer_times_, 0, sizeof(BufferTimes));
+    memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
 }
 
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
@@ -216,7 +236,7 @@ int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame)
     return 0;
 }
 
-int32_t RecordWriter::UpdateBufferTimes(uint32_t type, UTime time);
+int32_t RecordWriter::UpdateBufferTimes(uint32_t type, UTime &time)
 {
     Log(logger_, "update buffer times");
 
@@ -230,7 +250,7 @@ int32_t RecordWriter::UpdateBufferTimes(uint32_t type, UTime time);
         buffer_times_.i_frame_start_time = time;
     }
 
-    if (buffer_times_.end_time < update.end_time)
+    if (buffer_times_.end_time < time)
     {
         buffer_times_.end_time = time;
     }
@@ -247,11 +267,13 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
 {
     assert(record_file != NULL);
     Log(logger_, "write buffer, write_length is %d, record file base name is %s, number is %d", 
-            write_length, record_file->base_name_, record_file->number_);
+            write_length, record_file->base_name_.c_str(), record_file->number_);
+
+    int32_t ret;
 
     Mutex::Locker lock(last_record_file_mutex_);
 
-    ret = reocrd_file->Append(buffer_, write_length, buffer_times_);
+    ret = record_file->Append(buffer_, write_length, buffer_times_);
     assert(ret == 0);
 
     buffer_.erase(0, write_length);
@@ -260,10 +282,10 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
     return 0;
 }
 
-int32_t RecordWriter::BuildRecordFileIndex(RecordFile *file, char *record_file_info_buffer, uint32_t record_file_info_length
+int32_t RecordWriter::BuildRecordFileIndex(RecordFile *file, char *record_file_info_buffer, uint32_t record_file_info_length,
                             char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_flag_info_number)
 {
-    assert(record_file != NULL);
+    int32_t ret;
     Log(logger_, "build record file index");
 
     RecordFile *record_file = NULL;
@@ -285,45 +307,49 @@ int32_t RecordWriter::BuildRecordFileIndex(RecordFile *file, char *record_file_i
 
 int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
 {
-    assert(write_index_event != NULL);
-    Log(logger_, "write index, write_index_event is %p", write_index_event);
-    write_index_event = NULL;
+    Mutex::Locker lock(store_client_center->timer_lock);
+
+    assert(write_index_event_ != NULL);
+    Log(logger_, "write index, write_index_event_ is %p", write_index_event_);
+    write_index_event_ = NULL;
 
     int32_t ret;
-    struct RecordFileInfo record_file_info_buffer = {0}:
+    IndexFile *index_file = NULL;
+    struct RecordFileInfo record_file_info_buffer = {0};
     struct RecordFragmentInfo record_frag_info_buffer = {0};
     uint32_t record_frag_info_number = 0;
+    uint32_t file_info_write_offset;
+    uint32_t file_counts = index_file->GetFileCounts();
+    uint32_t frag_info_write_offset;
 
     ret = BuildRecordFileIndex(record_file, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo), 
                                 (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo), &record_frag_info_number);
     if (ret == -ERR_RECORD_WRITE_OFFSET_ZERO)
     {
-        goto Again;
+        goto again;
     }
     else
     {
         assert(ret == 0);
     }
 
-    IndexFile *index_file = NULL;
     ret = index_file_manager->Find(record_file->base_name_, &index_file);
     assert(ret == 0 && index_file != NULL);
 
-    uint32_t file_info_write_offset = record_file->number_ * sizeof(RecordFileInfo);
-    uint32_t frag_info_write_offset = index_file->file_counts_ * sizeof(RecordFileInfo) + 
+    file_info_write_offset = record_file->number_ * sizeof(RecordFileInfo);
+    frag_info_write_offset = file_counts * sizeof(RecordFileInfo) + 
             record_file->number_ * kStripeCount * sizeof(RecordFragmentInfo) + record_frag_info_number * sizeof(RecordFragmentInfo);
-    index_file->Write(file_info_write_offset, record_file_info_buffer, record_file_info_length);
-    index_file->Write(frag_info_write_offset, record_frag_info_buffer, record_frag_info_length);
+    index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
+    index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
 
     if (r == -1)
     {
         return 0;
     }
 
-Again:
-    write_index_event = new C_WriteIndexTick(store_client_, NULL);
-    store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event);
-
+again:
+    write_index_event_ = new C_WriteIndexTick(store_client_, NULL);
+    store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event_);
 
     return 0;
 }
@@ -332,21 +358,21 @@ int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t aft
 {
     Mutex::Locker lock(store_client_center->timer_lock);
 
-    if (write_index_event != NULL)
+    if (write_index_event_ != NULL)
     {
-        Log(logger_, "cancel write index, write_index_event is %p", write_index_event);
-        store_client_center->timer.CancelEvent(write_index_event);
-        write_index_event = NULL;
+        Log(logger_, "cancel write index, write_index_event_ is %p", write_index_event_);
+        store_client_center->timer.CancelEvent(write_index_event_);
+        write_index_event_ = NULL;
     }
 
-    write_index_event = new C_WriteIndexTick(store_client_, record_file);
-    store_client_center->timer.AddEventAfter(after_seconds, write_index_event);
-    Log(logger_, "reset write index, write_index_event is %p, record_file is %p", write_index_event, record_file);
+    write_index_event_ = new C_WriteIndexTick(store_client_, record_file);
+    store_client_center->timer.AddEventAfter(after_seconds, write_index_event_);
+    Log(logger_, "reset write index, write_index_event_ is %p, record_file is %p", write_index_event_, record_file);
 
     return 0;
 }
 
-int32_t RecordWriter::Entry()
+void *RecordWriter::Entry()
 {
     int32_t ret;
     Log(logger_, "entry");
@@ -400,7 +426,7 @@ int32_t RecordWriter::Entry()
                 }
             }
 
-            uint32_t buffer_old_length = buffer_->length();
+            uint32_t buffer_old_length = buffer_.length();
             uint32_t frame_length = kHeaderSize + frame->size;
             if (add_o_frame)
             {
@@ -412,23 +438,25 @@ int32_t RecordWriter::Entry()
             if (ret == ERR_ITEM_NOT_FOUND)
             {
                 Log(logger_, "doesn't find any record file");
-                ret = store_client_->GetFreeFile(frame->frame_time, &record_file);
+                UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
+                ret = store_client_->GetFreeFile(stamp, &record_file);
                 assert(ret == 0);
                 assert(record_file != NULL);
             }
 
             uint32_t write_offset = record_file->record_offset_;
-            assert(write_length <= kRecordFileSize);
+            assert(write_offset <= kRecordFileSize);
             uint32_t file_left_size = kRecordFileSize - write_offset;
 
+            UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
             if ((buffer_old_length + frame_length) <= file_left_size)
             {
                 EncodeFrame(add_o_frame, frame);
                 
                 /* 更新当前buffer的时间 */
-                UpdateBufferTimes(type, frame->frame_time);
+                UpdateBufferTimes(frame_type, stamp);
 
-                uint32_t buffer_length = buffer.length();
+                uint32_t buffer_length = buffer_.length();
                 if (buffer_length >= kBlockSize)
                 {
                     uint32_t block_count = buffer_length / kBlockSize;
@@ -451,10 +479,11 @@ int32_t RecordWriter::Entry()
                 ResetWriteIndexEvent(record_file, 0);
 
                 EncodeFrame(add_o_frame, frame);
-                UpdateBufferTimes(type, frame->frame_time);
+                UpdateBufferTimes(frame_type, stamp);
 
                 RecordFile *record_file = NULL;
-                ret = store_client_->GetFreeFile(frame->frame_time, &record_file);
+                UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
+                ret = store_client_->GetFreeFile(stamp, &record_file);
                 assert(ret == 0 && record_file != NULL);
 
                 uint32_t buffer_length = buffer_.length();
@@ -501,7 +530,7 @@ int32_t RecordWriter::Entry()
     queue_mutex_.Unlock();
     
     Log(logger_, "entry end");
-    return;
+    return 0;
 }
 
 void RecordWriter::Start()
@@ -520,6 +549,8 @@ void RecordWriter::Stop()
 {
     Log(logger_, "stop");
 
+    uint32_t ret;
+
     /* stop queue */
     queue_mutex_.Lock();
     stop_ = true;
@@ -528,7 +559,7 @@ void RecordWriter::Stop()
     Join();
 
     /* clear buffer string */
-    String temp;
+    string temp;
     temp.swap(buffer_);
 
     /* clear buffer times*/
@@ -566,15 +597,15 @@ void RecordWriter::Shutdown()
 //                  record reader
 // ======================================================= //
 RecordReader::RecordReader(StoreClient *store_client)
-: store_client_(store_client), record_file_(NULL), read_offset_(0), current_o_frame_(NULL)
+: store_client_(store_client), record_file_(NULL), read_offset_(0)
 {
-
+    memset((void *)&current_o_frame_, 0, sizeof(FRAME_INFO_T));
 }
 
 int32_t RecordReader::Seek(UTime &stamp)
 {
     int32_t ret;
-    uint32_t read_offset = 0;
+    uint32_t offset = 0;
     RecordFile *record_file = NULL;
     
     ret = store_client_->GetRecordFile(stamp, &record_file);
@@ -593,6 +624,8 @@ int32_t RecordReader::Seek(UTime &stamp)
 
 int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 {
+    int32_t ret;
+
     if (record_file_ == NULL)
     {
         return -ERR_SEEK_ERROR;
@@ -605,7 +638,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 
         if (frame->type == JVN_DATA_O)
         {
-            if (current_o_frame_ != NULL)
+            if (current_o_frame_.type == JVN_DATA_O)
             {
                 /* o frame no change */
                 if ((current_o_frame_.size == frame->size)
@@ -661,6 +694,16 @@ StoreClient::StoreClient(Logger *logger, string stream_info)
 
 }
 
+string StoreClient::GetStreamInfo()
+{
+    return stream_info_;
+}
+
+bool StoreClient::IsRecordFileEmpty()
+{
+    return record_file_map_.IsEmpty();
+}
+
 int32_t StoreClient::OpenWrite(uint32_t id)
 {
     Log(logger_, "open write, id is %d", id);
@@ -673,24 +716,26 @@ int32_t StoreClient::OpenWrite(uint32_t id)
 int32_t StoreClient::OpenRead(uint32_t id)
 {
     Log(logger_, "open read, id is %d", id);
-    pair<map<uint32_t, RecordReader>::iterator, bool> ret;
+    pair<map<uint32_t, RecordReader*>::iterator, bool> ret;
 
     Mutex::Locker lock(reader_mutex_);
-    RecordReader record_reader(this);
+    RecordReader *record_reader = new RecordReader(this);
     ret = record_readers_.insert(make_pair(id, record_reader));
-    assert(ret->second == true);
+    assert(ret.second == true);
 
     return 0;
 }
 
 int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
 {
+    int32_t ret;
     Log(logger_, "seek read id, id is %d", id);
 
     reader_mutex_.Lock();
-    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
     assert(iter != record_readers_.end());
-    RecordReader record_reader = iter->second;
+    RecordReader *record_reader = iter->second;
+    assert(record_reader != NULL);
     reader_mutex_.Unlock();
 
     ret = record_reader->Seek(stamp);
@@ -705,18 +750,18 @@ int32_t StoreClient::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
     Log(logger_, "read frame, id is %d", id);
 
     int32_t ret = 0;
-    RecordReader record_reader;
+    RecordReader *record_reader = NULL;
 
-    read_mutex_.Lock();
-    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    reader_mutex_.Lock();
+    map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
     if (iter == record_readers_.end())
     {
         return -ERR_ITEM_NOT_FOUND;
     }
     record_reader = iter->second;
-    read_mutex_.Unlock();
+    reader_mutex_.Unlock();
 
-    ret = record_reader.ReadFrame(frame);
+    ret = record_reader->ReadFrame(frame);
     if (ret != 0)
     {
         return ret;
@@ -730,6 +775,8 @@ int32_t StoreClient::EnqueueFrame(FRAME_INFO_T *frame)
     assert(frame != NULL);
     assert(frame->buffer != NULL);
     Log(logger_, "enqueue frame %p", frame);
+
+    int32_t ret;
 
     WriteOp *write_op = (WriteOp*)malloc(sizeof(WriteOp));
     assert(write_op != NULL);
@@ -748,7 +795,7 @@ int32_t StoreClient::EnqueueFrame(FRAME_INFO_T *frame)
         memcpy(write_op->frame_info->buffer, frame->buffer, frame->size);
     }
 
-    ret = writer->Enqueue(write_op);
+    ret = writer.Enqueue(write_op);
 
     return ret;
 }
@@ -761,18 +808,18 @@ int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
     int32_t ret;
     RecordFile *free_file = NULL;
 
-    ret = free_file_table->Get(&free_file);
+    ret = free_file_table->Get(stream_info_, &free_file);
     assert(ret == 0 && free_file != NULL);
 
     /* used to record read */
     free_file->stream_info_ = stream_info_;
     free_file->start_time_ = time;
     free_file->state_ = kIdle;
-    ret = record_file_map_->PutRecordFile(time, free_file);
+    ret = record_file_map_.PutRecordFile(time, free_file);
     assert(ret == 0);
 
     /* used to recycle */
-    ret = store_client_center->AddToRecycleQueue(this, record_file);
+    ret = store_client_center->AddToRecycleQueue(this, free_file);
     assert(ret == 0);
 
     *record_file = free_file;
@@ -784,21 +831,21 @@ int32_t StoreClient::GetLastRecordFile(RecordFile **record_file)
     assert(record_file != NULL);
     Log(logger_, "get last record file");
 
-    return record_file_map_->GetLastRecordFile(record_file);
+    return record_file_map_.GetLastRecordFile(record_file);
 }
 
 int32_t StoreClient::GetRecordFile(UTime &stamp, RecordFile **record_file)
 {
     Log(logger_, "get record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
     
-    return record_file_map_->GetRecordFile(stamp, record_file);
+    return record_file_map_.GetRecordFile(stamp, record_file);
 }
 
-int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile **record_file)
+int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile *record_file)
 {
     Log(logger_, "put record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
 
-    return record_file_map_->PutRecordFile(stamp, record_file);
+    return record_file_map_.PutRecordFile(stamp, record_file);
 }
 
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
@@ -813,7 +860,7 @@ int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r)
 {
     Log(logger_, "write record file index");
 
-    writer.WriteRecordFileIndex();
+    writer.WriteRecordFileIndex(record_file, r);
 
     return 0;
 }
@@ -832,16 +879,16 @@ int32_t StoreClient::CloseWrite(uint32_t id)
 int32_t StoreClient::CloseRead(uint32_t id)
 {
     Log(logger_, "close read id %d");
-    int32_t ret;
 
-    map<uint32_t, RecordReader>::iterator iter = record_readers_.find(id);
+    map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
     if (iter == record_readers_.end())
     {
-        return;
+        return -ERR_ITEM_NOT_FOUND;
     }
 
-    RecordReader record_reader = iter->second;
-    record_reader.Close();
+    RecordReader *record_reader = iter->second;
+    record_reader->Close();
+    delete record_reader;
 
     return 0;
 }
@@ -849,16 +896,16 @@ int32_t StoreClient::CloseRead(uint32_t id)
 void StoreClient::Shutdown()
 {
     writer.Shutdown();
-    reader.Shutdown();
     record_file_map_.Shutdown();
 
+    //TODO reader shutdown
     return;
 }
 
 // ======================================================= //
 //              store client center 
 // ======================================================= //
-StoreClientCenter::StoreClientCenter(Logger *logger, IdCenter *id_center)
+StoreClientCenter::StoreClientCenter(Logger *logger)
 : logger_(logger), rwlock_("StoreClientCenter::RWLock"), recycle_mutex_("StoreClientCenter::RecycleMutex"),
 timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 {
@@ -867,16 +914,15 @@ timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 
 int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
 {
-    assert(flags == 0 || flags == 1);
+    assert(flag == 0 || flag == 1);
 
     int32_t ret;
-    string stream_info;
     StoreClient *client = NULL;
 
     Log(logger_, "open store client, flag is %d, id is %d, stream info is %s", 
         flag, id, stream_info.c_str());
 
-    if (flags == 0)
+    if (flag == 0)
     {
         ret = FindStoreClient(stream_info, &client);
         assert(ret == 0 && client != NULL);
@@ -939,12 +985,36 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
     return 0;
 }
 
+int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
+{
+    assert(client != NULL);
+    Log(logger_, "remove store client, client is %p", client);
+    
+    RWLock::WRLocker lock(rwlock_);
+
+    string stream_info = client->GetStreamInfo();
+    map<string, StoreClient*>::iterator map_iter = client_search_map_.find(stream_info);
+    assert(map_iter != client_search_map_.end());
+    client_search_map_.erase(map_iter);
+
+    client->Shutdown();
+    delete client;
+    client = NULL;
+
+    return 0;
+}
+
 int32_t StoreClientCenter::Close(uint32_t id, int flag)
 {
     assert(flag == 0 || flag == 1);
     Log(logger_, "close store client %d, flag is %d", id, flag);
 
     int32_t ret;
+
+    rwlock_.GetWriteLock();
+    clients_.erase(clients_.begin() + id);
+    rwlock_.PutWriteLock();
+
     StoreClient *client = NULL;
 
     ret = GetStoreClient(id, &client);
@@ -987,7 +1057,7 @@ int32_t StoreClientCenter::WriteFrame(uint32_t id, FRAME_INFO_T *frame)
 
 int32_t StoreClientCenter::SeekRead(uint32_t id, UTime &stamp)
 {
-    Log(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
+    Log(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp.tv_sec, stamp.tv_nsec);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1009,7 +1079,7 @@ int32_t StoreClientCenter::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
     int32_t ret;
     StoreClient *client = NULL;
 
-    ret = GetStoreClient(id, frame);
+    ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
         return ret;
@@ -1048,14 +1118,13 @@ int32_t StoreClientCenter::StartRecycle()
 
 int32_t StoreClientCenter::Recycle()
 {
-    int recycle_count = 0;
+    uint32_t recycle_count = 0;
     int32_t ret = 0;
     Log(logger_, "recycle");
 
     Mutex::Locker lock(recycle_mutex_);
-    dequeue<RecycleItem>::iterator iter = recycle_queue_.begin();
-    while(iter != recycle_queue_.end() 
-            && recycle_count <= kFilesPerRecycle)
+    deque<RecycleItem>::iterator iter = recycle_queue_.begin();
+    while(iter != recycle_queue_.end() && recycle_count <= kFilesPerRecycle)
     {
         RecycleItem recycle_item = *iter;
         RecordFile *record_file = recycle_item.record_file;
@@ -1074,9 +1143,10 @@ int32_t StoreClientCenter::Recycle()
         ret = store_client->RecycleRecordFile(record_file);
         assert(ret == 0);
 
-        if (store_client->Empty())
+        if (store_client->IsRecordFileEmpty())
         {
-            ret = store_client_
+            ret = store_client_center->RemoveStoreClient(store_client);
+            assert(ret == 0);
         }
 
         deque<RecycleItem>::iterator del_iter = iter;
@@ -1099,16 +1169,15 @@ int32_t StoreClientCenter::Recycle()
 void StoreClientCenter::Shutdown()
 {
     {
-        rwlock_.Lock();
+        RWLock::WRLocker lock(rwlock_);
         vector<StoreClient*>::iterator iter = clients_.begin();
-        for (iter; iter != clients_.end(); iter++)
+        for (; iter != clients_.end(); iter++)
         {
             StoreClient *store_client = *iter;
             store_client->Shutdown();
             delete store_client;
             store_client = NULL;
         }
-        rwlock_.Unlock();
     }
 
     {

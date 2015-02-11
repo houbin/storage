@@ -4,7 +4,7 @@
 #include "config_opts.h"
 #include "free_file_table.h"
 #include "index_file.h"
-#include "storage.h"
+#include "../include/storage.h"
 #include "store_client_center.h"
 
 using namespace util;
@@ -33,7 +33,7 @@ void storage_init()
     store_client_center = new StoreClientCenter(logger);
     assert(store_client_center != NULL);
 
-    free_file_table = new FreeFileTable();
+    free_file_table = new FreeFileTable(logger);
     assert(free_file_table != NULL);
 
     index_file_manager = new IndexFileManager(logger);
@@ -50,7 +50,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     int32_t ret;
     string key_info(stream_info);
 
-    ret = id_map.ApplyForFreeId(key_info, id);
+    ret = id_center->ApplyForId(key_info, flags, id);
     if (ret != 0)
     {
         return ret;
@@ -60,7 +60,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     ret = store_client_center->Open(flags, *id, key_info);
     if (ret != 0)
     {
-        id_map.ReleaseId(id);
+        id_center->ReleaseId(*id);
         return ret;
     }
 
@@ -83,7 +83,7 @@ int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info)
     return store_client_center->ReadFrame(id, frame_info);
 }
 
-void storage_close(const uint32_t id);
+void storage_close(const uint32_t id)
 {
     int32_t ret;
     int flag;
@@ -102,7 +102,7 @@ void storage_close(const uint32_t id);
 
 void storage_shutdown()
 {
-    id_center.Shutdown();
+    id_center->Shutdown();
     delete id_center;
     id_center = NULL;
 

@@ -42,6 +42,11 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     Log(logger, "%s file count %d", base_name_.c_str(), file_counts_);
 }
 
+uint32_t IndexFile::GetFileCounts()
+{
+    return file_counts_;
+}
+
 int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
 {
     char *temp = NULL;
@@ -158,7 +163,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 
     fseek(index_file_, offset, SEEK_SET);
     ret = fwrite(buffer, 1, length, index_file_);
-    assert((uint32_t)ret == length);
+    assert(ret == (int)length);
 
     return 0;
 }

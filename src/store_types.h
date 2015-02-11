@@ -1,11 +1,14 @@
 #ifndef STORAGE_STREAM_TYPES_H_
 #define STORAGE_STREAM_TYPES_H_
 
+#include "stdlib.h"
 #include "../include/storage_api.h"
 #include "../util/utime.h"
 
 using namespace std;
 using namespace util;
+
+#define safe_free(ptr) do{if(ptr){free(ptr);ptr = NULL;}}while(0)
 
 namespace storage
 {
