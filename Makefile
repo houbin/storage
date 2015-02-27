@@ -24,7 +24,7 @@ util/mutex.d util/thread.d util/timer.d
 all:$(PRG)
 
 $(PRG):$(OBJ)
-	$(CC) -fPIC -shared -o $@ $(OBJ) $(LIB)
+	$(CC) -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)
 
 .SUFFIXES: .c .o .cc
 %.o : %.cc

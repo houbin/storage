@@ -23,7 +23,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 
     string file_path;
     file_path = base_name_ + "index";
-    index_file_ = fopen(file_path.c_str(), "r");
+    index_file_ = fopen(file_path.c_str(), "rb+");
     assert(index_file_ != NULL);
 
     /* read file counts */
@@ -114,8 +114,13 @@ int32_t IndexFile::AnalyzeAllEntry()
     record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
     assert(record_file_info_buffer != NULL);
 
+    fseek(index_file_, 0, SEEK_SET);
     ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts_, index_file_);
-    assert(ret == file_counts_);
+    if (ret != file_counts_)
+    {
+        Log(logger_, "ret is %d, errno msg is %s", ret, strerror(errno));
+        assert(ret == file_counts_);
+    }
 
     uint32_t i = 0;
     for (i = 0; i < file_counts_; i++)
@@ -161,9 +166,14 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 
     int ret = 0;
 
-    fseek(index_file_, offset, SEEK_SET);
+    ret = fseek(index_file_, offset, SEEK_SET);
+    assert(ret != -1);
     ret = fwrite(buffer, 1, length, index_file_);
-    assert(ret == (int)length);
+    if (ret != length)
+    {
+        Log(logger_, "index_file is %p, buffer is %s, fwrite return %d, errno msg is %s", index_file_, buffer, ret, strerror(errno));
+        assert(ret == (int)length);
+    }
 
     return 0;
 }

@@ -38,6 +38,7 @@ void storage_init()
 
     index_file_manager = new IndexFileManager(logger);
     assert(index_file_manager != NULL);
+    index_file_manager->Init();
 
     return;
 }

@@ -6,6 +6,9 @@
 
 namespace storage
 {
+
+uint64_t kOpSeq = 0;
+
 // ======================================================= //
 //                  record file map
 // ======================================================= //
@@ -151,8 +154,8 @@ void RecordFileMap::Shutdown()
 //                  store client writer
 // ======================================================= //
 RecordWriter::RecordWriter(Logger *logger, StoreClient *store_client)
-: logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), current_o_frame_(NULL), 
- write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), stop_(false)
+: logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), current_o_frame_(NULL),
+write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), stop_(false)
 {
     memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
 }
@@ -160,7 +163,7 @@ RecordWriter::RecordWriter(Logger *logger, StoreClient *store_client)
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
 {
     assert(write_op != NULL);
-    Log(logger_, "writer enqueue write_op %p", write_op);
+    Log(logger_, "writer enqueue write_op %p, seq is %d", write_op, kOpSeq++);
 
     Mutex::Locker lock(queue_mutex_);
     if (stop_)
@@ -179,8 +182,6 @@ int32_t RecordWriter::Dequeue(WriteOp **write_op)
 {
     assert(write_op != NULL);
     Log(logger_, "writer dequeue write_op");
-
-    Mutex::Locker locker(queue_mutex_);
 
     *write_op = write_op_queue_.front();
     write_op_queue_.pop_front();
@@ -375,6 +376,7 @@ int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t aft
 void *RecordWriter::Entry()
 {
     int32_t ret;
+    bool first_i_frame = false;
     Log(logger_, "entry");
 
     queue_mutex_.Lock();
@@ -383,6 +385,8 @@ void *RecordWriter::Entry()
     {
         while(!write_op_queue_.empty())
         {
+            Log(logger_, "write op queue have one event");
+            
             WriteOp *write_op = NULL;
             ret = Dequeue(&write_op);
             assert(ret == 0);
@@ -390,6 +394,7 @@ void *RecordWriter::Entry()
             assert(write_op->frame_info != NULL);
 
             queue_mutex_.Unlock();
+            Log(logger_, "queue mutex unlock");
 
             FRAME_INFO_T *frame = write_op->frame_info;
             safe_free(write_op);
@@ -406,24 +411,36 @@ void *RecordWriter::Entry()
 
                 current_o_frame_ = frame;
                 queue_mutex_.Lock();
+                Log(logger_, "frame is O frame, assign current o frame, continue");
                 continue;
             }
-            else
+            else if (frame_type == JVN_DATA_I)
             {
                 if (current_o_frame_ == NULL)
                 {
                     safe_free(frame->buffer);
                     safe_free(frame);
+
+                    Log(logger_, "no O frame, continue");
                     queue_mutex_.Lock();
                     continue;
                 }
 
-                if (frame_type == JVN_DATA_I)
+                add_o_frame = true;
+                first_i_frame = true;
+                current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
+                current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
+                Log(logger_, "I frame, and already have O frame, continue");
+            }
+            else
+            {
+                if (first_i_frame == false)
                 {
-                    add_o_frame = true;
-                    current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
-                    current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
+                    Log(logger_, "no I frame, continue");
+                    queue_mutex_.Lock();
+                    continue;
                 }
+                Log(logger_, "B or P frame");
             }
 
             uint32_t buffer_old_length = buffer_.length();
@@ -435,7 +452,7 @@ void *RecordWriter::Entry()
 
             RecordFile *record_file = NULL;
             ret = store_client_->GetLastRecordFile(&record_file);
-            if (ret == ERR_ITEM_NOT_FOUND)
+            if (ret == -ERR_ITEM_NOT_FOUND)
             {
                 Log(logger_, "doesn't find any record file");
                 UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
@@ -443,6 +460,7 @@ void *RecordWriter::Entry()
                 assert(ret == 0);
                 assert(record_file != NULL);
             }
+            Log(logger_, "get last record file ok");
 
             uint32_t write_offset = record_file->record_offset_;
             assert(write_offset <= kRecordFileSize);
@@ -524,7 +542,9 @@ void *RecordWriter::Entry()
             break;
         }
 
+        Log(logger_, "queue cond wait");
         queue_cond_.Wait(queue_mutex_);
+        Log(logger_, "have one event");
     }
 
     queue_mutex_.Unlock();
@@ -945,7 +965,7 @@ int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
         ret = client->OpenWrite(id);
     }
 
-    Log(logger_, "open store client, flag is %d, id id %d, ret is %d", flag, id, ret);
+    Log(logger_, "open store client, flag is %d, id is %d, ret is %d", flag, id, ret);
 
     return ret;
 }

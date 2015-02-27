@@ -47,7 +47,7 @@ int make_frame(int *type, int *length, char **buffer)
         frame->buffer = (char *)malloc(100);
         memset(frame->buffer, 'o', 100);
     }
-    else if (seq % 40 == 0)
+    else if (seq % 40 == 2)
     {
         frame->type = JVN_DATA_I;
         
@@ -94,7 +94,7 @@ int main()
     storage_open(stream_info, 64, 1, &write_id);
 
     int i = 0;
-    for (i = 0; i < 10000; i++)
+    for (i = 0; i < 100; i++)
     {
         int type;
         int length;

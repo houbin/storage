@@ -27,12 +27,14 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
     if (iter == disk_free_file_info_.end())
     {
-        disk_info = (DiskInfo *)malloc(sizeof(DiskInfo));
+        disk_info = new struct DiskInfo;
         disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
+        Log(logger_, "not found disk info");
     }
     else
     {
         disk_info = iter->second;
+        Log(logger_, "found disk info");
     }
 
     assert(disk_info != NULL);
@@ -47,7 +49,9 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     index_file->Write(write_offset, (char *)&record_file_info, sizeof(struct RecordFileInfo));
     record_file->Clear();
 
+    Log(logger_, "before, push back record file %p, disk_info is %p", record_file, disk_info);
     disk_info->free_file_queue.push_back(record_file);
+    Log(logger_, "after, push back record file %p, disk_info is %p", record_file, disk_info);
     cond_.Signal();
 
     return 0;

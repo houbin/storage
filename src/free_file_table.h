@@ -17,11 +17,11 @@ using namespace util;
 namespace storage
 {
 
-typedef struct st_disk_info
+struct DiskInfo
 {
     set<string> writing_streams;
     deque<RecordFile*> free_file_queue;
-}DiskInfo;
+};
 
 class FreeFileTable
 {

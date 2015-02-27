@@ -1,8 +1,8 @@
 CC = g++
-CC_FLAG = -g
+CC_FLAG = -g -rdynamic
 
 INC =
-LIB = -L./ -lstorage
+LIB = -lstorage
 
 PRG = storage_test
 

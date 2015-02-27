@@ -167,10 +167,9 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
 int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
 {
     int ret;
-    Log(logger_, "write stream %s , length %d", buffer.c_str(), length);
+    Log(logger_, "append length is %d", length);
 
-    assert(write_fd_ < 0);
-    if (write_fd_ == 0)
+    if (write_fd_ < 0)
     {
         char buffer[32] = {0};
         snprintf(buffer, 32, "record_%05d", number_);
@@ -182,9 +181,16 @@ int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
         assert(write_fd_ > 0);
         lseek(write_fd_, record_offset_, SEEK_SET);
     }
+
+    assert(write_fd_ >= 0);
     
     ret = write(write_fd_, buffer.c_str(), length);
-    assert(ret == (int)length);
+    if (ret != length)
+    {
+        Log(logger_, "write return %d, errno msg is %s", ret, strerror(errno));
+        assert(ret == (int)length);
+    }
+
     fdatasync(write_fd_);
 
     if (state_ != kWriting)
