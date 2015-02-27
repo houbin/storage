@@ -196,6 +196,7 @@ public:
 
     int32_t Open(int flags, uint32_t id, string &stream_info);
     int32_t Close(uint32_t id, int flag);
+    int32_t AddStoreClient(string &stream_info, StoreClient **client);
 
     int32_t GetStoreClient(uint32_t id, StoreClient **client);
     int32_t FindStoreClient(string stream_info, StoreClient **client);

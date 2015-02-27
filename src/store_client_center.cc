@@ -283,22 +283,11 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
     return 0;
 }
 
-int32_t RecordWriter::BuildRecordFileIndex(RecordFile *file, char *record_file_info_buffer, uint32_t record_file_info_length,
+int32_t RecordWriter::BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
                             char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_flag_info_number)
 {
-    int32_t ret;
     Log(logger_, "build record file index");
-
-    RecordFile *record_file = NULL;
-    if (file == NULL)
-    {
-        ret = store_client_->GetLastRecordFile(&record_file);
-        assert(ret == 0 && record_file != NULL);
-    }
-    else
-    {
-        record_file = file;
-    }
+    assert(record_file != NULL);
 
     Mutex::Locker lock(last_record_file_mutex_);
 
@@ -308,20 +297,24 @@ int32_t RecordWriter::BuildRecordFileIndex(RecordFile *file, char *record_file_i
 
 int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
 {
-    Mutex::Locker lock(store_client_center->timer_lock);
-
     assert(write_index_event_ != NULL);
     Log(logger_, "write index, write_index_event_ is %p", write_index_event_);
     write_index_event_ = NULL;
 
     int32_t ret;
-    IndexFile *index_file = NULL;
     struct RecordFileInfo record_file_info_buffer = {0};
     struct RecordFragmentInfo record_frag_info_buffer = {0};
     uint32_t record_frag_info_number = 0;
+    IndexFile *index_file = NULL;
     uint32_t file_info_write_offset;
-    uint32_t file_counts = index_file->GetFileCounts();
     uint32_t frag_info_write_offset;
+    uint32_t file_counts;
+
+    if (record_file == NULL)
+    {
+        ret = store_client_->GetLastRecordFile(&record_file);
+        assert(ret == 0 && record_file != NULL);
+    }
 
     ret = BuildRecordFileIndex(record_file, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo), 
                                 (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo), &record_frag_info_number);
@@ -336,6 +329,7 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
 
     ret = index_file_manager->Find(record_file->base_name_, &index_file);
     assert(ret == 0 && index_file != NULL);
+    file_counts = index_file->GetFileCounts();
 
     file_info_write_offset = record_file->number_ * sizeof(RecordFileInfo);
     frag_info_write_offset = file_counts * sizeof(RecordFileInfo) + 
@@ -948,6 +942,9 @@ int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
         assert(ret == 0 && client != NULL);
 
         ret = client->OpenRead(id);
+
+        RWLock::WRLocker lock(rwlock_);
+        clients_[id] = client;
     }
     else
     {
@@ -968,6 +965,17 @@ int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
     Log(logger_, "open store client, flag is %d, id is %d, ret is %d", flag, id, ret);
 
     return ret;
+}
+
+int32_t StoreClientCenter::AddStoreClient(string &stream_info, StoreClient **client)
+{
+    *client = new StoreClient(logger_, stream_info);
+    assert(*client != NULL);
+
+    RWLock::WRLocker lock(rwlock_);
+    client_search_map_.insert(make_pair(stream_info, *client));
+
+    return 0;
 }
 
 int32_t StoreClientCenter::GetStoreClient(uint32_t id, StoreClient **client)
@@ -1030,11 +1038,6 @@ int32_t StoreClientCenter::Close(uint32_t id, int flag)
     Log(logger_, "close store client %d, flag is %d", id, flag);
 
     int32_t ret;
-
-    rwlock_.GetWriteLock();
-    clients_.erase(clients_.begin() + id);
-    rwlock_.PutWriteLock();
-
     StoreClient *client = NULL;
 
     ret = GetStoreClient(id, &client);
@@ -1051,7 +1054,12 @@ int32_t StoreClientCenter::Close(uint32_t id, int flag)
     else
     {
         ret = client->CloseWrite(id);
+
     }
+
+    rwlock_.GetWriteLock();
+    clients_[id] = NULL;
+    rwlock_.PutWriteLock();
 
     Log(logger_, "close store client %d, return ret %d", id, ret);
 
@@ -1193,6 +1201,11 @@ void StoreClientCenter::Shutdown()
         vector<StoreClient*>::iterator iter = clients_.begin();
         for (; iter != clients_.end(); iter++)
         {
+            if (*iter == NULL)
+            {
+                continue;
+            }
+
             StoreClient *store_client = *iter;
             store_client->Shutdown();
             delete store_client;

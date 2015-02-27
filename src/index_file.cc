@@ -150,6 +150,10 @@ int32_t IndexFile::AnalyzeAllEntry()
         string stream_info(record_file->stream_info_);
         StoreClient *store_client = NULL;
         int32_t ret = store_client_center->FindStoreClient(stream_info, &store_client);
+        if (ret != 0)
+        {
+            ret = store_client_center->AddStoreClient(stream_info, &store_client);
+        }
         assert(ret == 0);
         ret = store_client->PutRecordFile(record_file->start_time_, record_file);
         assert(ret == 0);
