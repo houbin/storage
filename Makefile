@@ -16,6 +16,10 @@ OBJ = src/free_file_table.o src/id_center.o src/index_file.o src/record_file.o s
 src/store_client_center.o util/clock.o util/coding.o util/cond.o util/crc32c.o util/logger.o \
 util/mutex.o util/thread.o util/timer.o
 
+DEPS = src/free_file_table.d src/id_center.d src/index_file.d src/record_file.d src/storage_api.d \
+src/store_client_center.d util/clock.d util/coding.d util/cond.d util/crc32c.d util/logger.d \
+util/mutex.d util/thread.d util/timer.d
+
 #all target
 all:$(PRG)
 
@@ -29,4 +33,4 @@ $(PRG):$(OBJ)
 .PRONY:clean
 clean:
 	@echo "Removing linked and compiled files......;"
-	rm -f $(OBJ) $(PRG)
+	-rm -f $(OBJ) $(PRG) $(DEPS)

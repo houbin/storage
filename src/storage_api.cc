@@ -24,8 +24,8 @@ void storage_init()
 {
     int32_t ret;
     
-    ret = NewLogger(log_dir, &logger);
-    assert(ret != 0);
+    ret = NewLogger("/tmp/storage.log", &logger);
+    assert(ret == 0);
 
     id_center = new IdCenter(logger);
     assert(id_center != NULL);

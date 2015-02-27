@@ -40,7 +40,6 @@ get_confirm()
 	done	
 }
 
-echo ${SCRIPT_PATH}
 cd ${SCRIPT_PATH}
 
 chmod +x ./umount_all_points.sh
@@ -81,7 +80,7 @@ then
 	echo "bye"
 	exit
 fi
-	
+
 chmod +x ./mount_one_disk.sh
 for disk in ${spare_disks}
 do
