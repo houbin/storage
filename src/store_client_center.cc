@@ -97,7 +97,8 @@ int32_t RecordFileMap::GetLastRecordFile(RecordFile **record_file)
 int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "push back record file, time %d.%d", time.tv_sec, time.tv_nsec);
+    Log(logger_, "push back record file, time %d.%d, base name is %s, number is %d", 
+        time.tv_sec, time.tv_nsec, record_file->base_name_, record_file->number_);
 
     pair<map<UTime, RecordFile*>::iterator, bool> ret;
 
@@ -144,6 +145,7 @@ void RecordFileMap::Shutdown()
     for (; iter != record_file_map_.end(); iter++)
     {
         RecordFile *record_file = iter->second;
+        delete record_file;
         record_file = NULL;
     }
 
@@ -464,8 +466,6 @@ void *RecordWriter::Entry()
             if ((buffer_old_length + frame_length) <= file_left_size)
             {
                 EncodeFrame(add_o_frame, frame);
-                
-                /* 更新当前buffer的时间 */
                 UpdateBufferTimes(frame_type, stamp);
 
                 uint32_t buffer_length = buffer_.length();
@@ -579,6 +579,15 @@ void RecordWriter::Stop()
     /* clear buffer times*/
     memset(&buffer_times_, 0, sizeof(BufferTimes));
 
+    /* finish last record file write */
+    {
+        RecordFile *record_file = NULL;
+        ret = store_client_->GetLastRecordFile(&record_file);
+        assert(ret == 0 && record_file != NULL);
+
+        record_file->FinishWrite();
+    }
+    
     /* do timer */
     {
         Mutex::Locker lock(store_client_center->timer_lock);
@@ -587,15 +596,6 @@ void RecordWriter::Stop()
             store_client_center->timer.DoEvent(write_index_event_);
             write_index_event_ = NULL;
         }
-    }
-
-    // finish last record file write
-    {
-        RecordFile *record_file = NULL;
-        ret = store_client_->GetLastRecordFile(&record_file);
-        assert(ret == 0 && record_file != NULL);
-
-        record_file->FinishWrite();
     }
 
     return;
@@ -629,7 +629,7 @@ int32_t RecordReader::Seek(UTime &stamp)
     }
 
     record_file_ = record_file;
-    ret = record_file_->GetStampOffset(stamp, &offset);
+    ret = record_file_->SeekStampOffset(stamp, &offset);
     assert(ret == 0);
     read_offset_ = offset;
 
@@ -648,7 +648,10 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
     while(true)
     {
         ret = record_file_->ReadFrame(read_offset_, frame);
-        assert(ret == 0);
+        if (ret != 0)
+        {
+            return ret;
+        }
 
         if (frame->type == JVN_DATA_O)
         {
@@ -690,6 +693,11 @@ int32_t RecordReader::Close()
 {
     safe_free(current_o_frame_.buffer);
 
+    if (record_file_ != NULL)
+    {
+        record_file_->FinishRead();
+    }
+
     return 0;
 }
 
@@ -708,14 +716,14 @@ StoreClient::StoreClient(Logger *logger, string stream_info)
 
 }
 
-string StoreClient::GetStreamInfo()
-{
-    return stream_info_;
-}
-
 bool StoreClient::IsRecordFileEmpty()
 {
     return record_file_map_.IsEmpty();
+}
+
+string StoreClient::GetStreamInfo()
+{
+    return stream_info_;
 }
 
 int32_t StoreClient::OpenWrite(uint32_t id)
@@ -724,63 +732,6 @@ int32_t StoreClient::OpenWrite(uint32_t id)
 
     writer.Start();
     
-    return 0;
-}
-
-int32_t StoreClient::OpenRead(uint32_t id)
-{
-    Log(logger_, "open read, id is %d", id);
-    pair<map<uint32_t, RecordReader*>::iterator, bool> ret;
-
-    Mutex::Locker lock(reader_mutex_);
-    RecordReader *record_reader = new RecordReader(this);
-    ret = record_readers_.insert(make_pair(id, record_reader));
-    assert(ret.second == true);
-
-    return 0;
-}
-
-int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
-{
-    int32_t ret;
-    Log(logger_, "seek read id, id is %d", id);
-
-    reader_mutex_.Lock();
-    map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
-    assert(iter != record_readers_.end());
-    RecordReader *record_reader = iter->second;
-    assert(record_reader != NULL);
-    reader_mutex_.Unlock();
-
-    ret = record_reader->Seek(stamp);
-    assert(ret == 0);
-
-    return 0;
-}
-
-int32_t StoreClient::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
-{
-    assert(frame != NULL);
-    Log(logger_, "read frame, id is %d", id);
-
-    int32_t ret = 0;
-    RecordReader *record_reader = NULL;
-
-    reader_mutex_.Lock();
-    map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
-    if (iter == record_readers_.end())
-    {
-        return -ERR_ITEM_NOT_FOUND;
-    }
-    record_reader = iter->second;
-    reader_mutex_.Unlock();
-
-    ret = record_reader->ReadFrame(frame);
-    if (ret != 0)
-    {
-        return ret;
-    }
-
     return 0;
 }
 
@@ -814,6 +765,81 @@ int32_t StoreClient::EnqueueFrame(FRAME_INFO_T *frame)
     return ret;
 }
 
+int32_t StoreClient::CloseWrite(uint32_t id)
+{
+    Log(logger_, "close write id %d", id);
+    
+    writer.Stop();
+
+    free_file_table->Close(stream_info_);
+
+    return 0;
+}
+
+int32_t StoreClient::OpenRead(uint32_t id)
+{
+    Log(logger_, "open read, id is %d", id);
+    pair<map<uint32_t, RecordReader*>::iterator, bool> ret;
+
+    Mutex::Locker lock(reader_mutex_);
+    RecordReader *record_reader = new RecordReader(this);
+    ret = record_readers_.insert(make_pair(id, record_reader));
+    assert(ret.second == true);
+
+    return 0;
+}
+
+int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
+{
+    int32_t ret;
+    RecordReader *record_reader = NULL;
+    Log(logger_, "seek read id, id is %d", id);
+
+    {
+        Mutex::Locker lock(reader_mutex_);
+        map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
+        if (iter == record_readers_.end())
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
+        
+        record_reader = iter->second;
+        assert(record_reader != NULL);
+    }
+
+    ret = record_reader->Seek(stamp, id);
+    assert(ret == 0);
+
+    return 0;
+}
+
+int32_t StoreClient::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
+{
+    assert(frame != NULL);
+    Log(logger_, "read frame, id is %d", id);
+
+    int32_t ret = 0;
+    RecordReader *record_reader = NULL;
+
+    {
+        Mutex::Locker lock(read_mutex);
+        map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
+        if (iter == record_readers_.end())
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
+        record_reader = iter->second;
+    }
+
+    ret = record_reader->ReadFrame(frame);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    return 0;
+}
+
 int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
 {
     assert(record_file != NULL);
@@ -828,7 +854,6 @@ int32_t StoreClient::GetFreeFile(UTime &time, RecordFile **record_file)
     /* used to record read */
     free_file->stream_info_ = stream_info_;
     free_file->start_time_ = time;
-    free_file->state_ = kIdle;
     ret = record_file_map_.PutRecordFile(time, free_file);
     assert(ret == 0);
 
@@ -879,17 +904,6 @@ int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r)
     return 0;
 }
 
-int32_t StoreClient::CloseWrite(uint32_t id)
-{
-    Log(logger_, "close write id %d", id);
-    
-    writer.Stop();
-
-    free_file_table->Close(stream_info_);
-
-    return 0;
-}
-
 int32_t StoreClient::CloseRead(uint32_t id)
 {
     Log(logger_, "close read id %d");
@@ -929,22 +943,26 @@ timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
 {
     assert(flag == 0 || flag == 1);
+    Log(logger_, "open store client, flag is %d, id is %d, stream info is %s", 
+        flag, id, stream_info.c_str());
 
     int32_t ret;
     StoreClient *client = NULL;
 
-    Log(logger_, "open store client, flag is %d, id is %d, stream info is %s", 
-        flag, id, stream_info.c_str());
-
     if (flag == 0)
     {
         ret = FindStoreClient(stream_info, &client);
-        assert(ret == 0 && client != NULL);
+        if (ret != 0)
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
+
+        {
+            RWLock::WRLocker lock(rwlock_);
+            clients_[id] = client;
+        }
 
         ret = client->OpenRead(id);
-
-        RWLock::WRLocker lock(rwlock_);
-        clients_[id] = client;
     }
     else
     {
@@ -954,9 +972,11 @@ int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
             client = new StoreClient(logger_, stream_info);
             assert(client != NULL);
 
-            RWLock::WRLocker lock(rwlock_);
-            clients_[id] = client;
-            client_search_map_.insert(make_pair(stream_info, client));
+            {
+                RWLock::WRLocker lock(rwlock_);
+                clients_[id] = client;
+                client_search_map_.insert(make_pair(stream_info, client));
+            }
         }
 
         ret = client->OpenWrite(id);

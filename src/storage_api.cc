@@ -57,7 +57,6 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
         return ret;
     }
 
-    /* 准备读或写数据结构 */
     ret = store_client_center->Open(flags, *id, key_info);
     if (ret != 0)
     {

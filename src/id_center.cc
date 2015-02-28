@@ -29,7 +29,7 @@ int32_t IdCenter::ApplyForId(string key_info, int flags, uint32_t *id)
         }
 
         uint32_t write_counts = write_key_info_.size();
-        if (write_counts >= MAX_STREAM_COUNTS)
+        if (write_counts >= MAX_WRITE_STREAM_COUNTS)
         {
             return -ERR_REACH_WRITE_THREHOLD;
         }
@@ -144,14 +144,6 @@ int32_t IdCenter::GetFlag(uint32_t id, int &flag)
     {
         flag = 1;
     }
-
-    return 0;
-}
-
-int32_t IdCenter::GetWriteCounts(uint32_t *write_counts)
-{
-    Mutex::Locker lock(mutex_);
-    *write_counts = write_key_info_.size();
 
     return 0;
 }

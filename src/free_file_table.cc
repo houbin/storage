@@ -28,6 +28,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     if (iter == disk_free_file_info_.end())
     {
         disk_info = new struct DiskInfo;
+        assert(disk_info != NULL);
         disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
         Log(logger_, "not found disk info");
     }
@@ -49,9 +50,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     index_file->Write(write_offset, (char *)&record_file_info, sizeof(struct RecordFileInfo));
     record_file->Clear();
 
-    Log(logger_, "before, push back record file %p, disk_info is %p", record_file, disk_info);
     disk_info->free_file_queue.push_back(record_file);
-    Log(logger_, "after, push back record file %p, disk_info is %p", record_file, disk_info);
     cond_.Signal();
 
     return 0;
@@ -81,6 +80,11 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
             
             return 0;
         }
+        else
+        {
+            // stream migrated to other disk
+            disk_info->writing_streams.erase(stream_info);
+        }
     }
 
     ret = GetNewDiskFreeFile(stream_info, record_file);
@@ -89,7 +93,6 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
     return 0;
 }
 
-/* 进入该函数之前，保证mutex_已经上锁 */
 int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
@@ -132,8 +135,10 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
         }
     }
 
+    // update disk info
     *record_file = valid_disk_info->free_file_queue.front();
     valid_disk_info->free_file_queue.pop_front();
+    valid_disk_info->writing_streams.insert(stream_info);
 
     map<string, string>::iterator iter = stream_to_disk_map_.find(stream_info);
     if (iter != stream_to_disk_map_.end())
@@ -165,7 +170,7 @@ int32_t FreeFileTable::Close(string stream_info)
         if (iter != disk_free_file_info_.end())
         {
             DiskInfo *disk_info = iter->second;
-            disk_info->writing_streams.erase(disk_base_name);
+            disk_info->writing_streams.erase(stream_info);
         }
     }
 
@@ -177,8 +182,27 @@ int32_t FreeFileTable::Shutdown()
     Log(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
+    while(!disk_free_file_info_.empty())
+    {
+        map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
 
-
+        DiskInfo *disk_info = iter->second;
+        while(!disk_info->free_file_queue.empty())
+        {
+            RecordFile *record_file = disk_info->free_file_queue.front();
+            disk_info->free_file_queue.pop_front();
+            if (record_file != NULL)
+            {
+                delete record_file;
+                record_file = NULL;
+            }
+        }
+        
+        disk_free_file_info_.erase(iter);
+        delete disk_info;
+        disk_info = NULL;
+    }
+    
     return 0;
 }
 

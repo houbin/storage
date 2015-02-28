@@ -31,9 +31,6 @@ public:
     int32_t ReleaseId(uint32_t id);
 
     int32_t GetFlag(uint32_t id, int &flag);
-    
-    int32_t GetWriteCounts(uint32_t *write_counts);
-
     void Shutdown();
 };
 

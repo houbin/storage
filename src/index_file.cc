@@ -65,13 +65,6 @@ int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
     record_file->locked_ = *temp;
     temp += 1;
 
-    record_file->state_ = *temp;
-    if (record_file->state_ != kCleared)
-    {
-        record_file->state_ = kIdle;
-    }
-    temp += 1;
-
     uint32_t a = *temp;
     uint32_t b = *(temp + 1);
     record_file->record_fragment_count_ = a | (b << 8);
@@ -167,9 +160,9 @@ int32_t IndexFile::AnalyzeAllEntry()
 int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
     Log(logger_, "write offset is %d, buffer is %p, length is %d", offset, buffer, length);
-
     int ret = 0;
 
+    Mutex::Locker lock(mutex_);
     ret = fseek(index_file_, offset, SEEK_SET);
     assert(ret != -1);
     ret = fwrite(buffer, 1, length, index_file_);
@@ -192,14 +185,13 @@ int32_t IndexFile::Shutdown()
 }
 
 IndexFileManager::IndexFileManager(Logger *logger)
-: logger_(logger), mutex_("IndexFileManager::Lock"), stop_(false)
+: logger_(logger), mutex_("IndexFileManager::Lock")
 {
 
 }
 
 int32_t IndexFileManager::Init()
 {
-
     ScanAllIndexFile();
     AnalyzeAllIndexFile();
     return 0;
@@ -267,12 +259,6 @@ int32_t IndexFileManager::Find(string base_name, IndexFile **index_file)
     Log(logger_, "find index file %s", base_name.c_str());
 
     Mutex::Locker lock(mutex_);
-    if (stop_)
-    {
-        Log(logger_, "stopped");
-        return -ERR_SHUTDOWN;
-    }
-
     map<string, IndexFile*>::iterator iter = index_file_map_.find(base_name);
     if (iter == index_file_map_.end())
     {
@@ -290,7 +276,6 @@ int32_t IndexFileManager::Shutdown()
     Log(logger_, "shutdown");
     
     Mutex::Locker lock(mutex_);
-    stop_ = true;
     while (!index_file_map_.empty())
     {
         map<string, IndexFile*>::iterator iter = index_file_map_.begin();
@@ -307,3 +292,4 @@ int32_t IndexFileManager::Shutdown()
 }
 
 }
+

@@ -17,6 +17,7 @@ class IndexFile
 {
 private:
     Logger *logger_;
+    Mutex mutex_;
 
     string base_name_;
     FILE *index_file_;
@@ -41,8 +42,6 @@ private:
 
     Mutex mutex_;
     map<string, IndexFile*> index_file_map_;
-
-    bool stop_;
 
 public:
     IndexFileManager(Logger *logger);

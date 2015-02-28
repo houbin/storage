@@ -125,11 +125,17 @@ private:
 public:
     StoreClient(Logger *logger, string stream_info);
 
-    string GetStreamInfo();
     bool IsRecordFileEmpty();
+    string GetStreamInfo();
 
-    int32_t Open(int flags, uint32_t id);
-    int32_t EnqueueFrame(FRAME_INFO_T *frame);
+    int32_t OpenWrite(uint32_t id);
+    int32_t EnqueueFrame(FRAME_INFO_T *frame);
+    int32_t CloseWrite(uint32_t id);
+
+    int32_t OpenRead(uint32_t id);
+    int32_t SeekRead(uint32_t id, UTime &stamp);
+    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
+    int32_t CloseRead(uint32_t id);
 
     int32_t GetFreeFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
@@ -139,13 +145,6 @@ public:
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
-    int32_t OpenWrite(uint32_t id);
-    int32_t OpenRead(uint32_t id);
-    int32_t SeekRead(uint32_t id, UTime &stamp);
-    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
-
-    int32_t CloseWrite(uint32_t id);
-    int32_t CloseRead(uint32_t id);
 
     void Shutdown();
 };
@@ -180,9 +179,9 @@ class StoreClientCenter
 private:
     Logger *logger_;
 
-    /* only used for add or delete client */
+    /* used for add/delete/find client */
     RWLock rwlock_;
-    vector<StoreClient*> clients_; // 以操作id为下标，用于快速查找对应的client
+    vector<StoreClient*> clients_;
     map<string, StoreClient*> client_search_map_;
     
     Mutex recycle_mutex_;

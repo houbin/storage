@@ -16,8 +16,8 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), locked_(false),
-state_(kCleared), record_fragment_count_(0), start_time_(0, 0), end_time_(0, 0),
+: logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), read_count_(0),
+locked_(false), record_fragment_count_(0), start_time_(0, 0), end_time_(0, 0),
 i_frame_start_time_(0, 0), i_frame_end_time_(0, 0), record_offset_(0)
 {
 
@@ -25,14 +25,24 @@ i_frame_start_time_(0, 0), i_frame_end_time_(0, 0), record_offset_(0)
 
 int32_t RecordFile::Clear()
 {
-    Log(logger_, "clear index");
+    Log(logger_, "clear record file index memory info");
 
-    /* 清零内存中的数据 */
+    if (this->write_fd_ >= 0)
+    {
+        close(this->write_fd_);
+    }
+
+    if (this->read_fd_ >= 0)
+    {
+        close(this->read_fd_);
+    }
+    
     this->write_fd_ = -1;
     this->read_fd_ = -1;
+    this->read_count_= 0;
+    
     this->stream_info_.clear();
     this->locked_ = false;
-    this->state_= kCleared;
     this->record_fragment_count_ = 0;
     UTime temp(0, 0);
     this->start_time_ = temp;
@@ -48,7 +58,7 @@ bool RecordFile::CheckRecycle()
 {
     Log(logger_, "check recycle");
 
-    if (state_ != kIdle && locked_ == true)
+    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
     {
         return false;
     }
@@ -75,9 +85,6 @@ int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uin
 
     *temp = locked_;
     temp += sizeof(record_file_info.locked);
-
-    *temp = state_;
-    temp += sizeof(record_file_info.state_);
 
     *temp = record_fragment_count_ & 0xff;
     *(temp+1) = record_fragment_count_ >> 8;
@@ -180,6 +187,9 @@ int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
         write_fd_ = open(record_file_path.c_str(), O_WRONLY);
         assert(write_fd_ > 0);
         lseek(write_fd_, record_offset_, SEEK_SET);
+
+        record_fragment_count_ += 1;
+        assert(record_fragment_count_ <= 256);
     }
 
     assert(write_fd_ >= 0);
@@ -192,12 +202,6 @@ int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
     }
 
     fdatasync(write_fd_);
-
-    if (state_ != kWriting)
-    {
-        state_ = kWriting;
-        record_fragment_count_ += 1;
-    }
 
     /* update times */
     if((start_time_ == 0) && (update.start_time != 0))
@@ -234,7 +238,6 @@ int32_t RecordFile::FinishWrite()
         close(write_fd_);
         write_fd_ = -1;
     }
-    state_ = kIdle;
 
     return 0;
 }
@@ -272,12 +275,13 @@ int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
     return 0;
 }
 
-int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
+int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
 {
     Log(logger_, "get stamp offset");
     uint32_t ret = 0;
     uint32_t stamp_offset = 0;
 
+    read_count_++;
     if (read_fd_ < 0)
     {
         char buffer[32] = {0};
@@ -319,28 +323,24 @@ int32_t RecordFile::GetStampOffset(UTime &stamp, uint32_t *offset)
 
     if (stamp_offset >= record_offset_)
     {
-        assert("?" != 0);
+        return -ERR_READ_REACH_TO_END;
     }
 
     return 0;
 }
 
-int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
+int32_t RecordFile::ReadFrame(uint32_t read_offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
     Log(logger_, "read frame");
 
     int ret = 0;
-    
-    if (read_fd_ < 0) 
-    {
-        char buffer[32] = {0};
-        snprintf(buffer, 32, "record_%05d", number_);
-        string record_file_path(base_name_);
-        record_file_path.append(buffer);
 
-        read_fd_ = open(record_file_path.c_str(), O_RDONLY);
-        assert(read_fd_ > 0);
+    assert(read_fd_ >= 0);
+    if (read_offset >= record_offset_)
+    {
+        Log(logger_, "read reach to end");
+        return -ERR_READ_REACH_TO_END;
     }
 
     char header[kHeaderSize] = {0};
@@ -357,6 +357,20 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 
     ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
     assert(ret == (int)frame->size);
+
+    return 0;
+}
+
+int32_t RecordFile::FinishRead()
+{
+    Log(logger_, "finish read");
+    read_count_--;
+    assert(read_count_ >= 0);
+    if (read_count_ == 0)
+    {
+        close(read_fd_);
+        read_fd_ = -1;
+    }
 
     return 0;
 }
