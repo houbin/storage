@@ -91,6 +91,7 @@ int main()
     strncpy(stream_info, "stream info aaaa", 64);
 
     storage_init();
+
     storage_open(stream_info, 64, 1, &write_id);
 
     int i = 0;

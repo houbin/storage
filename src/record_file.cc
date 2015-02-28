@@ -329,7 +329,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
     return 0;
 }
 
-int32_t RecordFile::ReadFrame(uint32_t read_offset, FRAME_INFO_T *frame)
+int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
     Log(logger_, "read frame");
@@ -337,7 +337,7 @@ int32_t RecordFile::ReadFrame(uint32_t read_offset, FRAME_INFO_T *frame)
     int ret = 0;
 
     assert(read_fd_ >= 0);
-    if (read_offset >= record_offset_)
+    if (offset >= record_offset_)
     {
         Log(logger_, "read reach to end");
         return -ERR_READ_REACH_TO_END;

@@ -98,7 +98,7 @@ int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
 {
     assert(record_file != NULL);
     Log(logger_, "push back record file, time %d.%d, base name is %s, number is %d", 
-        time.tv_sec, time.tv_nsec, record_file->base_name_, record_file->number_);
+        time.tv_sec, time.tv_nsec, record_file->base_name_.c_str(), record_file->number_);
 
     pair<map<UTime, RecordFile*>::iterator, bool> ret;
 
@@ -807,7 +807,7 @@ int32_t StoreClient::SeekRead(uint32_t id, UTime &stamp)
         assert(record_reader != NULL);
     }
 
-    ret = record_reader->Seek(stamp, id);
+    ret = record_reader->Seek(stamp);
     assert(ret == 0);
 
     return 0;
@@ -822,7 +822,7 @@ int32_t StoreClient::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
     RecordReader *record_reader = NULL;
 
     {
-        Mutex::Locker lock(read_mutex);
+        Mutex::Locker lock(reader_mutex_);
         map<uint32_t, RecordReader*>::iterator iter = record_readers_.find(id);
         if (iter == record_readers_.end())
         {

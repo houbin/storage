@@ -17,7 +17,7 @@ namespace storage
 {
 
 IndexFile::IndexFile(Logger *logger, string base_name)
-: logger_(logger), base_name_(base_name)
+: logger_(logger), mutex_("IndexFile::Locker"), base_name_(base_name)
 {
     int ret = 0;
 
