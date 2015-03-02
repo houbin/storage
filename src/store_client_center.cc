@@ -57,8 +57,8 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
 
     // judge if stamp > all file stamp
     {
-        map<UTime, RecordFile*>::iterator iter = record_file.rbegin();
-        RecordFile *record_file = iter->second;
+        map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
+        RecordFile *record_file = riter->second;
         if (record_file->end_time_ > time)
         {
             return -ERR_ITEM_NOT_FOUND;
