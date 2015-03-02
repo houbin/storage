@@ -95,7 +95,7 @@ int main()
     storage_open(stream_info, 64, 1, &write_id);
 
     int i = 0;
-    for (i = 0; i < 100; i++)
+    for (i = 0; i < 100000; i++)
     {
         int type;
         int length;
@@ -103,6 +103,8 @@ int main()
 
         make_frame(&type, &length, &frame);
         storage_write(write_id, (FRAME_INFO_T*)frame);
+        free(((FRAME_INFO_T *)frame)->buffer);
+        free(frame);
         usleep(40000);
     }
 
