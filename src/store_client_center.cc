@@ -13,7 +13,7 @@ uint64_t kOpSeq = 0;
 //                  record file map
 // ======================================================= //
 RecordFileMap::RecordFileMap(Logger *logger)
-: logger_(logger), rwlock_("RecordFileMap::rwlock"), stop_(false)
+: logger_(logger), rwlock_("RecordFileMap::rwlock")
 {
 
 }
@@ -40,21 +40,29 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
     map<UTime, RecordFile*>::iterator iter_up;
 
     RWLock::RDLocker locker(rwlock_);
-    if (stop_)
-    {
-        return -ERR_SHUTDOWN;
-    }
-
-    if (!record_file_map_.empty())
+    if (record_file_map_.empty())
     {
         return -ERR_ITEM_NOT_FOUND;
     }
 
-    map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
-    assert(iter != record_file_map_.end());
-    if (iter->first > time)
+    // judge if stamp < all file stamp
     {
-        return -ERR_ITEM_NOT_FOUND;
+        map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
+        assert(iter != record_file_map_.end());
+        if (iter->first > time)
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
+    }
+
+    // judge if stamp > all file stamp
+    {
+        map<UTime, RecordFile*>::iterator iter = record_file.rbegin();
+        RecordFile *record_file = iter->second;
+        if (record_file->end_time_ > time)
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
     }
 
     iter_up = record_file_map_.upper_bound(time);
@@ -79,11 +87,6 @@ int32_t RecordFileMap::GetLastRecordFile(RecordFile **record_file)
     Log(logger_, "get last record file");
 
     RWLock::RDLocker locker(rwlock_);
-    if (stop_)
-    {
-        return -ERR_SHUTDOWN;
-    }
-
     map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
     if (riter == record_file_map_.rend())
     {
@@ -103,11 +106,6 @@ int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
     pair<map<UTime, RecordFile*>::iterator, bool> ret;
 
     RWLock::WRLocker locker(rwlock_);
-    if (stop_)
-    {
-        return -ERR_SHUTDOWN;
-    }
-
     ret = record_file_map_.insert(make_pair(time, record_file));
     if (ret.second == false)
     {
@@ -138,9 +136,8 @@ int32_t RecordFileMap::EraseRecordFile(RecordFile *record_file)
 void RecordFileMap::Shutdown()
 {
     Log(logger_, "shutdown");
+    
     RWLock::WRLocker locker(rwlock_);
-    stop_ = true;
-
     map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
     for (; iter != record_file_map_.end(); iter++)
     {
@@ -522,6 +519,7 @@ void *RecordWriter::Entry()
             uint32_t buffer_length = buffer_.length();
             if (buffer_length != 0)
             {
+                Log(logger_, "stop_, write left data");
                 uint32_t ret;
                 RecordFile *record_file = NULL;
 

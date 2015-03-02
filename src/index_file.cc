@@ -24,7 +24,11 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     string file_path;
     file_path = base_name_ + "index";
     index_file_ = fopen(file_path.c_str(), "rb+");
-    assert(index_file_ != NULL);
+    if (index_file_ == NULL)
+    {
+        Log(logger_, "fopen %s error, errno msg is %s", file_path.c_str(), strerror(errno));
+        assert(index_file_ != NULL);
+    }
 
     /* read file counts */
     string file_count_path;

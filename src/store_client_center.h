@@ -30,8 +30,6 @@ private:
     map<UTime, RecordFile*> record_file_map_;
     map<RecordFile*, map<UTime, RecordFile*>::iterator> file_search_map_;
 
-    bool stop_;
-
 public:
     RecordFileMap(Logger *logger);
     bool IsEmpty();
