@@ -191,6 +191,7 @@ public:
 
     StoreClientCenter(Logger *logger);
 
+    int32_t Init();
     int32_t Open(int flags, uint32_t id, string &stream_info);
     int32_t Close(uint32_t id, int flag);
     int32_t AddStoreClient(string &stream_info, StoreClient **client);

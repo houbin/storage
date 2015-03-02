@@ -225,6 +225,8 @@ int32_t RecordFile::Append(string &buffer, uint32_t length, BufferTimes &update)
     }
 
     record_offset_ += length;
+    Log(logger_, "write ok, file is %srecord_%05d, write length is %d, record offset is %d, ", 
+        base_name_.c_str(), number_, length, record_offset_);
 
     return 0;
 }

@@ -32,6 +32,7 @@ void storage_init()
 
     store_client_center = new StoreClientCenter(logger);
     assert(store_client_center != NULL);
+    store_client_center->Init();
 
     free_file_table = new FreeFileTable(logger);
     assert(free_file_table != NULL);

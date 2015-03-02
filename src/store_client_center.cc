@@ -938,6 +938,16 @@ timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
 
+int32_t StoreClientCenter::Init()
+{
+    {
+        Mutex::Locker lock(timer_lock);
+        timer.Init();
+    }
+
+    return 0;
+}
+
 int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
 {
     assert(flag == 0 || flag == 1);

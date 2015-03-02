@@ -109,7 +109,8 @@ void SafeTimer::AddEventAfter(double seconds, Context *callback)
 
 void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
-    Log(logger_, "AddEventAfter %d.%d -> %p", t.tv_sec, t.tv_nsec, callback);
+    UTime now = GetClockNow();
+    Log(logger_, "AddEventAfter %d.%d -> %p, now is %d.%d", t.tv_sec, t.tv_nsec, callback, now.tv_sec, now.tv_nsec);
 
     if (stop_)
     {

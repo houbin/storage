@@ -175,6 +175,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
         Log(logger_, "index_file is %p, buffer is %s, fwrite return %d, errno msg is %s", index_file_, buffer, ret, strerror(errno));
         assert(ret == (int)length);
     }
+    Log(logger_, "index file write, offset is %d, length is %d", offset, length);
 
     return 0;
 }
