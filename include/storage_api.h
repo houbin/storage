@@ -30,6 +30,29 @@ typedef struct frame_info
     char *buffer;       // 帧数据
 }FRAME_INFO_T;
 
+typedef struct disk_info
+{
+    char name[32];
+    uint32_t capacity;
+    char status[32];
+}DISK_INFO_T;
+
+/* 功能： 获取磁盘信息
+ * 输入： disk 磁盘名称
+ *
+ * 输出： disk_info 获取的磁盘信息
+ * 返回： void
+ */
+extern int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info);
+
+/* 功能： 格式化一块磁盘
+ * 输入： disk  磁盘名称
+ *
+ * 输出： 无
+ * 返回： void
+ */
+extern void storage_formate_disk(char *disk);
+
 /* 功能： 初始化storage模块 
  * 输入：   无
  *

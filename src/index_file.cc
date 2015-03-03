@@ -210,10 +210,10 @@ int32_t IndexFileManager::ScanAllIndexFile()
 
     Log(logger_, "scan all index file");
 
-    dp = opendir("/jovision");
+    dp = opendir("/jovision/mnt/");
     assert(dp != NULL);
 
-    chdir("/jovision");
+    chdir("/jovision/mnt/");
     while((entry = readdir(dp)) != NULL)
     {
         lstat(entry->d_name, &statbuf);
@@ -226,7 +226,7 @@ int32_t IndexFileManager::ScanAllIndexFile()
             }
 
             IndexFile *index_file = NULL;
-            string base_name("/jovision/");
+            string base_name("/jovision/mnt/");
             base_name = base_name + entry->d_name + "/";
             index_file = new IndexFile(logger_, base_name);
             assert(index_file != NULL);

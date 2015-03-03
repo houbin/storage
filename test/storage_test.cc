@@ -90,8 +90,15 @@ int main()
 
     strncpy(stream_info, "stream info aaaa", 64);
 
-    storage_init();
 
+    char disk[32] = "sdb";
+    DISK_INFO_T disk_info = {0};
+    ret = storage_get_disk_info(disk, &disk_info);
+    printf("ret is %d, disk_info name is %s, capacity is %d, status is %s\n", 
+                    ret, disk_info.name, disk_info.capacity, disk_info.status);
+    storage_formate_disk(disk);
+
+    storage_init();
     storage_open(stream_info, 64, 1, &write_id);
 
     int i = 0;

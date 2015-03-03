@@ -1,4 +1,4 @@
-#bin/sh
+#!/bin/sh
 # umount all mount points that belongs to our
 # umount /jovision/*
 MOUNT_PARENT_DIR=/jovision

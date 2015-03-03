@@ -1,6 +1,6 @@
 #!/bin/sh
 
-mount_dir=/jovision
+mount_dir=/jovision/mnt
 index_file_name=index
 file_count_name=file_count
 

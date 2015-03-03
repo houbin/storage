@@ -1,4 +1,7 @@
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "../util/logger.h"
 #include "../include/storage_api.h"
 #include "config_opts.h"
@@ -19,6 +22,47 @@ IndexFileManager *index_file_manager = NULL;
 
 extern "C"
 {
+
+int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info)
+{
+    char disk_mount_path[64] = {0};
+    char file_count_str[32] = {0};
+    
+    memset(disk_info, 0, sizeof(DISK_INFO_T));
+    snprintf(disk_info->name, 31, "%s", disk);
+    
+    snprintf(disk_mount_path, 63, "/jovision/%s/file_count", disk);
+    int fd = open(disk_mount_path, O_RDONLY);
+    if (fd == -1)
+    {
+        strcpy(disk_info->status, "Uninitialized");
+        return 0;
+    }
+
+    if (pread(fd, file_count_str, 32, 0) <= 0)
+    {
+        strcpy(disk_info->status, "Uninitialized");
+        return 0;
+    }
+    close(fd);
+
+    int file_count = atoi(file_count_str);
+    disk_info->capacity = file_count * 256;
+    strcpy(disk_info->status, "Initialized");
+
+    return 0;
+}
+
+void storage_formate_disk(char *disk)
+{
+    char command[256] = {0};
+
+    snprintf(command, 255, "/jovision/shell/disk_format/formate_one_disk.sh %s", disk);
+
+    system(command);
+    
+    return;
+}
 
 void storage_init()
 {
