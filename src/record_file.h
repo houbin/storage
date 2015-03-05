@@ -42,8 +42,13 @@ public:
 
     bool CheckRecycle();
 
-    int32_t EncodeRecordFileInfoIndex(char * record_file_buffer, uint32_t record_file_length);
-    int32_t EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uint32_t record_frag_info_length);
+    int32_t EncodeRecordFileInfoIndex(char *buffer, uint32_t length);
+    int32_t DecodeRecordFileInfoIndex(char *buffer, uint32_t length);
+
+    int32_t EncodeRecordFragInfoIndex(char *buffer, uint32_t length);
+    int32_t DecodeRecordFragInfoIndex(char *buffer, uint32_t length, RecordFragmentInfo &frag_info);
+    int32_t GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue);
+
     int32_t BuildIndex(char *record_file_buffer, uint32_t record_file_length, char *record_frag_info_buffer,
                             uint32_t record_frag_info_length, uint32_t *record_frag_number);
 

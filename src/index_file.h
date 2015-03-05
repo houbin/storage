@@ -27,11 +27,10 @@ public:
     IndexFile(Logger *logger, string base_name);
 
     uint32_t GetFileCounts();
-
     int32_t AnalyzeAllEntry();
-    int32_t AnalyzeOneEntry(char *buffer, RecordFile *record_file);
 
     int32_t Write(uint32_t offset, char *buffer, uint32_t length);
+    int32_t Read(char *buffer, uint32_t length, uint32_t offset);
     int32_t Shutdown();
 };
 

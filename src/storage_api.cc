@@ -53,15 +53,26 @@ int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info)
     return 0;
 }
 
-void storage_formate_disk(char *disk)
+int32_t storage_formate_disk(char *disk)
 {
     char command[256] = {0};
+    FILE *fp = NULL;
 
-    snprintf(command, 255, "/jovision/shell/disk_format/formate_one_disk.sh %s", disk);
+    snprintf(command, 255, "/jovision/shell/disk_format/format_one_disk.sh %s", disk);
+    fp = popen(command, "r");
+    if (fp == NULL)
+    {
+        return -1;
+    }
 
-    system(command);
-    
-    return;
+    char *result_buffer = new char[2048];
+    memset(result_buffer, 0, 2048);
+    while(fgets(result_buffer, 2048, fp) != NULL)
+    {
+        
+    }
+
+    return pclose(fp);
 }
 
 void storage_init()
@@ -115,6 +126,39 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
 int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info)
 {
     return store_client_center->WriteFrame(id, frame_info);
+}
+
+int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, const UTIME_T *end, 
+        FRAGMENT_INFO_T **frag_info, uint32_t *count)
+{
+    int32_t ret;
+    deque<FRAGMENT_INFO_T*> frag_info_queue;
+    UTime start_time(start->seconds, start->nseconds);
+    UTime end_time(end->seconds, end->nseconds);
+
+    ret = store_client_center->ListRecordFragments(id, start_time, end_time, frag_info_queue);
+    if (ret != 0)
+    {
+        return ret;
+    }
+    
+    *count = frag_info_queue.size();
+    if (*count == 0)
+    {
+        frag_info = NULL;
+        return 0;
+    }
+
+    frag_info = new FRAGMENT_INFO_T*[*count];
+    assert(frag_info != NULL);
+
+    for (int i = 0; i < *count; i++)
+    {
+        frag_info[i] = frag_info_queue.front();
+        frag_info_queue.pop_front();
+    }
+
+    return 0;
 }
 
 int32_t storage_seek(const uint32_t id, const UTIME_T *stamp)

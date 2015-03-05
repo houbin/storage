@@ -35,10 +35,15 @@ public:
     bool IsEmpty();
 
     int32_t GetRecordFile(UTime &time, RecordFile **record_file);
-    int32_t GetNextRecordFile(RecordFile *current_record_file, RecordFile **next_record_file);
+    int32_t ListRecordFragments(UTime &time, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
+
+    int32_t GetFragInfoWithStartTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &start);
+    int32_t GetFragInfoWithStartAndEndTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &start, UTime &end);
+    int32_t GetFragInfoWithEndTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &end);
+    int32_t GetFragInfo(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file);
 
     void Shutdown();
 };
@@ -143,6 +148,7 @@ public:
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
+    int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
 
     void Shutdown();
 };
@@ -203,6 +209,8 @@ public:
     int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t SeekRead(uint32_t id, UTime &stamp);
     int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
+
+    int32_t ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();

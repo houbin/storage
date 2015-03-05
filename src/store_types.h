@@ -40,7 +40,7 @@ struct RecordFileInfo
     UTime i_frame_start_time;
     UTime i_frame_end_time;
     uint32_t record_offset;
-    char padding[16];
+    char padding[17];
 }; 
 
 struct RecordFragmentInfo

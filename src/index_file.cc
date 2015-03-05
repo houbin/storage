@@ -51,54 +51,6 @@ uint32_t IndexFile::GetFileCounts()
     return file_counts_;
 }
 
-int32_t IndexFile::AnalyzeOneEntry(char *buffer, RecordFile *record_file)
-{
-    char *temp = NULL;
-
-    assert(buffer != NULL);
-    assert(record_file != NULL);
-
-    Log(logger_, "analyze one entry");
-
-    temp = buffer;
-    char stream_info[64] = {0};
-    memcpy(stream_info, buffer, 64);
-    record_file->stream_info_.assign(stream_info);
-    temp += 64;
-
-    record_file->locked_ = *temp;
-    temp += 1;
-
-    uint32_t a = *temp;
-    uint32_t b = *(temp + 1);
-    record_file->record_fragment_count_ = a | (b << 8);
-    temp += 2;
-
-    record_file->start_time_.tv_sec = DecodeFixed32(temp);
-    temp += 4;
-    record_file->start_time_.tv_nsec = DecodeFixed32(temp);
-    temp += 4;
-
-    record_file->end_time_.tv_sec = DecodeFixed32(temp);
-    temp += 4;
-    record_file->end_time_.tv_nsec = DecodeFixed32(temp);
-    temp +=4;
-
-    record_file->i_frame_start_time_.tv_sec = DecodeFixed32(temp);
-    temp += 4;
-    record_file->i_frame_start_time_.tv_nsec = DecodeFixed32(temp);
-    temp += 4;
-
-    record_file->i_frame_end_time_.tv_sec = DecodeFixed32(temp);
-    temp += 4;
-    record_file->i_frame_end_time_.tv_nsec = DecodeFixed32(temp);
-    temp += 4;
-
-    record_file->record_offset_ = DecodeFixed32(temp);
-
-    return 0;
-}
-
 int32_t IndexFile::AnalyzeAllEntry()
 {
     size_t ret;
@@ -142,7 +94,8 @@ int32_t IndexFile::AnalyzeAllEntry()
         uint32_t actual_crc = crc32c::Value(temp, length);
         assert(expected_crc == actual_crc);
         temp += 4;
-        AnalyzeOneEntry(temp, record_file);
+        ret = record_file->DecodeRecordFileInfoIndex(temp, sizeof(RecordFileInfo));
+        assert(ret == 0);
 
         string stream_info(record_file->stream_info_);
         StoreClient *store_client = NULL;
@@ -180,10 +133,31 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
     return 0;
 }
 
+int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
+{
+    Log(logger_, "read length is %d, offset is %d", length, offset);
+
+    Mutex::Locker lock(mutex_);
+    ret = fseek(index_file_, offset, SEEK_SET);
+    assert(ret != -1);
+
+    ret = fread(buffer, 1, length, index_file_);
+    if (ret != length)
+    {
+        Log(logger_, "index_file is %p, fread return %d, errno msg is %s", index_file_, ret, strerror(errno));
+        assert(ret == (int)length);
+    }
+
+    Log(logger_, "index file read, length is %d, offset is %d", length, offset);
+
+    return 0;
+}
+
 int32_t IndexFile::Shutdown()
 {
     Log(logger_, "shutdown");
 
+    Mutex::Locker lock(mutex_);
     fclose(index_file_);
 
     return 0;

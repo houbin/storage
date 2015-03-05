@@ -41,7 +41,7 @@ typedef struct disk_info
  * 输入： disk 磁盘名称
  *
  * 输出： disk_info 获取的磁盘信息
- * 返回： void
+ * 返回： 成功返回0，失败返回负数
  */
 extern int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info);
 
@@ -49,9 +49,9 @@ extern int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info);
  * 输入： disk  磁盘名称
  *
  * 输出： 无
- * 返回： void
+ * 返回： 成功返回0，失败返回负数
  */
-extern void storage_formate_disk(char *disk);
+extern int32_t storage_formate_disk(char *disk);
 
 /* 功能： 初始化storage模块 
  * 输入：   无
@@ -70,7 +70,7 @@ extern void storage_init();
  *
  * 输出：   id              视频流操作id
  *          
- * 返回： 成功返回0，失败返回-1 
+ * 返回： 成功返回0，失败返回负数
  */
 extern int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id);
 
@@ -78,7 +78,7 @@ extern int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_
  * 输入：   id          操作的流id
  *          frame_info  视频数据内容
  *
- * 返回： 成功返回0，失败返回-1 
+ * 返回： 成功返回0，失败返回负数
  */
 extern int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info);
 
@@ -91,14 +91,14 @@ extern int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info);
  * 输出：   frag_info   获取的录像段数组头指针
  *          count       录像段个数
  *
- * 返回： 成功返回0，失败返回-1 
+ * 返回： 成功返回0，失败返回负数
  */
 extern int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, const UTIME_T *end, FRAGMENT_INFO_T **frag_info, uint32_t *count);
 
 /* 功能： 释放录像段内存
  * 输入：   frag_info   录像段数组头指针
  *
- * 返回： 成功返回0，失败返回-1 
+ * 返回： 成功返回0，失败返回负数
  */
 extern void storage_free_record_fragments(FRAGMENT_INFO_T *frag_info);
 
@@ -106,7 +106,7 @@ extern void storage_free_record_fragments(FRAGMENT_INFO_T *frag_info);
  * 输入：   id      操作的视频流id
  *          stamp   需要seek到的时刻
  *
- * 返回： 成功返回0，失败返回-1
+ * 返回： 成功返回0，失败返回负数
  */
 extern int32_t storage_seek(const uint32_t id, const UTIME_T *stamp);
 
@@ -115,7 +115,7 @@ extern int32_t storage_seek(const uint32_t id, const UTIME_T *stamp);
  *          
  * 输出：   frame_info  读取的视频帧数据，所有用到的内存由调用者申请
  *           
- * 返回： 读取的字节数（0表示没有读到数据），失败返回-1
+ * 返回： 读取的字节数（0表示没有读到数据），失败返回负数
  */
 extern int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info);
 
