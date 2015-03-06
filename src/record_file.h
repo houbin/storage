@@ -2,6 +2,7 @@
 #define STORAGE_RECORD_FILE_
 
 #include <string>
+#include <deque>
 #include "../util/logger.h"
 #include "../util/mutex.h"
 #include "store_types.h"

@@ -26,6 +26,7 @@
 #define ERR_NO_MAGIC_CODE           3004
 #define ERR_SEEK_ERROR              3005
 #define ERR_READ_REACH_TO_END       3006
+#define ERR_CRC_CHECK               3007
 
 
 #endif

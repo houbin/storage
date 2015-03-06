@@ -7,6 +7,8 @@
 namespace storage
 {
 
+#define BUFFER_APPEND(buffer, write_offset, src_data, src_len) {memcpy(buffer + write_offset, src_data, src_len);write_offset+=src_len;}
+
 uint64_t kOpSeq = 0;
 
 // ======================================================= //
@@ -22,7 +24,7 @@ bool RecordFileMap::IsEmpty()
 {
     Log(logger_, "is empty");
 
-    RDLocker::RDLocker lock(rwlock_);
+    RWLock::RDLocker lock(rwlock_);
     if (record_file_map_.empty())
     {
         return true;
@@ -90,7 +92,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
     int32_t ret;
     RecordFile *start_rf = NULL;
 
-    RDLocker::RDLocker lock(rwlock_);
+    RWLock::RDLocker lock(rwlock_);
     if (record_file_map_.empty())
     {
         return -ERR_ITEM_NOT_FOUND;
@@ -100,9 +102,9 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
     if (ret == -ERR_ITEM_NOT_FOUND)
     {
         map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
-        assert(iter != record_file_map_.rend());
-        RecordFile *end_file= iter->second;
-        asssert(end_file != NULL);
+        assert(riter != record_file_map_.rend());
+        RecordFile *end_file= riter->second;
+        assert(end_file != NULL);
         if (start >= end_file->end_time_)
         {
             return -ERR_ITEM_NOT_FOUND;
@@ -131,11 +133,11 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)
         {
             /* end time landed in the record file */
-            if (record_file->start_time_ <= end && record_file_->end_time_ >= start)
+            if (record_file->start_time_ <= end && record_file->end_time_ >= start)
             {
                 ret = GetFragInfoWithStartAndEndTime(frag_info_queue, record_file, start, end);
                 assert(ret == 0);
-                done = true;
+                done_flag = true;
                 break;
             }
 
@@ -219,47 +221,133 @@ int32_t RecordFileMap::GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T*> &frag_in
     assert(record_file != NULL);
     
     int32_t ret;
+    deque<FRAGMENT_INFO_T*> frag_queue_temp;
 
-    
-    ret = record_file->GetAllFragInfo(frag_info_queue)
+    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    assert (ret == 0);
 
-
-
-
-
-
-
-
-
-
-    uint32_t frag_count = record_file->record_fragment_count_;
-
-    /* need to read fragment info in index file */
-    IndexFile *index_file = NULL;
-    ret = index_file_manager->Find(record_file->base_name_, &index_file);
-    assert(ret == 0);
-
-    uint32_t frag_info_offset = index_file->file_counts_ * sizeof(RecordFileInfo) 
-                            + record_file->number_ * sizeof(RecordFragmentInfo);
-    uint32_t frag_info_length = sizeof(RecordFragmentInfo) * frag_count;
-
-    char *record_frag_info = malloc(frag_info_length);
-    assert(record_frag_info != NULL);
-    memset(record_frag_info, 0, frag_info_length);
-
-    ret = index_file->Read(record_frag_info, frag_info_length, frag_info_offset);
-    if (ret != frag_info_length)
+    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
+    for(; iter != frag_queue_temp.end(); iter++)
     {
-        Log(logger_, "index file read length is %d, offset is %d error", frag_info_length, frag_info_offset);
-        assert(ret == frag_info_length);
-    }
+        FRAGMENT_INFO_T *temp = *iter;
+        assert(temp != NULL);
 
-    for(int i = 0; i < frag_count; i++)
-    {
+        assert(temp->start_time > start);
         
+        if (temp->end_time < start)
+        {
+            continue;
+        }
+
+        if (temp->start_time <= start && temp->end_time >= start)
+        {
+            temp->start_time.seconds = start.tv_sec;
+            temp->start_time.nseconds = start.tv_nsec;
+            frag_queue_temp.push_back(temp);
+            break;
+        }
+
+        frag_queue_temp.push_back(temp);
     }
 
-    
+    return 0;
+}
+
+int32_t RecordFileMap::GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file,
+                                                            UTime &start, UTime &end)
+{
+    Log(logger_, "get frag with start and end time");
+
+    int32_t ret;
+    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+
+    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    assert (ret == 0);
+
+    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
+    for (; iter != frag_queue_temp.end(); iter++)
+    {
+        FRAGMENT_INFO_T *temp = *iter;
+        assert(temp != NULL);
+
+        if (temp->end_time < start)
+        {
+            continue;
+        }
+
+        if (temp->start_time <= start && temp->end_time >= start)
+        {
+            temp->start_time.seconds = start.tv_sec;
+            temp->start_time.nseconds = start.tv_nsec;
+            frag_queue_temp.push_back(temp);
+            break;
+        }
+
+        if (temp->start_time <= end && temp->end_time >= end)
+        {
+            temp->end_time.seconds = end.tv_sec;
+            temp->end_time.nseconds = end.tv_nsec;
+            frag_queue_temp.push_back(temp);
+            break;
+        }
+
+        frag_queue_temp.push_back(temp);
+    }
+
+    return 0;
+}
+
+int32_t RecordFileMap::GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file, UTime &end)
+{
+    Log(logger_, "get frag info with end time");
+
+    int32_t ret;
+    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+
+    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    assert (ret == 0);
+
+    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
+    for (; iter != frag_queue_temp.end(); iter++)
+    {
+        FRAGMENT_INFO_T *temp = *iter;
+        assert(temp != NULL);
+
+        if (temp->start_time <= end && temp->end_time >= end)
+        {
+            temp->end_time.seconds = end.tv_sec;
+            temp->end_time.nseconds = end.tv_nsec;
+            frag_queue_temp.push_back(temp);
+            break;
+        }
+
+        frag_queue_temp.push_back(temp);
+    }
+
+    return 0;
+}
+
+int32_t RecordFileMap::GetFragInfo(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file)
+{
+    Log(logger_, "get frag info");
+    assert(record_file != NULL);
+
+    int32_t ret;
+    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+
+    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    assert (ret == 0);
+
+    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
+    for (; iter != frag_queue_temp.end(); iter++)
+    {
+        FRAGMENT_INFO_T *temp = *iter;
+        assert(temp != NULL);
+
+        frag_queue_temp.push_back(temp);
+    }
+
+    return 0;
 }
 
 void RecordFileMap::Shutdown()
@@ -282,10 +370,14 @@ void RecordFileMap::Shutdown()
 //                  store client writer
 // ======================================================= //
 RecordWriter::RecordWriter(Logger *logger, StoreClient *store_client)
-: logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), current_o_frame_(NULL),
-write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), stop_(false)
+: logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), write_offset_(0), 
+current_o_frame_(NULL), write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), 
+stop_(false)
 {
     memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
+
+    buffer_ = (char *)malloc(sizeof(kBlockSize));
+    assert(buffer_ != NULL);
 }
 
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
@@ -353,14 +445,21 @@ int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame)
     {
         char header[kHeaderSize] = {0}; 
         EncodeHeader(header, current_o_frame_); 
-        buffer_.append(header, kHeaderSize); 
-        buffer_.append(current_o_frame_->buffer, current_o_frame_->size);
+
+        memcpy(buffer_ + write_offset_, header, kHeaderSize);
+        write_offset_ += kHeaderSize;
+        memcpy(buffer_ + write_offset_, current_o_frame_->buffer, current_o_frame_->size);
+        write_offset_ += current_o_frame_->size;
     }
 
     char header[kHeaderSize] = {0}; 
     EncodeHeader(header, frame); 
-    buffer_.append(header, kHeaderSize); 
-    buffer_.append(frame->buffer, frame->size); 
+
+
+    memcpy(buffer_ + write_offset_, header, kHeaderSize);
+    write_offset_ += kHeaderSize;
+    memcpy(buffer_ + write_offset_, frame->buffer, frame->size);
+    write_offset_ += frame->size;
 
     return 0;
 }
@@ -405,7 +504,8 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
     ret = record_file->Append(buffer_, write_length, buffer_times_);
     assert(ret == 0);
 
-    buffer_.erase(0, write_length);
+    memset(buffer_, 0, kBlockSize);
+    write_offset_ = 0;
     memset(&buffer_times_, 0, sizeof(BufferTimes));
 
     return 0;
@@ -559,13 +659,14 @@ void *RecordWriter::Entry()
                 if (first_i_frame == false)
                 {
                     Log(logger_, "no I frame, continue");
+                    safe_free(frame->buffer);
+                    safe_free(frame);
                     queue_mutex_.Lock();
                     continue;
                 }
                 Log(logger_, "B or P frame");
             }
 
-            uint32_t buffer_old_length = buffer_.length();
             uint32_t frame_length = kHeaderSize + frame->size;
             if (add_o_frame)
             {
@@ -579,16 +680,22 @@ void *RecordWriter::Entry()
                 Log(logger_, "doesn't find any record file");
                 UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
                 ret = store_client_->GetFreeFile(stamp, &record_file);
-                assert(ret == 0);
-                assert(record_file != NULL);
+                assert(ret == 0 && record_file != NULL);
             }
+            assert(ret == 0);
+
             Log(logger_, "get last record file ok");
 
-            uint32_t write_offset = record_file->record_offset_;
-            assert(write_offset <= kRecordFileSize);
-            uint32_t file_left_size = kRecordFileSize - write_offset;
+            uint32_t file_offset = record_file->record_offset_;
+            assert(file_offset <= kRecordFileSize);
+            uint32_t file_left_size = kRecordFileSize - file_offset;
 
             UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
+            if (add_o_frame)
+            {
+                
+            }
+
             if ((buffer_old_length + frame_length) <= file_left_size)
             {
                 EncodeFrame(add_o_frame, frame);
@@ -705,6 +812,13 @@ void RecordWriter::Stop()
 
     /* clear buffer times*/
     memset(&buffer_times_, 0, sizeof(BufferTimes));
+
+    /* free current o frame */
+    if (current_o_frame_ != NULL)
+    {
+        safe_free(current_o_frame_->buffer);
+    }
+    safe_free(current_o_frame_);
 
     /* finish last record file write */
     {
@@ -1050,7 +1164,7 @@ int32_t StoreClient::CloseRead(uint32_t id)
 
 int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue)
 {
-    Log(logger_, "list record fragments, id is %d, start is %d.%d, end is %d.%d", id, 
+    Log(logger_, "list record fragments, start is %d.%d, end is %d.%d",
         start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
     
     int32_t ret;
@@ -1310,7 +1424,7 @@ int32_t StoreClientCenter::ListRecordFragments(uint32_t id, UTime &start, UTime 
         return ret;
     }
 
-    return store_client->ListRecordFragments(id, start, end, frag_info_queue);
+    return store_client->ListRecordFragments(start, end, frag_info_queue);
 }
 
 int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)

@@ -51,6 +51,9 @@ struct RecordFragmentInfo
     UTime end_time;
     UTime i_frame_start_time;
     UTime i_frame_end_time;
+
+    uint32_t start_offset;
+    uint32_t end_offset;
 };
 #pragma pack()
 
@@ -80,6 +83,37 @@ inline bool operator==(const UTIME_T &x, const UTIME_T &y)
 }
 
 inline bool operator!=(const UTIME_T &x, const UTIME_T &y)
+{
+    return !(operator==(x, y));
+}
+
+
+inline bool operator>(const UTIME_T &x, const UTime &y)
+{
+    return ((x.seconds > y.tv_sec) || ((x.seconds == y.tv_sec) && (x.nseconds > y.tv_nsec)));
+}
+
+inline bool operator<=(const UTIME_T &x, const UTime &y)
+{
+    return !(operator>(x, y));
+}
+
+inline bool operator<(const UTIME_T &x, const UTime &y)
+{
+    return ((x.seconds < y.tv_sec) || ((x.seconds == y.tv_sec) && (x.nseconds < y.tv_nsec)));
+}
+
+inline bool operator>=(const UTIME_T &x, const UTime &y)
+{
+    return !(operator<(x,y));
+}
+
+inline bool operator==(const UTIME_T &x, const UTime &y)
+{
+    return ((x.seconds == y.tv_sec) && (x.nseconds == y.tv_nsec));
+}
+
+inline bool operator!=(const UTIME_T &x, const UTime &y)
 {
     return !(operator==(x, y));
 }

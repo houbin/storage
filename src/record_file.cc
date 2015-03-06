@@ -9,6 +9,7 @@
 #include "store_types.h"
 #include "record_file.h"
 #include "index_file.h"
+#include "../include/storage.h"
 
 using namespace util;
 
@@ -127,8 +128,9 @@ int32_t RecordFile::DecodeRecordFileInfoIndex(char *buffer, uint32_t length)
     char *temp = NULL;
 
     temp = buffer;
-    char stream_info[64] = {0};
-    memcpy(stream_info_, buffer, 64);
+    char stream_str[64] = {0};
+    memcpy(stream_str, buffer, 64);
+    stream_info_.assign(stream_str);
     temp += 64;
 
     locked_ = *temp;
@@ -219,7 +221,10 @@ int32_t RecordFile::DecodeRecordFragInfoIndex(char *buffer, uint32_t length, Rec
     temp += 4;
 
     uint32_t expected_length = sizeof(RecordFragmentInfo) - sizeof(frag_info.length) - sizeof(frag_info.crc);
-    asssert(expected_length == actual_length);
+    if (expected_length != actual_length);
+    {
+        return -ERR_CRC_CHECK;
+    }
 
     uint32_t expected_crc = DecodeFixed32(temp);
     temp += 4;
@@ -260,14 +265,16 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue)
 
     if (record_fragment_count_ == 1)
     {
-        FRAGMENT_INFO_T *frag_info = new FRAGMENT_INFO_T;¬
-        assert(frag_info != NULL);¬
+        FRAGMENT_INFO_T *frag_info = new FRAGMENT_INFO_T;
+        assert(frag_info != NULL);
         
-        frag_info->start_time= start_time_;
-        frag_info->end_time= end_time_;
+        frag_info->start_time.seconds = start_time_.tv_sec;
+        frag_info->start_time.nseconds = start_time_.tv_nsec;
+        frag_info->end_time.seconds = end_time_.tv_sec;
+        frag_info->end_time.nseconds = end_time_.tv_nsec;
         
-        frag_info_queue.push_back(frag_info);¬
-        return 0;¬ 
+        frag_info_queue.push_back(frag_info);
+        return 0;
     }
 
     /* need to read fragment info in index file */ 
@@ -275,10 +282,11 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue)
     ret = index_file_manager->Find(base_name_, &index_file); 
     assert(ret == 0); 
     
-    uint32_t frag_info_offset = index_file->file_counts_ * sizeof(RecordFileInfo) + number_ * sizeof(RecordFragmentInfo); 
+    uint32_t file_counts = index_file->GetFileCounts();
+    uint32_t frag_info_offset = file_counts * sizeof(RecordFileInfo) + number_ * sizeof(RecordFragmentInfo); 
     uint32_t frag_info_length = sizeof(RecordFragmentInfo) * record_fragment_count_;
     
-    char *record_frag_info = malloc(frag_info_length); 
+    char *record_frag_info = (char *)malloc(frag_info_length);
     assert(record_frag_info != NULL); 
     memset(record_frag_info, 0, frag_info_length); 
     
@@ -294,13 +302,20 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue)
         RecordFragmentInfo temp_frag_info = {0};
         char *temp_buffer = record_frag_info;
 
-        DecodeRecordFragInfoIndex(temp_buffer, sizeof(RecordFragmentInfo), temp_frag_info);
+        ret = DecodeRecordFragInfoIndex(temp_buffer, sizeof(RecordFragmentInfo), temp_frag_info);
+        if (ret == -ERR_CRC_CHECK)
+        {
+            Log(logger_, "found crc check error, i is %d", i);
+            return 0;
+        }
 
-        FRAGMENT_INFO_T *frag_info = new FRAGMENT_INFO_T;¬
-        assert(frag_info != NULL);¬
+        FRAGMENT_INFO_T *frag_info = new FRAGMENT_INFO_T;
+        assert(frag_info != NULL);
         
-        frag_info->start_time = temp_frag_info.start_time;
-        frag_info->end_time = temp_frag_info.end_time;
+        frag_info->start_time.seconds = temp_frag_info.start_time.tv_sec;
+        frag_info->start_time.nseconds = temp_frag_info.start_time.tv_nsec;
+        frag_info->end_time.seconds = temp_frag_info.end_time.tv_sec;
+        frag_info->end_time.nseconds = temp_frag_info.end_time.tv_sec;
     
         frag_info_queue.push_back(frag_info);
     }

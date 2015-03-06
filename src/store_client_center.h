@@ -40,10 +40,10 @@ public:
     int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
 
-    int32_t GetFragInfoWithStartTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &start);
-    int32_t GetFragInfoWithStartAndEndTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &start, UTime &end);
-    int32_t GetFragInfoWithEndTime(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file, UTime &end);
-    int32_t GetFragInfo(vector<FRAGMENT_INFO_T*> &frag_info_vec, RecordFile *record_file);
+    int32_t GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &start);
+    int32_t GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &start, UTime &end);
+    int32_t GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &end);
+    int32_t GetFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file);
 
     void Shutdown();
 };
@@ -61,7 +61,8 @@ private:
     Cond queue_cond_;
     deque<WriteOp*> write_op_queue_;
 
-    string buffer_;
+    char *buffer_;
+    uint32_t write_offset_;
     BufferTimes buffer_times_;
 
     FRAME_INFO_T *current_o_frame_;

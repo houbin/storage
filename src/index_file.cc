@@ -136,6 +136,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 {
     Log(logger_, "read length is %d, offset is %d", length, offset);
+    int ret;
 
     Mutex::Locker lock(mutex_);
     ret = fseek(index_file_, offset, SEEK_SET);
