@@ -7,8 +7,6 @@
 namespace storage
 {
 
-#define BUFFER_APPEND(buffer, write_offset, src_data, src_len) {memcpy(buffer + write_offset, src_data, src_len);write_offset+=src_len;}
-
 uint64_t kOpSeq = 0;
 
 // ======================================================= //
@@ -375,9 +373,6 @@ current_o_frame_(NULL), write_index_event_(NULL), last_record_file_mutex_("Recor
 stop_(false)
 {
     memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
-
-    buffer_ = (char *)malloc(sizeof(kBlockSize));
-    assert(buffer_ != NULL);
 }
 
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
@@ -436,29 +431,29 @@ int32_t RecordWriter::EncodeHeader(char *header, FRAME_INFO_T *frame)
     return 0;
 }
 
-int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame)
+int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *temp_buffer)
 {
     assert(frame != NULL);
     Log(logger_, "encode frame, add_o_frame is %d, frame is %p", add_o_frame, frame);
 
+    uint32_t write_offset = 0;
     if (add_o_frame)
     {
         char header[kHeaderSize] = {0}; 
         EncodeHeader(header, current_o_frame_); 
 
-        memcpy(buffer_ + write_offset_, header, kHeaderSize);
-        write_offset_ += kHeaderSize;
-        memcpy(buffer_ + write_offset_, current_o_frame_->buffer, current_o_frame_->size);
-        write_offset_ += current_o_frame_->size;
+        memcpy(temp_buffer, header, kHeaderSize);
+        write_offset += kHeaderSize;
+        memcpy(temp_buffer + write_offset, current_o_frame_->buffer, current_o_frame_->size);
+        write_offset += current_o_frame_->size;
     }
 
     char header[kHeaderSize] = {0}; 
     EncodeHeader(header, frame); 
 
-
-    memcpy(buffer_ + write_offset_, header, kHeaderSize);
-    write_offset_ += kHeaderSize;
-    memcpy(buffer_ + write_offset_, frame->buffer, frame->size);
+    memcpy(temp_buffer + write_offset, header, kHeaderSize);
+    write_offset += kHeaderSize;
+    memcpy(temp_buffer + write_offset, frame->buffer, frame->size);
     write_offset_ += frame->size;
 
     return 0;
@@ -523,7 +518,7 @@ int32_t RecordWriter::BuildRecordFileIndex(RecordFile *record_file, char *record
                                     record_frag_info_buffer, record_frag_info_length, record_flag_info_number);
 }
 
-int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
+int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r, bool stop)
 {
     assert(write_index_event_ != NULL);
     Log(logger_, "write index, write_index_event_ is %p", write_index_event_);
@@ -565,7 +560,7 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
     index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
     index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
 
-    if (r == -1)
+    if (stop)
     {
         return 0;
     }
@@ -577,7 +572,7 @@ again:
     return 0;
 }
 
-int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds)
+int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds, bool stop)
 {
     Mutex::Locker lock(store_client_center->timer_lock);
 
@@ -588,7 +583,7 @@ int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t aft
         write_index_event_ = NULL;
     }
 
-    write_index_event_ = new C_WriteIndexTick(store_client_, record_file);
+    write_index_event_ = new C_WriteIndexTick(store_client_, record_file, stop);
     store_client_center->timer.AddEventAfter(after_seconds, write_index_event_);
     Log(logger_, "reset write index, write_index_event_ is %p, record_file is %p", write_index_event_, record_file);
 
@@ -691,53 +686,69 @@ void *RecordWriter::Entry()
             uint32_t file_left_size = kRecordFileSize - file_offset;
 
             UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
-            if (add_o_frame)
-            {
-                
-            }
 
-            if ((buffer_old_length + frame_length) <= file_left_size)
-            {
-                EncodeFrame(add_o_frame, frame);
-                UpdateBufferTimes(frame_type, stamp);
+            char *temp_buffer = NULL;
+            temp_buffer = (char *)malloc(frame_length);
+            UpdateBufferTimes(frame_type, stamp);
+            EncodeFrame(add_o_frame, frame, temp_buffer);
 
-                uint32_t buffer_length = buffer_.length();
-                if (buffer_length >= kBlockSize)
+            if ((write_offset_ + frame_length) <= file_left_size)
+            {
+                uint32_t temp_buffer_write_offset = 0;
+                uint32_t frame_left_len = frame_length;
+                while(frame_left_len > 0)
                 {
-                    uint32_t block_count = buffer_length / kBlockSize;
-                    uint32_t write_length = block_count * kBlockSize;
-                    ret = WriteBuffer(record_file, write_length);
-                    assert(ret == 0);
+                    uint32_t buffer_left_size = kBlockSize - write_offset_;
+                    if (buffer_left_size == 0)
+                    {
+                        ret = WriteBuffer(record_file, kBlockSize);
+                        assert(ret == 0);
+                        continue;
+                    }
+
+                    uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len: buffer_left_size;
+                    memcpy(buffer_ + write_offset_, temp_buffer + temp_buffer_write_offset, copy_len);
+
+                    frame_left_len -= copy_len;
+                    write_offset_ += copy_len;
+                    temp_buffer_write_offset += copy_len;
                 }
             }
             else
             {
                 /* no enough space in record file */
-                if (buffer_old_length != 0)
+                if (write_offset_ != 0)
                 {
-                    uint32_t write_length = buffer_old_length;
-                    ret = WriteBuffer(record_file, write_length);
+                    ret = WriteBuffer(record_file, kBlockSize);
                     assert(ret == 0);
                 }
 
                 record_file->FinishWrite();
-                ResetWriteIndexEvent(record_file, 0);
-
-                EncodeFrame(add_o_frame, frame);
-                UpdateBufferTimes(frame_type, stamp);
+                ResetWriteIndexEvent(record_file, 0, false);
 
                 RecordFile *record_file = NULL;
                 UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
                 ret = store_client_->GetFreeFile(stamp, &record_file);
                 assert(ret == 0 && record_file != NULL);
 
-                uint32_t buffer_length = buffer_.length();
-                if (buffer_length >= kBlockSize)
+                uint32_t temp_buffer_write_offset = 0;
+                uint32_t frame_left_len = frame_length;
+                while(frame_left_len > 0)
                 {
-                    uint32_t block_count = buffer_length / kBlockSize;
-                    uint32_t write_length = block_count * kBlockSize;
-                    ret = WriteBuffer(record_file, write_length);
-                    assert(ret == 0);
+                    uint32_t buffer_left_size = kBlockSize - write_offset_;
+                    if (buffer_left_size == 0)
+                    {
+                        ret = WriteBuffer(record_file, kBlockSize);
+                        assert(ret == 0);
+                        continue;
+                    }
+
+                    uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len : buffer_left_size;
+                    memcpy(buffer_ + write_offset_, temp_buffer + temp_buffer_write_offset, copy_len);
+
+                    frame_left_len -= copy_len;
+                    write_offset_ += copy_len;
+                    temp_buffer_write_offset += copy_len;
                 }
             }
 
@@ -752,8 +763,7 @@ void *RecordWriter::Entry()
         
         if (stop_)
         {
-            uint32_t buffer_length = buffer_.length();
-            if (buffer_length != 0)
+            if (write_offset_ != 0)
             {
                 Log(logger_, "stop_, write left data");
                 uint32_t ret;
@@ -763,8 +773,11 @@ void *RecordWriter::Entry()
                 assert(ret == 0);
                 assert(record_file != NULL);
 
-                ret = WriteBuffer(record_file, buffer_length);
+                ret = WriteBuffer(record_file, kBlockSize);
                 assert(ret == 0);
+
+                record_file->FinishWrite();
+                ResetWriteIndexEvent(record_file, 0, true);
             }
 
             break;
@@ -785,10 +798,15 @@ void RecordWriter::Start()
 {
     Log(logger_, "Start");
 
+    /* alloc */
+    buffer_ = new char[kBlockSize];
+    assert(buffer_ != NULL);
+    write_offset_ = 0;
+
     stop_ = false;
     Create();
 
-    ResetWriteIndexEvent(NULL, WRITE_INDEX_INTERVAL);
+    ResetWriteIndexEvent(NULL, WRITE_INDEX_INTERVAL, false);
 
     return;
 }
@@ -806,12 +824,10 @@ void RecordWriter::Stop()
     queue_mutex_.Unlock();
     Join();
 
-    /* clear buffer string */
-    string temp;
-    temp.swap(buffer_);
-
-    /* clear buffer times*/
-    memset(&buffer_times_, 0, sizeof(BufferTimes));
+    /* delete buffer */
+    delete []buffer_;
+    buffer_ = NULL;
+    write_offset_ = 0;
 
     /* free current o frame */
     if (current_o_frame_ != NULL)
@@ -819,25 +835,6 @@ void RecordWriter::Stop()
         safe_free(current_o_frame_->buffer);
     }
     safe_free(current_o_frame_);
-
-    /* finish last record file write */
-    {
-        RecordFile *record_file = NULL;
-        ret = store_client_->GetLastRecordFile(&record_file);
-        assert(ret == 0 && record_file != NULL);
-
-        record_file->FinishWrite();
-    }
-    
-    /* do timer */
-    {
-        Mutex::Locker lock(store_client_center->timer_lock);
-        if (write_index_event_ != NULL)
-        {
-            store_client_center->timer.DoEvent(write_index_event_);
-            write_index_event_ = NULL;
-        }
-    }
 
     return;
 }
@@ -1136,11 +1133,11 @@ int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
     return 0;
 }
 
-int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r)
+int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r, bool stop)
 {
     Log(logger_, "write record file index");
 
-    writer.WriteRecordFileIndex(record_file, r);
+    writer.WriteRecordFileIndex(record_file, r, stop);
 
     return 0;
 }

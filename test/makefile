@@ -2,11 +2,11 @@ CC = g++
 CC_FLAG = -g -rdynamic
 
 INC =
-LIB = -lstorage
+LIB = -L../ -lstorage -lpthread
 
-PRG = storage_test
+PRG = write_test
 
-OBJS = ./storage_test.o
+OBJS = ./storage_test.o ./storage_main.o
 
 all:$(PRG)
 

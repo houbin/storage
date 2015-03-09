@@ -52,8 +52,8 @@ struct RecordFragmentInfo
     UTime i_frame_start_time;
     UTime i_frame_end_time;
 
-    uint32_t start_offset;
-    uint32_t end_offset;
+    uint32_t frag_start_offset;
+    uint32_t frag_end_offset;
 };
 #pragma pack()
 

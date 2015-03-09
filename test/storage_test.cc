@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 #include <stdio.h>
 #include <math.h>
 #include <unistd.h>
@@ -7,115 +8,112 @@
 #include <string.h>
 #include <stdint.h>
 #include "../include/storage_api.h"
+#include "storage_test.h"
 
-#define JVN_DATA_I           0x01//视频I帧
-#define JVN_DATA_B           0x02//视频B帧
-#define JVN_DATA_P           0x03//视频P帧
-#define JVN_DATA_A           0x04//音频
-#define JVN_DATA_S           0x05//帧尺寸
-#define JVN_DATA_OK          0x06//视频帧收到确认
-#define JVN_DATA_DANDP       0x07//下载或回放收到确认
-#define JVN_DATA_O           0x08//其他自定义数据
-#define JVN_DATA_SKIP        0x09//视频S帧
-#define JVN_DATA_SPEED 0x64//主控码率
-#define JVN_DATA_HEAD        0x66//视频频解码头，该数据出现的同时将清空缓存
-
-uint64_t seq = 0;
-
-int make_frame(int *type, int *length, char **buffer)
+void FrameWriter::Start()
 {
-    FRAME_INFO_T *frame = NULL;
-    
-    frame = (FRAME_INFO_T *)malloc(sizeof(FRAME_INFO_T));
-    if (frame == NULL)
-    {
-        return -ENOMEM;
-    }
+    Create();
 
+    return;
+}
+
+int FrameWriter::MakeFrame(int *type, int *length, FRAME_INFO_T *frame)
+{
     struct timeval now;
     gettimeofday(&now, NULL);
     frame->frame_time.seconds = now.tv_sec;
     frame->frame_time.nseconds = now.tv_usec * 1000;
-    frame->stamp = seq;
+    frame->stamp = seq_;
 
     int rand_number = rand();
 
-    if (seq == 0)
+    if (seq_ == 0)
     {
         frame->type = JVN_DATA_O;
         frame->size = 100;
         frame->buffer = (char *)malloc(100);
         memset(frame->buffer, 'o', 100);
     }
-    else if (seq % 40 == 2)
+    else if (seq_ % 30 == 2)
     {
         frame->type = JVN_DATA_I;
         
-        int len = rand_number % (900 * 1024) + 100 * 1024;
+        int len = rand_number % (200 * 1024) + 10 * 1024;
         frame->size = len;
         frame->buffer = (char *)malloc(frame->size);
         memset(frame->buffer, 'i', frame->size);
     }
-    else if (seq % 4 == 0)
+    else
     {
         frame->type = JVN_DATA_B;
-        
 
-        int len = rand_number % (90 * 1024) + 10 * 1024;
+        int len = rand_number % (30 * 1024) + 30;
         frame->size = len;
         frame->buffer = (char *)malloc(frame->size);
         memset(frame->buffer, 'b', frame->size);
     }
-    else
-    {
-        frame->type = JVN_DATA_P;
 
-        int len = rand_number % (80 * 1024) + 10 * 1024;
-        frame->size = len;
-        frame->buffer = (char *)malloc(frame->size);
-        memset(frame->buffer, 'p', frame->size);
-    }
+    seq_++;
+    usleep(30 * 1000);
 
-    seq++;
-
-    *buffer = (char *)frame;
     return 0;
 }
 
-int main()
+void *FrameWriter::Entry()
 {
     int ret = 0;
-    uint32_t  write_id = 0;
+    int type = 0;
+    int length = 0;
+    uint32_t temp_op_id = 0;
+    FRAME_INFO_T frame = {0};
+    
     char stream_info[64] = {0};
+    snprintf(stream_info, 63, "stream_info_id_%d", id_);
 
-    strncpy(stream_info, "stream info aaaa", 64);
-
-
-    char disk[32] = "sdb";
-    DISK_INFO_T disk_info = {0};
-    ret = storage_get_disk_info(disk, &disk_info);
-    printf("ret is %d, disk_info name is %s, capacity is %d, status is %s\n", 
-                    ret, disk_info.name, disk_info.capacity, disk_info.status);
-    storage_formate_disk(disk);
-
-    storage_init();
-    storage_open(stream_info, 64, 1, &write_id);
-
-    int i = 0;
-    for (i = 0; i < 100000; i++)
+    for (int i = 0; i < 10000; i++)
     {
-        int type;
-        int length;
-        char *frame = NULL;
+        memset(&frame, 0, sizeof(FRAME_INFO_T));
+        if (op_id_ < 0)
+        {
+            ret = storage_open(stream_info, 64, 1, &temp_op_id);
+            assert (ret == 0);
+            op_id_ = (int32_t)temp_op_id;
+            fprintf(stderr, "storage open id %d\n", op_id_);
+        }
 
-        make_frame(&type, &length, &frame);
-        storage_write(write_id, (FRAME_INFO_T*)frame);
-        free(((FRAME_INFO_T *)frame)->buffer);
-        free(frame);
-        usleep(40000);
+        MakeFrame(&type, &length, &frame);
+
+        ret = storage_write(op_id_, &frame);
+        if (ret != 0)
+        {
+            fprintf(stderr, "storage write return %d\n", ret);
+            return 0; 
+        }
+
+        if (frame.buffer != NULL)
+        {
+            free(frame.buffer);
+            frame.buffer = NULL;
+        }
+
+        if (i % 123 == 122)
+        {
+            fprintf(stderr, "storage close id %d", op_id_);
+            storage_close(op_id_);
+            op_id_ = -1;
+            sleep(10);
+        }
     }
 
-    storage_close(write_id);
-    storage_shutdown();
     return 0;
 }
+
+void FrameWriter::Shutdown()
+{
+    fprintf(stderr, "shutdown %d\n", id_);
+    
+    Join();
+
+    return;
+}
+
