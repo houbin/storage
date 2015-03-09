@@ -22,7 +22,8 @@ src/store_client_center.d util/clock.d util/coding.d util/cond.d util/crc32c.d u
 util/mutex.d util/thread.d util/timer.d
 
 #all target
-all:$(PRG) $(STATIC_PRG)
+#all:$(PRG) $(STATIC_PRG)
+all:$(STATIC_PRG)
 
 $(PRG):$(OBJ)
 	$(CC) -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)

@@ -454,7 +454,7 @@ int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *t
     memcpy(temp_buffer + write_offset, header, kHeaderSize);
     write_offset += kHeaderSize;
     memcpy(temp_buffer + write_offset, frame->buffer, frame->size);
-    write_offset_ += frame->size;
+    write_offset += frame->size;
 
     return 0;
 }
@@ -1242,6 +1242,11 @@ int32_t StoreClientCenter::Open(int flag, uint32_t id, string &stream_info)
                 clients_[id] = client;
                 client_search_map_.insert(make_pair(stream_info, client));
             }
+        }
+        else
+        {
+            RWLock::WRLocker lock(rwlock_);
+            clients_[id] = client;
         }
 
         ret = client->OpenWrite(id);

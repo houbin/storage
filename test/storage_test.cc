@@ -87,6 +87,7 @@ void *FrameWriter::Entry()
         if (ret != 0)
         {
             fprintf(stderr, "storage write return %d\n", ret);
+            assert(ret == 0);
             return 0; 
         }
 
@@ -98,7 +99,7 @@ void *FrameWriter::Entry()
 
         if (i % 123 == 122)
         {
-            fprintf(stderr, "storage close id %d", op_id_);
+            fprintf(stderr, "storage close id %d\n", op_id_);
             storage_close(op_id_);
             op_id_ = -1;
             sleep(10);
