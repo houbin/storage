@@ -617,6 +617,7 @@ void *RecordWriter::Entry()
             queue_mutex_.Unlock();
             Log(logger_, "queue mutex unlock");
 
+            char *frame_buffer = NULL;
             FRAME_INFO_T *frame = write_op->frame_info;
             safe_free(write_op);
 
@@ -626,25 +627,21 @@ void *RecordWriter::Entry()
             {
                 if (current_o_frame_ != NULL)
                 {
-                    safe_free(current_o_frame_->buffer);
-                    safe_free(current_o_frame_);
+                    /* swap current o frame and frame */
+                    FRAME_INFO_T *temp = current_o_frame_;
+                    current_o_frame_ = frame;
+                    frame = temp;
                 }
-
-                current_o_frame_ = frame;
-                queue_mutex_.Lock();
-                Log(logger_, "frame is O frame, assign current o frame, continue");
-                continue;
+                
+                Log(logger_, "O frame, replace current o frame, continue");
+                goto FreeResource;
             }
             else if (frame_type == JVN_DATA_I)
             {
                 if (current_o_frame_ == NULL)
                 {
-                    safe_free(frame->buffer);
-                    safe_free(frame);
-
                     Log(logger_, "no O frame, continue");
-                    queue_mutex_.Lock();
-                    continue;
+                    goto FreeResource;
                 }
 
                 add_o_frame = true;
@@ -658,10 +655,7 @@ void *RecordWriter::Entry()
                 if (first_i_frame == false)
                 {
                     Log(logger_, "no I frame, continue");
-                    safe_free(frame->buffer);
-                    safe_free(frame);
-                    queue_mutex_.Lock();
-                    continue;
+                    goto FreeResource;
                 }
                 Log(logger_, "B or P frame");
             }
@@ -689,10 +683,9 @@ void *RecordWriter::Entry()
 
             UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
 
-            char *temp_buffer = NULL;
-            temp_buffer = (char *)malloc(frame_length);
+            frame_buffer = (char *)malloc(frame_length);
             UpdateBufferTimes(frame_type, stamp);
-            EncodeFrame(add_o_frame, frame, temp_buffer);
+            EncodeFrame(add_o_frame, frame, frame_buffer);
 
             if ((write_offset_ + frame_length) <= file_left_size)
             {
@@ -705,11 +698,11 @@ void *RecordWriter::Entry()
                     {
                         ret = WriteBuffer(record_file, kBlockSize);
                         assert(ret == 0);
-                        continue;
+                        goto FreeResource;
                     }
 
                     uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len: buffer_left_size;
-                    memcpy(buffer_ + write_offset_, temp_buffer + temp_buffer_write_offset, copy_len);
+                    memcpy(buffer_ + write_offset_, frame_buffer + temp_buffer_write_offset, copy_len);
 
                     frame_left_len -= copy_len;
                     write_offset_ += copy_len;
@@ -742,11 +735,11 @@ void *RecordWriter::Entry()
                     {
                         ret = WriteBuffer(record_file, kBlockSize);
                         assert(ret == 0);
-                        continue;
+                        goto FreeResource;
                     }
 
                     uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len : buffer_left_size;
-                    memcpy(buffer_ + write_offset_, temp_buffer + temp_buffer_write_offset, copy_len);
+                    memcpy(buffer_ + write_offset_, frame_buffer + temp_buffer_write_offset, copy_len);
 
                     frame_left_len -= copy_len;
                     write_offset_ += copy_len;
@@ -754,13 +747,17 @@ void *RecordWriter::Entry()
                 }
             }
 
-            if (!add_o_frame)
+FreeResource:    
+            if (frame != NULL)
             {
                 safe_free(frame->buffer);
-                safe_free(frame);
             }
 
+            safe_free(frame);
+            safe_free(frame_buffer);
+
             queue_mutex_.Lock();
+            continue;
         }
         
         if (stop_)
