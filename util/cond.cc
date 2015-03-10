@@ -1,5 +1,7 @@
 #include <pthread.h>
 #include <assert.h>
+#include <stdio.h>
+#include <errno.h>
 #include "mutex.h"
 #include "utime.h"
 #include "cond.h"
@@ -17,7 +19,13 @@ Cond::Cond()
 Cond::~Cond()
 {
     int r = pthread_cond_destroy(&cond_);
-    assert(r == 0);
+    if (r != 0)
+    {
+        errno = r;
+        perror("cond destroy error");
+        fprintf(stderr, "cond destroy error, r is %d\n", r);
+        assert(r == 0);
+    }
 }
 
 int32_t Cond::Wait(Mutex &mutex)

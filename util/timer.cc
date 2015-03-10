@@ -19,22 +19,18 @@ void SafeTimer::Init()
 void SafeTimer::Shutdown()
 {
     Log(logger_, "shutdown");
-
     if (thread_ != NULL)
     {
-        /* 先关掉定时器处理线程 */
-        mutex_.Lock();
+        CancelAllEvents();
         stop_ = true;
         cond_.Signal();
+
         mutex_.Unlock();
         thread_->Join();
+        mutex_.Lock();
+
         delete thread_;
         thread_ = NULL;
-
-        /* 然后处理定时器队列中的event */
-        mutex_.Lock();
-        DoAllEvents();
-        mutex_.Unlock();
     }
 
     return;

@@ -30,7 +30,7 @@ public:
 
 int32_t NewLogger(const char* name, Logger **logger);
 void LogFunc(Logger *info_log, const char* format, ...);
-#define Log(info_log, format, ...) LogFunc(info_log, "[File: %s, Func: %s:%d]: "format, __FILE__,  __func__, __LINE__, ##__VA_ARGS__)
+#define Log(info_log, format, ...) LogFunc(info_log, "[%s:%s:%d]: "format, __FILE__,  __func__, __LINE__, ##__VA_ARGS__)
 
 }
 

@@ -18,10 +18,43 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), read_count_(0),
-locked_(false), had_frame_(false), record_fragment_count_(0), start_time_(0, 0), end_time_(0, 0),
-i_frame_start_time_(0, 0), i_frame_end_time_(0, 0), frag_start_offset_(0), frag_end_offset_(0), record_offset_(0)
+locked_(false), had_frame_(false), record_fragment_count_(0), frag_start_offset_(0), frag_end_offset_(0), record_offset_(0)
 {
+    ZeroTimes();
+}
 
+int32_t RecordFile::OpenFd(bool for_write)
+{
+    char buffer[32] = {0};
+
+    snprintf(buffer, 32, "record_%05d", number_);
+    string record_file_path(base_name_);
+    record_file_path.append(buffer);
+
+    if (for_write)
+    {
+        write_fd_ = open(record_file_path.c_str(), O_WRONLY);
+        assert(write_fd_ >= 0);
+    }
+    else
+    {
+        read_fd_ = open(record_file_path.c_str(), O_RDONLY);
+        assert(read_fd_ >= 0);
+    }
+
+    return 0;
+}
+
+bool RecordFile::CheckRecycle()
+{
+    Log(logger_, "check recycle");
+
+    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 int32_t RecordFile::Clear()
@@ -42,15 +75,13 @@ int32_t RecordFile::Clear()
     this->read_fd_ = -1;
     this->read_count_= 0;
     
-    this->stream_info_.clear();
+    string temp;
+    temp.swap(this->stream_info_);
+
     this->locked_ = false;
     this->had_frame_ = false;
     this->record_fragment_count_ = 0;
-    UTime temp(0, 0);
-    this->start_time_ = temp;
-    this->end_time_ = temp;
-    this->i_frame_start_time_ = temp;
-    this->i_frame_end_time_ = temp;
+    ZeroTimes();
     this->frag_start_offset_ = 0;
     this->frag_end_offset_ = 0;
     this->record_offset_ = 0;
@@ -58,16 +89,40 @@ int32_t RecordFile::Clear()
     return 0;
 }
 
-bool RecordFile::CheckRecycle()
+int32_t RecordFile::UpdateTimes(BufferTimes &update)
 {
-    Log(logger_, "check recycle");
-
-    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
+    if((start_time_ == 0) && (update.start_time != 0))
     {
-        return false;
+        start_time_ = update.start_time;
     }
 
-    return true;
+    if ((i_frame_start_time_ == 0) && (update.i_frame_start_time != 0))
+    {
+        i_frame_start_time_ = update.i_frame_start_time;
+    }
+
+    if (end_time_ < update.end_time)
+    {
+        end_time_ = update.end_time;
+    }
+
+    if (i_frame_end_time_ < update.i_frame_end_time)
+    {
+        i_frame_end_time_ = update.i_frame_end_time;
+    }
+    
+    return 0;
+}
+
+int32_t RecordFile::ZeroTimes()
+{
+    UTime temp(0, 0);
+    this->start_time_ = temp;
+    this->end_time_ = temp;
+    this->i_frame_start_time_ = temp;
+    this->i_frame_end_time_ = temp;
+
+    return 0;
 }
 
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
@@ -371,9 +426,9 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
 {
     Log(logger_, "build index");
     
-    if (had_frame_ < 0)
+    if (had_frame_ == false)
     {
-        return -ERR_RECORD_WRITE_OFFSET_ZERO;
+        return -ERR_RECORD_NO_WRITE;
     }
 
     EncodeRecordFileInfoIndex(record_file_info_buffer, record_file_info_length);
@@ -387,29 +442,25 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 {
     int ret;
     bool open_fd = false;
-    Log(logger_, "append length is %d", length);
+
+    Log(logger_, "write file %srecord_%05d, offset is %d, length is %d", base_name_.c_str(), number_, record_offset_, length);
 
     if (write_fd_ < 0)
     {
-        char buffer[32] = {0};
-        snprintf(buffer, 32, "record_%05d", number_);
-
-        string record_file_path(base_name_);
-        record_file_path.append(buffer);
-
-        write_fd_ = open(record_file_path.c_str(), O_WRONLY);
-        assert(write_fd_ > 0);
+        int32_t ret = OpenFd(true);
+        assert(ret == 0);
         lseek(write_fd_, record_offset_, SEEK_SET);
 
         record_fragment_count_ += 1;
         assert(record_fragment_count_ <= 256);
 
+        // update start and end offset, zero times
         frag_start_offset_ = frag_end_offset_ = record_offset_;
+        ZeroTimes();
+
         open_fd = true;
     }
 
-    assert(write_fd_ >= 0);
-    
     ret = write(write_fd_, write_buffer, length);
     if (ret != length)
     {
@@ -418,37 +469,18 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     }
 
     fdatasync(write_fd_);
-
-    /* update times */
-    if((start_time_ == 0) && (update.start_time != 0))
-    {
-        start_time_ = update.start_time;
-    }
-
-    if ((i_frame_start_time_ == 0) && (update.i_frame_start_time != 0))
-    {
-        i_frame_start_time_ = update.i_frame_start_time;
-    }
-
-    if (end_time_ < update.end_time)
-    {
-        end_time_ = update.end_time;
-    }
-
-    if (i_frame_end_time_ < update.i_frame_end_time)
-    {
-        i_frame_end_time_ = update.i_frame_end_time;
-    }
+    UpdateTimes(update);
 
     record_offset_ += length;
     frag_end_offset_ = record_offset_;
-    Log(logger_, "write ok, file is %srecord_%05d, write length is %d, record offset is %d, ", 
-        base_name_.c_str(), number_, length, record_offset_);
 
     if (open_fd)
     {
         had_frame_ = true;
     }
+
+    Log(logger_, "write ok, file is %srecord_%05d, record offset is %d, write length is %d",
+                        base_name_.c_str(), number_, record_offset_, length);
 
     return 0;
 }
@@ -464,14 +496,6 @@ int32_t RecordFile::FinishWrite()
     }
 
     had_frame_ = false;
-
-    UTime temp(0, 0);
-    start_time_ = temp;
-    end_time_ = temp;
-    i_frame_start_time_ = temp;
-    i_frame_end_time_ = temp;
-
-    frag_start_offset_ = frag_end_offset_ = record_offset_;
 
     return 0;
 }
@@ -552,22 +576,17 @@ int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start
 int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
 {
     Log(logger_, "get stamp offset");
-    uint32_t ret = 0;
+    int32_t ret = 0;
+    uint32_t frag_start_offset = 0;
+    uint32_t frag_end_offset = 0;
 
     read_count_++;
     if (read_fd_ < 0)
     {
-        char buffer[32] = {0};
-        snprintf(buffer, 32, "record_%05d", number_);
-
-        string record_file_path(base_name_);
-        record_file_path.append(buffer);
-        read_fd_ = open(record_file_path.c_str(), O_RDONLY);
-        assert(read_fd_ > 0);
+        ret = OpenFd(false);
+        assert(ret == 0);
     }
 
-    uint32_t frag_start_offset = 0;
-    uint32_t frag_end_offset = 0;
     ret = GetStampStartAndEndOffset(stamp, frag_start_offset, frag_end_offset);
     if (ret != 0)
     {

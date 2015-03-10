@@ -43,9 +43,11 @@ public:
 
     RecordFile(Logger *logger, string base_name, uint32_t number);
 
-    int32_t Clear();
-
+    int32_t OpenFd(bool for_write);
     bool CheckRecycle();
+    int32_t Clear();
+    int32_t UpdateTimes(BufferTimes &update);
+    int32_t ZeroTimes();
 
     int32_t EncodeRecordFileInfoIndex(char *buffer, uint32_t length);
     int32_t DecodeRecordFileInfoIndex(char *buffer, uint32_t length);

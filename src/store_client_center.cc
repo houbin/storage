@@ -518,7 +518,7 @@ int32_t RecordWriter::BuildRecordFileIndex(RecordFile *record_file, char *record
                                     record_frag_info_buffer, record_frag_info_length, record_flag_info_number);
 }
 
-int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r, bool stop)
+int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
 {
     assert(write_index_event_ != NULL);
     Log(logger_, "write index, write_index_event_ is %p", write_index_event_);
@@ -536,12 +536,15 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r, bool 
     if (record_file == NULL)
     {
         ret = store_client_->GetLastRecordFile(&record_file);
-        assert(ret == 0 && record_file != NULL);
+        if (ret == -ERR_ITEM_NOT_FOUND)
+        {
+            goto again;
+        }
     }
 
     ret = BuildRecordFileIndex(record_file, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo), 
                                 (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo), &record_frag_info_number);
-    if (ret == -ERR_RECORD_WRITE_OFFSET_ZERO)
+    if (ret == -ERR_RECORD_NO_WRITE)
     {
         goto again;
     }
@@ -560,7 +563,8 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r, bool 
     index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
     index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
 
-    if (stop)
+    // stopped
+    if (r == -1)
     {
         return 0;
     }
@@ -572,7 +576,7 @@ again:
     return 0;
 }
 
-int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds, bool stop)
+int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds)
 {
     Mutex::Locker lock(store_client_center->timer_lock);
 
@@ -583,7 +587,7 @@ int32_t RecordWriter::ResetWriteIndexEvent(RecordFile *record_file, uint32_t aft
         write_index_event_ = NULL;
     }
 
-    write_index_event_ = new C_WriteIndexTick(store_client_, record_file, stop);
+    write_index_event_ = new C_WriteIndexTick(store_client_, record_file);
     store_client_center->timer.AddEventAfter(after_seconds, write_index_event_);
     Log(logger_, "reset write index, write_index_event_ is %p, record_file is %p", write_index_event_, record_file);
 
@@ -679,8 +683,6 @@ void *RecordWriter::Entry()
             }
             assert(ret == 0);
 
-            Log(logger_, "get last record file ok");
-
             uint32_t file_offset = record_file->record_offset_;
             assert(file_offset <= kRecordFileSize);
             uint32_t file_left_size = kRecordFileSize - file_offset;
@@ -724,7 +726,7 @@ void *RecordWriter::Entry()
                 }
 
                 record_file->FinishWrite();
-                ResetWriteIndexEvent(record_file, 0, false);
+                ResetWriteIndexEvent(record_file, 0);
 
                 RecordFile *record_file = NULL;
                 UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
@@ -775,17 +777,12 @@ void *RecordWriter::Entry()
 
                 ret = WriteBuffer(record_file, kBlockSize);
                 assert(ret == 0);
-
-                record_file->FinishWrite();
-                ResetWriteIndexEvent(record_file, 0, true);
             }
 
             break;
         }
 
-        Log(logger_, "queue cond wait");
         queue_cond_.Wait(queue_mutex_);
-        Log(logger_, "have one event");
     }
 
     queue_mutex_.Unlock();
@@ -806,7 +803,7 @@ void RecordWriter::Start()
     stop_ = false;
     Create();
 
-    ResetWriteIndexEvent(NULL, WRITE_INDEX_INTERVAL, false);
+    ResetWriteIndexEvent(NULL, WRITE_INDEX_INTERVAL);
 
     return;
 }
@@ -835,6 +832,25 @@ void RecordWriter::Stop()
         safe_free(current_o_frame_->buffer);
     }
     safe_free(current_o_frame_);
+
+    /* write record file index */
+    {
+        Mutex::Locker lock(store_client_center->timer_lock);
+        if (write_index_event_ != NULL)
+        {
+            store_client_center->timer.DoEvent(write_index_event_);
+            write_index_event_ = NULL;
+        }
+    }
+
+    /* finish record file */
+    {
+        RecordFile *record_file = NULL;
+        ret = store_client_->GetLastRecordFile(&record_file);
+        assert(ret == 0 && record_file != NULL);
+
+        record_file->FinishWrite();
+    }
 
     return;
 }
@@ -1133,11 +1149,11 @@ int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
     return 0;
 }
 
-int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r, bool stop)
+int32_t StoreClient::WriteRecordFileIndex(RecordFile *record_file, int r)
 {
     Log(logger_, "write record file index");
 
-    writer.WriteRecordFileIndex(record_file, r, stop);
+    writer.WriteRecordFileIndex(record_file, r);
 
     return 0;
 }
@@ -1364,7 +1380,7 @@ int32_t StoreClientCenter::Close(uint32_t id, int flag)
 int32_t StoreClientCenter::WriteFrame(uint32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "write frame, id is %d, frame %p", id, frame);
+    Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1511,26 +1527,23 @@ void StoreClientCenter::Shutdown()
 {
     {
         RWLock::WRLocker lock(rwlock_);
-        vector<StoreClient*>::iterator iter = clients_.begin();
-        for (; iter != clients_.end(); iter++)
+        map<string, StoreClient*>::iterator iter = client_search_map_.begin();
+        for(; iter != client_search_map_.end(); iter++)
         {
-            if (*iter == NULL)
-            {
-                continue;
-            }
-
-            StoreClient *store_client = *iter;
+            StoreClient *store_client = iter->second;
+            assert(store_client != NULL);
             store_client->Shutdown();
             delete store_client;
-            store_client = NULL;
+            iter->second = NULL;
         }
     }
 
     {
-        timer_lock.Lock();
+        Mutex::Locker lock(timer_lock);
         timer.Shutdown();
-        timer_lock.Unlock();
     }
+
+    return;
 }
 
 }

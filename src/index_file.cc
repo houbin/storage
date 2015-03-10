@@ -116,7 +116,7 @@ int32_t IndexFile::AnalyzeAllEntry()
 
 int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
-    Log(logger_, "write offset is %d, buffer is %p, length is %d", offset, buffer, length);
+    Log(logger_, "write file %sindex, offset is %d, length is %d", base_name_.c_str(), offset, length);
     int ret = 0;
 
     Mutex::Locker lock(mutex_);
@@ -128,7 +128,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
         Log(logger_, "index_file is %p, buffer is %s, fwrite return %d, errno msg is %s", index_file_, buffer, ret, strerror(errno));
         assert(ret == (int)length);
     }
-    Log(logger_, "index file write, offset is %d, length is %d", offset, length);
+    Log(logger_, "index file write ok, offset is %d, length is %d", offset, length);
 
     return 0;
 }

@@ -32,7 +32,8 @@ public:
     FrameWriter(uint32_t id) : id_(id), seq_(0), op_id_(-1) {}
 
     void Start();
-    int MakeFrame(int *type, int *length, FRAME_INFO_T *buffer);
+    int WriteOFrame();
+    int WriteFrame();
 
     void *Entry();
     void Shutdown();

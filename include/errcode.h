@@ -22,7 +22,7 @@
 #define ERR_ITEM_NOT_FOUND          3000
 #define ERR_REACH_WRITE_THREHOLD    3001
 #define ERR_REACH_READ_THREHOLD     3002
-#define ERR_RECORD_WRITE_OFFSET_ZERO 3003
+#define ERR_RECORD_NO_WRITE         3003
 #define ERR_NO_MAGIC_CODE           3004
 #define ERR_SEEK_ERROR              3005
 #define ERR_READ_REACH_TO_END       3006

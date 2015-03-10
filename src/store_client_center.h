@@ -86,8 +86,8 @@ public:
     int32_t BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
                         char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_frag_info_number);
 
-    int32_t WriteRecordFileIndex(RecordFile *record_file, int r, bool stop);
-    int32_t ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds, bool stop = false);
+    int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
+    int32_t ResetWriteIndexEvent(RecordFile *record_file, uint32_t after_seconds);
 
     void Start();
     void *Entry();
@@ -147,7 +147,7 @@ public:
     int32_t PutRecordFile(UTime &stamp, RecordFile *record_file);
     int32_t RecycleRecordFile(RecordFile *record_file);
 
-    int32_t WriteRecordFileIndex(RecordFile *record_file, int r, bool stop);
+    int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
     int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
 
@@ -160,14 +160,14 @@ class C_WriteIndexTick: public Context
     RecordFile *record_file_;
 public:
 
-    C_WriteIndexTick(StoreClient *client, RecordFile *record_file, bool stop = false)
-    : Context(stop), client_(client), record_file_(record_file)
+    C_WriteIndexTick(StoreClient *client, RecordFile *record_file)
+    : client_(client), record_file_(record_file)
     {}
 
     void Finish(int r)
     {
         int32_t ret;
-        ret = client_->WriteRecordFileIndex(record_file_, r, IsStopped());
+        ret = client_->WriteRecordFileIndex(record_file_, r);
         return;
     }
 };

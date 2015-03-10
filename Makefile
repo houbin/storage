@@ -23,7 +23,8 @@ util/mutex.d util/thread.d util/timer.d
 
 #all target
 #all:$(PRG) $(STATIC_PRG)
-all:$(STATIC_PRG)
+all:$(PRG)
+#all:$(STATIC_PRG)
 
 $(PRG):$(OBJ)
 	$(CC) -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)
@@ -38,4 +39,4 @@ $(STATIC_PRG):$(OBJ)
 .PRONY:clean
 clean:
 	@echo "Removing linked and compiled files......;"
-	-rm -f $(OBJ) $(PRG) $(DEPS)
+	-rm -f $(OBJ) $(PRG) $(DEPS) $(STATIC_PRG)
