@@ -6,7 +6,7 @@ LIB = -L../ -lstorage -lpthread
 
 PRG = write_test
 
-OBJS = ./storage_test.o ./storage_main.o
+OBJS = ./storage_test.o ./storage_main.o ../util/config.o
 
 all:$(PRG)
 

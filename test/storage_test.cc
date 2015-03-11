@@ -21,6 +21,9 @@ int FrameWriter::WriteOFrame()
 {
     seq_++;
 
+    char stream_info[64] = {0};
+    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
+
     int32_t ret;
     FRAME_INFO_T frame = {0};
     struct timeval now;
@@ -34,7 +37,7 @@ int FrameWriter::WriteOFrame()
     frame.buffer = (char *)malloc(100);
     memset(frame.buffer, 'o', 100);
 
-    fprintf(stderr, "seq_ is %d, O frame\n", seq_);
+    fprintf(stderr, "stream %s, seq_ is %d, O frame\n", stream_info, seq_);
 
     ret = storage_write(op_id_, &frame);
     if (ret != 0)
@@ -56,6 +59,9 @@ int FrameWriter::WriteFrame()
 {
     seq_++;
 
+    char stream_info[64] = {0};
+    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
+
     int32_t ret;
     FRAME_INFO_T frame = {0};
     struct timeval now;
@@ -75,7 +81,7 @@ int FrameWriter::WriteFrame()
         frame.buffer = (char *)malloc(frame.size);
         memset(frame.buffer, 'i', frame.size);
 
-        fprintf(stderr, "seq_ is %d, i frame\n", seq_);
+        fprintf(stderr, "stream %s, seq_ is %d, i frame\n", stream_info, seq_);
     }
     else
     {
@@ -86,7 +92,7 @@ int FrameWriter::WriteFrame()
         frame.buffer = (char *)malloc(frame.size);
         memset(frame.buffer, 'b', frame.size);
 
-        fprintf(stderr, "seq_ is %d, b or p frame\n", seq_);
+        fprintf(stderr, "stream %s, seq_ is %d, b or p frame\n", stream_info, seq_);
     }
 
     ret = storage_write(op_id_, &frame);
@@ -113,7 +119,7 @@ void *FrameWriter::Entry()
     uint32_t temp_op_id = 0;
     
     char stream_info[64] = {0};
-    snprintf(stream_info, 63, "stream_info_id_%d", id_);
+    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
 
     for (int i = 0; i < 10000; i++)
     {
