@@ -621,8 +621,14 @@ void *RecordWriter::Entry()
             FRAME_INFO_T *frame = write_op->frame_info;
             safe_free(write_op);
 
+            UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
             uint32_t frame_type = frame->type;
+            uint32_t frame_length = kHeaderSize + frame->size;
+            uint32_t file_offset = 0;
             bool add_o_frame = false;
+            RecordFile *record_file = NULL;
+            uint32_t file_left_size  = 0;
+
             if (frame_type == JVN_DATA_O)
             {
                 if (current_o_frame_ != NULL)
@@ -660,28 +666,23 @@ void *RecordWriter::Entry()
                 Log(logger_, "B or P frame");
             }
 
-            uint32_t frame_length = kHeaderSize + frame->size;
             if (add_o_frame)
             {
                 frame_length += kHeaderSize + current_o_frame_->size;
             }
 
-            RecordFile *record_file = NULL;
             ret = store_client_->GetLastRecordFile(&record_file);
             if (ret == -ERR_ITEM_NOT_FOUND)
             {
                 Log(logger_, "doesn't find any record file");
-                UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
                 ret = store_client_->GetFreeFile(stamp, &record_file);
                 assert(ret == 0 && record_file != NULL);
             }
             assert(ret == 0);
 
-            uint32_t file_offset = record_file->record_offset_;
+            file_offset = record_file->record_offset_;
             assert(file_offset <= kRecordFileSize);
-            uint32_t file_left_size = kRecordFileSize - file_offset;
-
-            UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
+            file_left_size = kRecordFileSize - file_offset;
 
             frame_buffer = (char *)malloc(frame_length);
             UpdateBufferTimes(frame_type, stamp);
