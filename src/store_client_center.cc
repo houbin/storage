@@ -631,13 +631,10 @@ void *RecordWriter::Entry()
 
             if (frame_type == JVN_DATA_O)
             {
-                if (current_o_frame_ != NULL)
-                {
-                    /* swap current o frame and frame */
-                    FRAME_INFO_T *temp = current_o_frame_;
-                    current_o_frame_ = frame;
-                    frame = temp;
-                }
+                /* swap current o frame and frame */
+                FRAME_INFO_T *temp = current_o_frame_;
+                current_o_frame_ = frame;
+                frame = temp;                
                 
                 Log(logger_, "O frame, replace current o frame, continue");
                 goto FreeResource;
