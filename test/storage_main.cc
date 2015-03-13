@@ -1,7 +1,10 @@
 #include <stdlib.h>
 #include <assert.h>
-#include "storage_test.h"
+#include "test_writer.h"
+#include "test_reader.h"
 #include "../util/config.h"
+#include "storage_main.h"
+#include "../include/storage.h"
 
 using namespace std;
 using namespace util;
@@ -9,39 +12,32 @@ using namespace util;
 int main()
 {
     Config *config = new Config("./config.txt");
+
     string write_thread_count_str;
+    string read_thread_count_str;
     write_thread_count_str = config->Read("frame_write_thread_count", write_thread_count_str);
+    read_thread_count_str = config->Read("frame_read_thread_count", read_thread_count_str);
+
     int write_thread_count = atoi(write_thread_count_str.c_str());
+    int read_thread_count = atoi(read_thread_count_str.c_str());
 
     fprintf(stderr, "write thread count is %d, write_thread_count_str is %s\n", write_thread_count, write_thread_count_str.c_str());
+    fprintf(stderr, "read thread count is %d, read_thread_count_str is %s\n", read_thread_count, read_thread_count_str.c_str());
 
     storage_init();
 
-    FrameWriter **write_array = new FrameWriter*[write_thread_count];
-    assert(write_array != NULL);
-    for (int i = 0; i < write_thread_count; i++)
-    {
-        write_array[i] = new FrameWriter(i);
-        assert(write_array[i] != NULL);
-    }
+    store_client_center->DumpClientSearchMap();
 
-    for (int i = 0; i < write_thread_count; i++)
-    {
-        write_array[i]->Start();
-    }
+    TestThread write_threads("writer", write_thread_count);
+    TestThread read_threads("reader", read_thread_count);
 
-    for (int i = 0; i < write_thread_count; i++)
-    {
-        write_array[i]->Shutdown();
-    }
+    write_threads.Start();
+    read_threads.Start();
 
-    for (int i = 0; i < write_thread_count; i++)
-    {
-        delete write_array[i];
-    }
-
-    delete []write_array;
+    write_threads.Shutdown();
+    read_threads.Shutdown();
 
     storage_shutdown();
+
     return 0;
 }

@@ -82,7 +82,7 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
     return 0;
 }
 
-int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue)
+int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
     Log(logger_, "get record files from time %d.%d to %d.%d", start.tv_sec, start.tv_nsec,
         end.tv_sec, end.tv_nsec);
@@ -213,136 +213,130 @@ int32_t RecordFileMap::EraseRecordFile(RecordFile *record_file)
     return 0;
 }
 
-int32_t RecordFileMap::GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &start)
+int32_t RecordFileMap::GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &frag_queue, RecordFile *record_file, UTime &start)
 {
     Log(logger_, "get frag info with start time, start is %d.%d", start.tv_sec, start.tv_nsec);
     assert(record_file != NULL);
     
     int32_t ret;
-    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+    deque<FRAGMENT_INFO_T> all_frag_info;
 
-    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    ret = record_file->GetAllFragInfo(all_frag_info);
     assert (ret == 0);
 
-    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
-    for(; iter != frag_queue_temp.end(); iter++)
+    deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
+    for(; iter != all_frag_info.end(); iter++)
     {
-        FRAGMENT_INFO_T *temp = *iter;
-        assert(temp != NULL);
+        FRAGMENT_INFO_T temp = *iter;
 
-        assert(temp->start_time > start);
+        assert(temp.start_time > start);
         
-        if (temp->end_time < start)
+        if (temp.end_time < start)
         {
             continue;
         }
 
-        if (temp->start_time <= start && temp->end_time >= start)
+        if (temp.start_time <= start && temp.end_time >= start)
         {
-            temp->start_time.seconds = start.tv_sec;
-            temp->start_time.nseconds = start.tv_nsec;
-            frag_queue_temp.push_back(temp);
+            temp.start_time.seconds = start.tv_sec;
+            temp.start_time.nseconds = start.tv_nsec;
+            frag_queue.push_back(temp);
             break;
         }
 
-        frag_queue_temp.push_back(temp);
+        frag_queue.push_back(temp);
     }
 
     return 0;
 }
 
-int32_t RecordFileMap::GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file,
+int32_t RecordFileMap::GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &frag_queue, RecordFile *record_file,
                                                             UTime &start, UTime &end)
 {
     Log(logger_, "get frag with start and end time");
 
     int32_t ret;
-    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+    deque<FRAGMENT_INFO_T> all_frag_info;
 
-    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    ret = record_file->GetAllFragInfo(all_frag_info);
     assert (ret == 0);
 
-    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
-    for (; iter != frag_queue_temp.end(); iter++)
+    deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
+    for (; iter != all_frag_info.end(); iter++)
     {
-        FRAGMENT_INFO_T *temp = *iter;
-        assert(temp != NULL);
+        FRAGMENT_INFO_T temp = *iter;
 
-        if (temp->end_time < start)
+        if (temp.end_time < start)
         {
             continue;
         }
 
-        if (temp->start_time <= start && temp->end_time >= start)
+        if (temp.start_time <= start && temp.end_time >= start)
         {
-            temp->start_time.seconds = start.tv_sec;
-            temp->start_time.nseconds = start.tv_nsec;
-            frag_queue_temp.push_back(temp);
+            temp.start_time.seconds = start.tv_sec;
+            temp.start_time.nseconds = start.tv_nsec;
+            frag_queue.push_back(temp);
             break;
         }
 
-        if (temp->start_time <= end && temp->end_time >= end)
+        if (temp.start_time <= end && temp.end_time >= end)
         {
-            temp->end_time.seconds = end.tv_sec;
-            temp->end_time.nseconds = end.tv_nsec;
-            frag_queue_temp.push_back(temp);
+            temp.end_time.seconds = end.tv_sec;
+            temp.end_time.nseconds = end.tv_nsec;
+            frag_queue.push_back(temp);
             break;
         }
 
-        frag_queue_temp.push_back(temp);
+        frag_queue.push_back(temp);
     }
 
     return 0;
 }
 
-int32_t RecordFileMap::GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file, UTime &end)
+int32_t RecordFileMap::GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &frag_queue, RecordFile *record_file, UTime &end)
 {
     Log(logger_, "get frag info with end time");
 
     int32_t ret;
-    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+    deque<FRAGMENT_INFO_T> all_frag_info;
 
-    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    ret = record_file->GetAllFragInfo(all_frag_info);
     assert (ret == 0);
 
-    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
-    for (; iter != frag_queue_temp.end(); iter++)
+    deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
+    for (; iter != all_frag_info.end(); iter++)
     {
-        FRAGMENT_INFO_T *temp = *iter;
-        assert(temp != NULL);
+        FRAGMENT_INFO_T temp = *iter;
 
-        if (temp->start_time <= end && temp->end_time >= end)
+        if (temp.start_time <= end && temp.end_time >= end)
         {
-            temp->end_time.seconds = end.tv_sec;
-            temp->end_time.nseconds = end.tv_nsec;
-            frag_queue_temp.push_back(temp);
+            temp.end_time.seconds = end.tv_sec;
+            temp.end_time.nseconds = end.tv_nsec;
+            frag_queue.push_back(temp);
             break;
         }
 
-        frag_queue_temp.push_back(temp);
+        frag_queue.push_back(temp);
     }
 
     return 0;
 }
 
-int32_t RecordFileMap::GetFragInfo(deque<FRAGMENT_INFO_T*> &frag_queue, RecordFile *record_file)
+int32_t RecordFileMap::GetFragInfo(deque<FRAGMENT_INFO_T> &frag_queue, RecordFile *record_file)
 {
     Log(logger_, "get frag info");
     assert(record_file != NULL);
 
     int32_t ret;
-    deque<FRAGMENT_INFO_T*> frag_queue_temp;
+    deque<FRAGMENT_INFO_T> all_frag_info;
 
-    ret = record_file->GetAllFragInfo(frag_queue_temp);
+    ret = record_file->GetAllFragInfo(all_frag_info);
     assert (ret == 0);
 
-    deque<FRAGMENT_INFO_T*>::iterator iter = frag_queue_temp.begin();
-    for (; iter != frag_queue_temp.end(); iter++)
+    deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
+    for (; iter != all_frag_info.end(); iter++)
     {
-        FRAGMENT_INFO_T *temp = *iter;
-        assert(temp != NULL);
-
-        frag_queue_temp.push_back(temp);
+        frag_queue.push_back(*iter);
     }
 
     return 0;
@@ -369,8 +363,7 @@ void RecordFileMap::Shutdown()
 // ======================================================= //
 RecordWriter::RecordWriter(Logger *logger, StoreClient *store_client)
 : logger_(logger), store_client_(store_client), queue_mutex_("RecordWriter::locker"), write_offset_(0), 
-current_o_frame_(NULL), write_index_event_(NULL), last_record_file_mutex_("RecordWriter::Last_record_file_mutex"), 
-stop_(false)
+current_o_frame_(NULL), write_index_event_(NULL), stop_(false)
 {
     memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
 }
@@ -494,8 +487,6 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
 
     int32_t ret;
 
-    Mutex::Locker lock(last_record_file_mutex_);
-
     ret = record_file->Append(buffer_, write_length, buffer_times_);
     assert(ret == 0);
 
@@ -511,8 +502,6 @@ int32_t RecordWriter::BuildRecordFileIndex(RecordFile *record_file, char *record
 {
     Log(logger_, "build record file index");
     assert(record_file != NULL);
-
-    Mutex::Locker lock(last_record_file_mutex_);
 
     return record_file->BuildIndex(record_file_info_buffer, record_file_info_length, 
                                     record_frag_info_buffer, record_frag_info_length, record_flag_info_number);
@@ -860,7 +849,7 @@ void RecordWriter::Shutdown()
 //                  record reader
 // ======================================================= //
 RecordReader::RecordReader(StoreClient *store_client)
-: store_client_(store_client), record_file_(NULL), read_offset_(0)
+: store_client_(store_client), record_file_(NULL), read_offset_(0), read_end_offset_(0)
 {
     memset((void *)&current_o_frame_, 0, sizeof(FRAME_INFO_T));
 }
@@ -868,7 +857,8 @@ RecordReader::RecordReader(StoreClient *store_client)
 int32_t RecordReader::Seek(UTime &stamp)
 {
     int32_t ret;
-    uint32_t offset = 0;
+    uint32_t seek_start_offset = 0;
+    uint32_t seek_end_offset = 0;
     RecordFile *record_file = NULL;
     
     ret = store_client_->GetRecordFile(stamp, &record_file);
@@ -878,9 +868,14 @@ int32_t RecordReader::Seek(UTime &stamp)
     }
 
     record_file_ = record_file;
-    ret = record_file_->SeekStampOffset(stamp, &offset);
-    assert(ret == 0);
-    read_offset_ = offset;
+    ret = record_file_->SeekStampOffset(stamp, seek_start_offset, seek_end_offset);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    read_offset_ = seek_start_offset;
+    read_end_offset_ = seek_end_offset;
 
     return 0;
 }
@@ -894,7 +889,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
         return -ERR_SEEK_ERROR;
     }
 
-    while(true)
+    while(read_offset_ < read_end_offset_)
     {
         ret = record_file_->ReadFrame(read_offset_, frame);
         if (ret != 0)
@@ -929,6 +924,11 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
         }
 
         break;
+    }
+
+    if (read_offset_ >= read_end_offset_)
+    {
+        return -ERR_READ_REACH_TO_END;
     }
 
     /* return frame */
@@ -1170,7 +1170,7 @@ int32_t StoreClient::CloseRead(uint32_t id)
     return 0;
 }
 
-int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue)
+int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
     Log(logger_, "list record fragments, start is %d.%d, end is %d.%d",
         start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
@@ -1422,7 +1422,7 @@ int32_t StoreClientCenter::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
     return client->ReadFrame(id, frame);
 }
 
-int32_t StoreClientCenter::ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue)
+int32_t StoreClientCenter::ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
     Log(logger_, "list record fragments, id is %d, start time is %d.%d, end time is %d.%d", 
         id, start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
@@ -1539,6 +1539,23 @@ void StoreClientCenter::Shutdown()
     }
 
     return;
+}
+
+int32_t StoreClientCenter::DumpClientSearchMap()
+{
+    RWLock::RDLocker lock(rwlock_);
+
+    map<string, StoreClient*>::iterator iter = client_search_map_.begin();
+    for (; iter != client_search_map_.end(); iter++)
+    {
+        string temp = iter->first;
+        StoreClient *store_client = iter->second;
+        string stream_info = store_client->GetStreamInfo();
+        fprintf(stderr, "stream info is %s, storeclient is %p, stream info of store client is %s\n", temp.c_str(), store_client,
+            stream_info.c_str());
+    }
+
+    return 0;
 }
 
 }

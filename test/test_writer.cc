@@ -8,7 +8,9 @@
 #include <string.h>
 #include <stdint.h>
 #include "../include/storage_api.h"
-#include "storage_test.h"
+#include "test_writer.h"
+#include "../util/coding.h"
+#include "../util/crc32c.h"
 
 void FrameWriter::Start()
 {
@@ -17,12 +19,44 @@ void FrameWriter::Start()
     return;
 }
 
+/*
+ * frame buffer format如下所示
+ *   |  stream info    |      seq      |    padding                           |   crc   |
+ *   |  64字节         |      4字节    |    填充0, 长度为帧长度减去72字节     |   4字节 |
+ * */
+int FrameWriter::FillFrame(char *buffer, int frame_buffer_length)
+{
+    int padding_length = 0;
+    char *temp = buffer;
+
+    if (frame_buffer_length <= 72)
+    {
+        assert(frame_buffer_length > 72);
+    }
+
+    // zero buffer
+    memset(buffer, 0, frame_buffer_length);
+
+    memcpy(temp, stream_info_, 64);
+    temp += 64;
+
+    EncodeFixed32(temp, seq_);
+    temp += 4;
+
+    padding_length = frame_buffer_length - 72;
+    temp += padding_length;
+
+    uint32_t crc_length = frame_buffer_length - 4;
+    uint32_t crc = crc32c::Value(buffer, crc_length);
+    EncodeFixed32(temp, crc);
+    temp += 4;
+
+    return 0;
+}
+
 int FrameWriter::WriteOFrame()
 {
     seq_++;
-
-    char stream_info[64] = {0};
-    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
 
     int32_t ret;
     FRAME_INFO_T frame = {0};
@@ -35,9 +69,9 @@ int FrameWriter::WriteOFrame()
     frame.type = JVN_DATA_O;
     frame.size = 100;
     frame.buffer = (char *)malloc(100);
-    memset(frame.buffer, 'o', 100);
 
-    fprintf(stderr, "stream %s, seq_ is %d, O frame\n", stream_info, seq_);
+    fprintf(stderr, "stream %s, seq_ is %d, O frame\n", stream_info_, seq_);
+    FillFrame(frame.buffer, 100);
 
     ret = storage_write(op_id_, &frame);
     if (ret != 0)
@@ -59,9 +93,6 @@ int FrameWriter::WriteFrame()
 {
     seq_++;
 
-    char stream_info[64] = {0};
-    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
-
     int32_t ret;
     FRAME_INFO_T frame = {0};
     struct timeval now;
@@ -79,21 +110,20 @@ int FrameWriter::WriteFrame()
         int len = rand_number % (200 * 1024) + 10 * 1024;
         frame.size = len;
         frame.buffer = (char *)malloc(frame.size);
-        memset(frame.buffer, 'i', frame.size);
 
-        fprintf(stderr, "stream %s, seq_ is %d, i frame\n", stream_info, seq_);
+        //fprintf(stderr, "stream %s, seq_ is %d, i frame\n", stream_info_, seq_);
     }
     else
     {
         frame.type = JVN_DATA_B;
 
-        int len = rand_number % (30 * 1024) + 30;
+        int len = rand_number % (30 * 1024) + 200;
         frame.size = len;
         frame.buffer = (char *)malloc(frame.size);
-        memset(frame.buffer, 'b', frame.size);
-
-        fprintf(stderr, "stream %s, seq_ is %d, b or p frame\n", stream_info, seq_);
+        //fprintf(stderr, "stream %s, seq_ is %d, b or p frame\n", stream_info_, seq_);
     }
+
+    FillFrame(frame.buffer, frame.size);
 
     ret = storage_write(op_id_, &frame);
     if (ret != 0)
@@ -118,14 +148,11 @@ void *FrameWriter::Entry()
     int length = 0;
     uint32_t temp_op_id = 0;
     
-    char stream_info[64] = {0};
-    snprintf(stream_info, 63, "stream_info_id_%03d", id_);
-
     for (int i = 0; i < 10000; i++)
     {
         if (op_id_ < 0)
         {
-            ret = storage_open(stream_info, 64, 1, &temp_op_id);
+            ret = storage_open(stream_info_, 64, 1, &temp_op_id);
             assert (ret == 0);
             op_id_ = (int32_t)temp_op_id;
             fprintf(stderr, "storage open id %d\n", op_id_);
@@ -137,7 +164,7 @@ void *FrameWriter::Entry()
 
         WriteFrame();
 
-        if (i % 1200 == 1199)
+        if (i % 1234 == 1233)
         {
             fprintf(stderr, "storage close id %d\n", op_id_);
             storage_close(op_id_);

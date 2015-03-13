@@ -1,1 +1,2 @@
-frame_write_thread_count=15
+frame_write_thread_count=1
+frame_read_thread_count=0

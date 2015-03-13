@@ -4,9 +4,9 @@ CC_FLAG = -g -rdynamic
 INC =
 LIB = -L../ -lstorage -lpthread
 
-PRG = write_test
+PRG = storage_test
 
-OBJS = ./storage_test.o ./storage_main.o ../util/config.o
+OBJS = ./test_writer.o ./test_reader.o ../util/config.o  ./storage_main.o
 
 all:$(PRG)
 

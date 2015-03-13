@@ -17,7 +17,7 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), write_fd_(-1), read_fd_(-1), read_count_(0),
+: logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"), write_fd_(-1), read_fd_(-1), read_count_(0),
 locked_(false), had_frame_(false), record_fragment_count_(0), frag_start_offset_(0), frag_end_offset_(0), record_offset_(0)
 {
     ZeroTimes();
@@ -43,18 +43,6 @@ int32_t RecordFile::OpenFd(bool for_write)
     }
 
     return 0;
-}
-
-bool RecordFile::CheckRecycle()
-{
-    Log(logger_, "check recycle");
-
-    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
-    {
-        return false;
-    }
-
-    return true;
 }
 
 int32_t RecordFile::Clear()
@@ -328,21 +316,21 @@ int32_t RecordFile::DecodeRecordFragInfoIndex(char *buffer, uint32_t length, Rec
     return 0;
 }
 
-int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo*> &frag_info_queue)
+int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 {
     int32_t ret;
 
     if (record_fragment_count_ == 1)
     {
-        RecordFragmentInfo *frag_info = new RecordFragmentInfo;
-        assert(frag_info != NULL);
+        RecordFragmentInfo temp;
+
+        memset(&temp, 0, sizeof(RecordFragmentInfo));
+        temp.start_time = start_time_;
+        temp.end_time = end_time_;
+        temp.frag_start_offset = frag_start_offset_;
+        temp.frag_end_offset = frag_end_offset_;
         
-        frag_info->start_time = start_time_;
-        frag_info->end_time = end_time_;
-        frag_info->frag_start_offset = frag_start_offset_;
-        frag_info->frag_end_offset = frag_end_offset_;
-        
-        frag_info_queue.push_back(frag_info);
+        frag_info_queue.push_back(temp);
         return 0;
     }
 
@@ -375,57 +363,158 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo*> &frag_info_queue
         if (ret == -ERR_CRC_CHECK)
         {
             Log(logger_, "found crc check error, i is %d", i);
+            safe_free(record_frag_info_buffer);
             return 0;
         }
 
-        RecordFragmentInfo *frag_info = new RecordFragmentInfo;
-        assert(frag_info != NULL);
-        
-        memcpy((void *)frag_info, (void *)&temp_frag_info, sizeof(RecordFragmentInfo));
-    
-        frag_info_queue.push_back(frag_info);
+        frag_info_queue.push_back(temp_frag_info);
     }
 
-    free(record_frag_info_buffer);
-    record_frag_info_buffer = NULL;
-
+    safe_free(record_frag_info_buffer);
     return 0;
 }
 
-int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue)
+int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
     Log(logger_, "get all record frag info index");
 
     int32_t ret;
 
-    deque<RecordFragmentInfo*> temp_queue;
+    deque<RecordFragmentInfo> temp_queue;
     ret = GetAllFragInfoEx(temp_queue);
     assert(ret == 0);
 
     while(!temp_queue.empty())
     {
-        RecordFragmentInfo *temp_frag = temp_queue.front();
+        RecordFragmentInfo temp_frag = temp_queue.front();
         temp_queue.pop_front();
-        assert(temp_frag != NULL);
 
-        FRAGMENT_INFO_T *frag_info = new FRAGMENT_INFO_T;
-        assert(frag_info != NULL);
-        frag_info->start_time.seconds = temp_frag->start_time.tv_sec;
-        frag_info->start_time.nseconds = temp_frag->start_time.tv_nsec;
-        frag_info->end_time.seconds = temp_frag->end_time.tv_sec;
-        frag_info->end_time.nseconds = temp_frag->end_time.tv_nsec;
+        FRAGMENT_INFO_T frag_info = {0};
+        frag_info.start_time.seconds = temp_frag.start_time.tv_sec;
+        frag_info.start_time.nseconds = temp_frag.start_time.tv_nsec;
+        frag_info.end_time.seconds = temp_frag.end_time.tv_sec;
+        frag_info.end_time.nseconds = temp_frag.end_time.tv_nsec;
 
-        delete temp_frag;
+        frag_info_queue.push_back(frag_info);
     }
 
     return 0;
+}
+
+int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
+{
+    assert(header != NULL);
+    assert(frame != NULL);
+    Log(logger_, "decode header");
+    
+    char *temp = header;
+
+    uint32_t magic_code = DecodeFixed32(temp);
+    temp += 4;
+    if (magic_code != kMagicCode)
+    {
+        return -ERR_NO_MAGIC_CODE;
+    }
+
+    frame->type = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->frame_time.seconds = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->frame_time.nseconds = DecodeFixed32(temp);
+    temp += 4;
+
+    frame->stamp = DecodeFixed64(temp);
+    temp += 8;
+
+    frame->size = DecodeFixed32(temp);
+    temp += 4;
+
+    return 0;
+}
+
+int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start_offset, uint32_t &frag_end_offset)
+{
+    int32_t ret;
+    deque<RecordFragmentInfo> temp_queue;
+
+    /* get all frag info */
+    ret = GetAllFragInfoEx(temp_queue);
+    assert (ret == 0);
+
+    deque<RecordFragmentInfo>::iterator iter = temp_queue.begin();
+    for(; iter != temp_queue.end(); iter++)
+    {
+        RecordFragmentInfo frag_info = *iter;
+
+        if (stamp >= frag_info.start_time && stamp <= frag_info.end_time)
+        {
+            frag_start_offset = frag_info.frag_start_offset;
+            frag_end_offset = frag_info.frag_end_offset;
+            break;
+        }
+    }
+
+    if (iter == temp_queue.end())
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
+{
+    assert(frame != NULL);
+    Log(logger_, "read frame");
+
+    int ret = 0;
+
+    assert(read_fd_ >= 0);
+    if (offset >= record_offset_)
+    {
+        Log(logger_, "read reach to end");
+        return -ERR_READ_REACH_TO_END;
+    }
+
+    char header[kHeaderSize] = {0};
+    ret = pread(read_fd_, header, kHeaderSize, offset);
+    assert(ret == (int)kHeaderSize);
+
+    {
+        uint32_t ret = DecodeHeader(header, frame);
+        if (ret != 0)
+        {
+            return -ERR_READ_REACH_TO_END;
+        }
+    }
+
+    ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
+    assert(ret == (int)frame->size);
+
+    return 0;
+}
+
+bool RecordFile::CheckRecycle()
+{
+    Log(logger_, "check recycle");
+
+    RWLock::RDLocker locker(rwlock_);
+    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_file_info_length, char *record_frag_info_buffer,
                                 uint32_t record_frag_info_length, uint32_t *record_frag_number)
 {
     Log(logger_, "build index");
-    
+
+    RWLock::RDLocker locker(rwlock_);
     if (had_frame_ == false)
     {
         return -ERR_RECORD_NO_WRITE;
@@ -444,6 +533,8 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     bool open_fd = false;
 
     Log(logger_, "write file %srecord_%05d, offset is %d, length is %d", base_name_.c_str(), number_, record_offset_, length);
+
+    RWLock::WRLocker lock(rwlock_);
 
     if (write_fd_ < 0)
     {
@@ -489,6 +580,7 @@ int32_t RecordFile::FinishWrite()
 {
     Log(logger_, "finish write");
     
+    RWLock::WRLocker lock(rwlock_);
     if (write_fd_ > 0)
     {
         close(write_fd_);
@@ -500,98 +592,35 @@ int32_t RecordFile::FinishWrite()
     return 0;
 }
 
-int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
-{
-    assert(header != NULL);
-    assert(frame != NULL);
-    Log(logger_, "decode header");
-    
-    char *temp = header;
-
-    uint32_t magic_code = DecodeFixed32(temp);
-    temp += 4;
-    if (magic_code != kMagicCode)
-    {
-        return -ERR_NO_MAGIC_CODE;
-    }
-
-    frame->type = DecodeFixed32(temp);
-    temp += 4;
-
-    frame->frame_time.seconds = DecodeFixed32(temp);
-    temp += 4;
-
-    frame->frame_time.nseconds = DecodeFixed32(temp);
-    temp += 4;
-
-    frame->stamp = DecodeFixed64(temp);
-    temp += 8;
-
-    frame->size = DecodeFixed32(temp);
-    temp += 4;
-
-    return 0;
-}
-
-int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start_offset, uint32_t &frag_end_offset)
-{
-    int32_t ret;
-    deque<RecordFragmentInfo*> temp_queue;
-
-    /* get all frag info */
-    ret = GetAllFragInfoEx(temp_queue);
-    assert (ret == 0);
-
-    deque<RecordFragmentInfo*>::iterator iter = temp_queue.begin();
-    for(; iter != temp_queue.end(); iter++)
-    {
-        RecordFragmentInfo *frag_info = *iter;
-        assert(frag_info != NULL);
-
-        if (stamp >= frag_info->start_time && stamp <= frag_info->end_time)
-        {
-            frag_start_offset = frag_info->frag_start_offset;
-            frag_end_offset = frag_info->frag_end_offset;
-            break;
-        }
-    }
-
-    while(!temp_queue.empty())
-    {
-        RecordFragmentInfo *frag_info = temp_queue.front();
-        temp_queue.pop_front();
-        assert(frag_info != NULL);
-
-        delete frag_info;
-    }
-
-    if (iter == temp_queue.end())
-    {
-        return -1;
-    }
-
-    return 0;
-}
-
-int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
+int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, uint32_t &seek_end_offset)
 {
     Log(logger_, "get stamp offset");
     int32_t ret = 0;
     uint32_t frag_start_offset = 0;
     uint32_t frag_end_offset = 0;
 
-    read_count_++;
-    if (read_fd_ < 0)
     {
-        ret = OpenFd(false);
-        assert(ret == 0);
+        RWLock::WRLocker lock(rwlock_);
+
+        read_count_++;
+        if (read_fd_ < 0)
+        {
+            ret = OpenFd(false);
+            assert(ret == 0);
+        }
+    
     }
 
-    ret = GetStampStartAndEndOffset(stamp, frag_start_offset, frag_end_offset);
-    if (ret != 0)
     {
-        return -ERR_ITEM_NOT_FOUND;
+        RWLock::RDLocker lock(rwlock_);
+        ret = GetStampStartAndEndOffset(stamp, frag_start_offset, frag_end_offset);
+        if (ret != 0)
+        {
+            return -ERR_ITEM_NOT_FOUND;
+        }
     }
+    
+    seek_end_offset = frag_end_offset;
 
     uint32_t stamp_offset = frag_start_offset;
     while(stamp_offset < frag_end_offset)
@@ -611,7 +640,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
         UTime frame_time(frame.frame_time.seconds, frame.frame_time.nseconds);
         if (frame_time >= stamp)
         {
-            *offset = stamp_offset;
+            seek_start_offset = stamp_offset;
             return 0;
         }
 
@@ -627,41 +656,11 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t *offset)
     return 0;
 }
 
-int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
-{
-    assert(frame != NULL);
-    Log(logger_, "read frame");
-
-    int ret = 0;
-
-    assert(read_fd_ >= 0);
-    if (offset >= record_offset_)
-    {
-        Log(logger_, "read reach to end");
-        return -ERR_READ_REACH_TO_END;
-    }
-
-    char header[kHeaderSize] = {0};
-    ret = pread(read_fd_, header, kHeaderSize, offset);
-    assert(ret == (int)kHeaderSize);
-
-    {
-        uint32_t ret = DecodeHeader(header, frame);
-        if (ret != 0)
-        {
-            return -ERR_READ_REACH_TO_END;
-        }
-    }
-
-    ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
-    assert(ret == (int)frame->size);
-
-    return 0;
-}
-
 int32_t RecordFile::FinishRead()
 {
     Log(logger_, "finish read");
+
+    RWLock::WRLocker lock(rwlock_);
     read_count_--;
     assert(read_count_ >= 0);
     if (read_count_ == 0)

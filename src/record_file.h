@@ -5,6 +5,7 @@
 #include <deque>
 #include "../util/logger.h"
 #include "../util/mutex.h"
+#include "../util/rwlock.h"
 #include "store_types.h"
 
 using namespace std;
@@ -20,6 +21,9 @@ public:
 
     string base_name_;
     uint32_t number_;
+
+    RWLock rwlock_;
+    
     int write_fd_;
     
     int read_fd_;
@@ -56,8 +60,8 @@ public:
     int32_t DecodeRecordFragInfoIndex(char *buffer, uint32_t length, RecordFragmentInfo &frag_info);
 
     int32_t GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start_offset, uint32_t &frag_end_offset);
-    int32_t GetAllFragInfoEx(deque<RecordFragmentInfo*> &frag_queue);
-    int32_t GetAllFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue);
+    int32_t GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_queue);
+    int32_t GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue);
 
     int32_t BuildIndex(char *record_file_buffer, uint32_t record_file_length, char *record_frag_info_buffer,
                             uint32_t record_frag_info_length, uint32_t *record_frag_number);
@@ -66,7 +70,7 @@ public:
     int32_t FinishWrite();
 
     int32_t DecodeHeader(char *header, FRAME_INFO_T *frame);
-    int32_t SeekStampOffset(UTime &stamp, uint32_t *offset);
+    int32_t SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
     int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t FinishRead();
 };

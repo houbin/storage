@@ -35,15 +35,15 @@ public:
     bool IsEmpty();
 
     int32_t GetRecordFile(UTime &time, RecordFile **record_file);
-    int32_t ListRecordFragments(UTime &time, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
+    int32_t ListRecordFragments(UTime &time, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
 
-    int32_t GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &start);
-    int32_t GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &start, UTime &end);
-    int32_t GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file, UTime &end);
-    int32_t GetFragInfo(deque<FRAGMENT_INFO_T*> &frag_info_queue, RecordFile *record_file);
+    int32_t GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &start);
+    int32_t GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &start, UTime &end);
+    int32_t GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &end);
+    int32_t GetFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file);
 
     void Shutdown();
 };
@@ -68,8 +68,6 @@ private:
     FRAME_INFO_T *current_o_frame_;
 
     C_WriteIndexTick *write_index_event_;
-
-    Mutex last_record_file_mutex_;
 
     bool stop_;
 
@@ -101,7 +99,10 @@ class RecordReader
 private:
     StoreClient *store_client_;
     RecordFile *record_file_;
+
     uint32_t read_offset_;
+    uint32_t read_end_offset_;
+
     FRAME_INFO_T current_o_frame_;
 
 public:
@@ -149,7 +150,7 @@ public:
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
-    int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
+    int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
 
     void Shutdown();
 };
@@ -211,13 +212,15 @@ public:
     int32_t SeekRead(uint32_t id, UTime &stamp);
     int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
 
-    int32_t ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T*> &frag_info_queue);
+    int32_t ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();
     int32_t Recycle();
 
     void Shutdown();
+
+    int32_t DumpClientSearchMap();
 };
 
 class C_Recycle : public Context

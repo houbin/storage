@@ -132,9 +132,9 @@ int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, c
         FRAGMENT_INFO_T **frag_info, uint32_t *count)
 {
     int32_t ret;
-    deque<FRAGMENT_INFO_T*> frag_info_queue;
     UTime start_time(start->seconds, start->nseconds);
     UTime end_time(end->seconds, end->nseconds);
+    deque<FRAGMENT_INFO_T> frag_info_queue;
 
     ret = store_client_center->ListRecordFragments(id, start_time, end_time, frag_info_queue);
     if (ret != 0)
@@ -145,18 +145,20 @@ int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, c
     *count = frag_info_queue.size();
     if (*count == 0)
     {
-        frag_info = NULL;
+        *frag_info = NULL;
         return 0;
     }
 
-    frag_info = new FRAGMENT_INFO_T*[*count];
-    assert(frag_info != NULL);
+    FRAGMENT_INFO_T *frag_info_buffer = new FRAGMENT_INFO_T[*count];
+    assert(frag_info_buffer != NULL);
 
     for (int i = 0; i < *count; i++)
     {
-        frag_info[i] = frag_info_queue.front();
+        frag_info_buffer[i] = frag_info_queue.front();
         frag_info_queue.pop_front();
     }
+
+    *frag_info = frag_info_buffer;
 
     return 0;
 }
