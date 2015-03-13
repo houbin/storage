@@ -91,9 +91,10 @@ int32_t IndexFile::AnalyzeAllEntry()
 
         uint32_t expected_crc = DecodeFixed32(temp);
         temp += 4;
+
         uint32_t actual_crc = crc32c::Value(temp, length);
         assert(expected_crc == actual_crc);
-        temp += 4;
+
         ret = record_file->DecodeRecordFileInfoIndex(temp, sizeof(RecordFileInfo));
         assert(ret == 0);
 
