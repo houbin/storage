@@ -52,6 +52,8 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
         assert(iter != record_file_map_.end());
         if (iter->first > time)
         {
+            Log(logger_, "time < all file stamp, time is %d.%d, first file start time is %d.%d", time.tv_sec, time.tv_nsec,
+                    iter->first.tv_sec, iter->first.tv_nsec);
             return -ERR_ITEM_NOT_FOUND;
         }
     }
@@ -60,8 +62,10 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
     {
         map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
         RecordFile *record_file = riter->second;
-        if (record_file->end_time_ > time)
+        if (record_file->end_time_ < time)
         {
+            Log(logger_, "time > all file stamp, time is %d.%d, end file start time is %d.%d", time.tv_sec, time.tv_nsec,
+                    record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec);
             return -ERR_ITEM_NOT_FOUND;
         }
     }

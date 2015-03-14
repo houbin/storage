@@ -5,6 +5,8 @@ index_file_name=index
 file_count_name=file_count
 
 disk=$1
+record_info_length=$2
+frag_info_length=$3
 
 disk_size=`parted /dev/$disk unit MiB print | grep -A2 Number | grep -v Number | grep -v '^$' | sed "s/MiB//g" | awk '{printf("%d\n", $4)}'`
 
@@ -25,7 +27,7 @@ done
 
 echo "start to fallocate index file"
 #fallocate index file
-file_use_bytes=$(echo "128 + 256 * 40" | bc)
+file_use_bytes=$(echo "${record_info_length} + 256 * ${frag_info_length}" | bc)
 index_file_size=$(echo "${file_use_bytes} * ${file_count}" | bc)
 echo "index file size is ${index_file_size}"
 fallocate -l ${index_file_size} ${mount_dir}/${disk}/${index_file_name}

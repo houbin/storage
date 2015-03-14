@@ -26,7 +26,7 @@ int main()
 
     storage_init();
 
-    store_client_center->DumpClientSearchMap();
+//    store_client_center->DumpClientSearchMap();
 
     TestThread write_threads("writer", write_thread_count);
     TestThread read_threads("reader", read_thread_count);

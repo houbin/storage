@@ -348,10 +348,10 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
     memset(record_frag_info_buffer, 0, frag_info_length); 
     
     ret = index_file->Read(record_frag_info_buffer, frag_info_length, frag_info_offset); 
-    if (ret != frag_info_length) 
+    if (ret != 0) 
     { 
         Log(logger_, "index file read length is %d, offset is %d error", frag_info_length, frag_info_offset); 
-        assert(ret == frag_info_length); 
+        assert(ret != 0); 
     } 
     
     for(int i = 0; i < record_fragment_count_; i++)
@@ -383,6 +383,8 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
     deque<RecordFragmentInfo> temp_queue;
     ret = GetAllFragInfoEx(temp_queue);
     assert(ret == 0);
+
+    Log(logger_, "size of temp_queue is %d", temp_queue.size());
 
     while(!temp_queue.empty())
     {

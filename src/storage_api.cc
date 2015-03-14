@@ -58,7 +58,10 @@ int32_t storage_formate_disk(char *disk)
     char command[256] = {0};
     FILE *fp = NULL;
 
-    snprintf(command, 255, "/jovision/shell/disk_format/format_one_disk.sh %s", disk);
+    int32_t record_info_index_length = sizeof(RecordFileInfo);
+    int32_t frag_info_index_length = sizeof(RecordFragmentInfo);
+
+    snprintf(command, 255, "/jovision/shell/disk_format/format_one_disk.sh %s %d %d", disk, record_info_index_length, frag_info_index_length);
     fp = popen(command, "r");
     if (fp == NULL)
     {

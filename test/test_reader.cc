@@ -21,8 +21,8 @@ int32_t FrameReader::GenerateListRangeTime(UTIME_T &start, UTIME_T &end)
     struct timeval now;
 
     /* 生成过去2小时的一段时间 */
-    int a = rand() % 7200;
-    int b = rand() % 7200;
+    int a = rand() % 28800;
+    int b = rand() % 28800;
 
     if (a > b)
     {
@@ -39,7 +39,7 @@ int32_t FrameReader::GenerateListRangeTime(UTIME_T &start, UTIME_T &end)
 
     start.seconds = now.tv_sec - max;
     start.nseconds = now.tv_usec * 1000;
-    end.seconds = now.tv_sec - min;
+    end.seconds = now.tv_sec;
     end.nseconds = now.tv_usec * 1000;
 
     return 0;
@@ -101,8 +101,21 @@ void *FrameReader::Entry()
         GenerateListRangeTime(start, end);
         FRAGMENT_INFO_T *frag_buffer = NULL;
         uint32_t count = 0;
+        fprintf(stderr, "list record frag from %d.%d to %d.%d\n", start.seconds, start.nseconds, end.seconds, end.nseconds);
         ret = storage_list_record_fragments(op_id_, &start, &end, &frag_buffer, &count);
-        assert(ret == 0);
+        if (ret != 0)
+        {
+            fprintf(stderr, "list record frag error, start time is %d.%d\n", start.seconds, start.nseconds);
+            continue;
+        }
+
+        for (int seq  = 0; seq < count; seq++)
+        {
+            FRAGMENT_INFO_T temp = frag_buffer[i];
+
+            fprintf(stderr, "frag info %d, start time is %d.%d, end time is %d.%d\n", seq, temp.start_time.seconds, temp.start_time.nseconds,
+                temp.end_time.seconds, temp.end_time.nseconds);
+        }
 
         /* pick one frag */
         int rand_number = rand() % count;
@@ -111,9 +124,10 @@ void *FrameReader::Entry()
         int read_rand_offset = rand() % (rand_frag.end_time.seconds - rand_frag.start_time.seconds + 60);
 
         UTIME_T read_start_time;
-        read_start_time.seconds = rand_frag.start_time.seconds - 30 + read_rand_offset;
+        read_start_time.seconds = rand_frag.start_time.seconds + read_rand_offset;
         read_start_time.nseconds = rand_frag.start_time.nseconds;
 
+        fprintf(stderr, "seek time is %d.%d\n", read_start_time.seconds, read_start_time.nseconds);
         ret = storage_seek(op_id_, &read_start_time);
         if (ret != 0)
         {

@@ -1,6 +1,8 @@
 #!/bin/sh 
 JOVISION=/jovision/mnt
 FORMAT_DISK=$1
+RECORD_INFO_INDEX_LENGTH=$2
+FRAG_INFO_INDEX_LENGTH=$3
 SYS_DISK="sda"
 
 if [ -z "${FORMAT_DISK}" ];then
@@ -46,5 +48,5 @@ SCRIPT_PATH=$(dirname `readlink -f $0`)
 cd ${SCRIPT_PATH}
 
 chmod +x ./fallocate_one_disk.sh
-./fallocate_one_disk.sh ${FORMAT_DISK}
+./fallocate_one_disk.sh ${FORMAT_DISK} ${RECORD_INFO_INDEX_LENGTH} ${FRAG_INFO_INDEX_LENGTH}
 
