@@ -187,7 +187,7 @@ void *FrameWriter::Entry()
 
 void FrameWriter::Shutdown()
 {
-    fprintf(stderr, "shutdown %d\n", id_);
+    fprintf(stderr, "Writer shutdown %d\n", id_);
     
     Join();
 

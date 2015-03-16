@@ -166,21 +166,10 @@ int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, c
     return 0;
 }
 
-int32_t storage_free_record_fragments(FRAGMENT_INFO_T **frag_info, uint32_t count)
+int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_t count)
 {
-    int32_t ret;
-
-    for (int i = 0; i < count; i++)
-    {
-        FRAGMENT_INFO_T *temp = frag_info[i];
-        if (temp != NULL)
-        {
-            delete temp;
-            temp = NULL;
-        }
-    }
-
-    delete []frag_info;
+    delete frag_info;
+    frag_info = NULL;
 
     return 0;
 }

@@ -225,7 +225,9 @@ int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uin
     char *temp = record_frag_info_buffer;
     
     uint32_t length = record_frag_info_length - sizeof(record_frag_info.length) - sizeof(record_frag_info.crc);
+    EncodeFixed32(temp, length);
     temp += sizeof(record_frag_info.length);
+
     temp += sizeof(record_frag_info.crc);
 
     char *crc_start = temp;
@@ -354,6 +356,7 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
         assert(ret != 0); 
     } 
     
+    Log(logger_, "record fragment count is %d", record_fragment_count_);
     for(int i = 0; i < record_fragment_count_; i++)
     {
         RecordFragmentInfo temp_frag_info = {0};

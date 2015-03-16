@@ -101,20 +101,21 @@ void *FrameReader::Entry()
         GenerateListRangeTime(start, end);
         FRAGMENT_INFO_T *frag_buffer = NULL;
         uint32_t count = 0;
-        fprintf(stderr, "list record frag from %d.%d to %d.%d\n", start.seconds, start.nseconds, end.seconds, end.nseconds);
+        fprintf(stderr, "\nlist record frag from %d.%d to %d.%d\n", start.seconds, start.nseconds, end.seconds, end.nseconds);
         ret = storage_list_record_fragments(op_id_, &start, &end, &frag_buffer, &count);
         if (ret != 0)
         {
-            fprintf(stderr, "list record frag error, start time is %d.%d\n", start.seconds, start.nseconds);
+            fprintf(stderr, "[list frag]: error, start time is %d.%d\n", start.seconds, start.nseconds);
             continue;
         }
 
+        fprintf(stderr, "[list frag]: ok, count is %d\n", count);
+
         for (int seq  = 0; seq < count; seq++)
         {
-            FRAGMENT_INFO_T temp = frag_buffer[i];
+            FRAGMENT_INFO_T temp = frag_buffer[seq];
 
-            fprintf(stderr, "frag info %d, start time is %d.%d, end time is %d.%d\n", seq, temp.start_time.seconds, temp.start_time.nseconds,
-                temp.end_time.seconds, temp.end_time.nseconds);
+            fprintf(stderr, "    fragment %d, start time is %d.%d, end time is %d.%d\n", seq, temp.start_time.seconds, temp.start_time.nseconds, temp.end_time.seconds, temp.end_time.nseconds);
         }
 
         /* pick one frag */
@@ -127,15 +128,16 @@ void *FrameReader::Entry()
         read_start_time.seconds = rand_frag.start_time.seconds + read_rand_offset;
         read_start_time.nseconds = rand_frag.start_time.nseconds;
 
-        fprintf(stderr, "seek time is %d.%d\n", read_start_time.seconds, read_start_time.nseconds);
+        fprintf(stderr, "random seek time is %d.%d\n", read_start_time.seconds, read_start_time.nseconds);
         ret = storage_seek(op_id_, &read_start_time);
         if (ret != 0)
         {
-            fprintf(stderr, "frag start is %d.%d, end is %d.%d, seek is %d.%d, seek ret is %d\n", start.seconds, start.nseconds, 
-            end.seconds, end.nseconds, read_start_time.seconds, read_start_time.nseconds, ret);
+            fprintf(stderr, "[seek]: error, frag start is %d.%d, end is %d.%d, seek is %d.%d, seek ret is %d\n", start.seconds, start.nseconds, end.seconds, end.nseconds, read_start_time.seconds, read_start_time.nseconds, ret);
             
             goto FreeResource;
         }
+
+        fprintf(stderr, "[seek]: ok, frag start is %d.%d, end is %d.%d, seek is %d.%d, seek ret is %d\n", start.seconds, start.nseconds, end.seconds, end.nseconds, read_start_time.seconds, read_start_time.nseconds, ret);
 
         // read 200 frame
         for (int j = 0; j < 200; j++)
@@ -143,8 +145,9 @@ void *FrameReader::Entry()
             ret = storage_read(op_id_, &frame_info);
             if (ret != 0)
             {
-                fprintf(stderr, "frag start is %d.%d, end is %d.%d, seek is %d.%d, read ret is %d\n", start.seconds, start.nseconds, 
-                end.seconds, end.nseconds, read_start_time.seconds, read_start_time.nseconds, ret);
+                fprintf(stderr, "[read], error, frag start is %d.%d, end is %d.%d, seek is %d.%d, read ret is %d\n", 
+                start.seconds, start.nseconds, end.seconds, end.nseconds, read_start_time.seconds, 
+                read_start_time.nseconds, ret);
                 
                 goto FreeResource;
             }
@@ -173,7 +176,7 @@ FreeResource:
 
 void FrameReader::Shutdown()
 {
-    fprintf(stderr, "shutdown %d\n", id_);
+    fprintf(stderr, "Reader shutdown %d\n", id_);
 
     Join();
     return;

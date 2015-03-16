@@ -101,7 +101,7 @@ extern int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *s
  *
  * 返回： 成功返回0，失败返回负数
  */
-extern int32_t storage_free_record_fragments(FRAGMENT_INFO_T **frag_info, uint32_t count);
+extern int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_t count);
 
 /* 功能： 读取录像数据时，seek到某一时刻
  * 输入：   id      操作的视频流id
