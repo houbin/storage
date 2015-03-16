@@ -49,8 +49,6 @@ struct RecordFragmentInfo
     uint32_t crc;
     UTime start_time;
     UTime end_time;
-    UTime i_frame_start_time;
-    UTime i_frame_end_time;
 
     uint32_t frag_start_offset;
     uint32_t frag_end_offset;

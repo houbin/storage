@@ -40,6 +40,9 @@ public:
     UTime end_time_; 
     UTime i_frame_start_time_;
     UTime i_frame_end_time_;
+
+    UTime frag_start_time_;
+    UTime frag_end_time_;
     uint32_t frag_start_offset_;
     uint32_t frag_end_offset_;
 
@@ -51,7 +54,7 @@ public:
     bool CheckRecycle();
     int32_t Clear();
     int32_t UpdateTimes(BufferTimes &update);
-    int32_t ZeroTimes();
+    int32_t ZeroRecordFileTimes();
 
     int32_t EncodeRecordFileInfoIndex(char *buffer, uint32_t length);
     int32_t DecodeRecordFileInfoIndex(char *buffer, uint32_t length);

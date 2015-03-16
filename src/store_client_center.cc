@@ -45,6 +45,7 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
     {
         return -ERR_ITEM_NOT_FOUND;
     }
+    Dump();
 
     // judge if stamp < all file stamp
     {
@@ -346,6 +347,26 @@ int32_t RecordFileMap::GetFragInfo(deque<FRAGMENT_INFO_T> &frag_queue, RecordFil
     return 0;
 }
 
+void RecordFileMap::Dump()
+{
+    Log(logger_, "dump");
+    RWLock::RDLocker locker(rwlock_);
+
+    map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
+    for (; iter != record_file_map_.end(); iter++)
+    {
+        RecordFile *record_file = iter->second;
+
+        Log(logger_, "key is %d.%d, record file info: stream info %s, record_fragment_count %d, start_time %d.%d,\
+end_time %d.%d, i_frame_start_time %d.%d, i_frame_end_time %d.%d, record_offset %d", iter->first.tv_sec, iter->first.tv_nsec,
+record_file->stream_info_.c_str(), record_file->record_fragment_count_, record_file->start_time_.tv_sec, record_file->start_time_.tv_nsec,
+record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec, record_file->i_frame_start_time_.tv_sec, record_file->i_frame_start_time_.tv_nsec,
+record_file->i_frame_end_time_.tv_sec, record_file->i_frame_end_time_.tv_nsec);
+    }
+
+    return;
+}
+
 void RecordFileMap::Shutdown()
 {
     Log(logger_, "shutdown");
@@ -552,7 +573,8 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
 
     file_info_write_offset = record_file->number_ * sizeof(RecordFileInfo);
     frag_info_write_offset = file_counts * sizeof(RecordFileInfo) + 
-            record_file->number_ * kStripeCount * sizeof(RecordFragmentInfo) + record_frag_info_number * sizeof(RecordFragmentInfo);
+            record_file->number_ * kStripeCount * sizeof(RecordFragmentInfo) + 
+            (record_frag_info_number -1) * sizeof(RecordFragmentInfo);
     index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
     index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
 
@@ -689,7 +711,6 @@ void *RecordWriter::Entry()
                     {
                         ret = WriteBuffer(record_file, kBlockSize);
                         assert(ret == 0);
-                        goto FreeResource;
                     }
 
                     uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len: buffer_left_size;
@@ -699,6 +720,8 @@ void *RecordWriter::Entry()
                     write_offset_ += copy_len;
                     temp_buffer_write_offset += copy_len;
                 }
+
+                goto FreeResource;
             }
             else
             {
@@ -726,7 +749,6 @@ void *RecordWriter::Entry()
                     {
                         ret = WriteBuffer(record_file, kBlockSize);
                         assert(ret == 0);
-                        goto FreeResource;
                     }
 
                     uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len : buffer_left_size;
@@ -736,6 +758,8 @@ void *RecordWriter::Entry()
                     write_offset_ += copy_len;
                     temp_buffer_write_offset += copy_len;
                 }
+
+                goto FreeResource;
             }
 
 FreeResource:    

@@ -45,6 +45,8 @@ public:
     int32_t GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &end);
     int32_t GetFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file);
 
+    void Dump();
+
     void Shutdown();
 };
 

@@ -48,7 +48,7 @@ int32_t FrameReader::GenerateListRangeTime(UTIME_T &start, UTIME_T &end)
 int32_t FrameReader::CheckFrame(FRAME_INFO_T *frame_info)
 {
     int ret = 0;
-    char length = frame_info->size;
+    uint32_t length = frame_info->size;
     char *buffer = frame_info->buffer;
 
     uint32_t actual_crc = crc32c::Value(buffer, length - 4);
@@ -85,9 +85,19 @@ void *FrameReader::Entry()
     UTIME_T start;
     UTIME_T end;
 
+    srand((int)time(0));
+
+    FRAME_INFO_T frame_info = {0};
+    frame_info.buffer = (char *)malloc(kBlockSize);
+
     for (; i < 10000; i++)
     {
-        FRAME_INFO_T frame_info = {0};
+        frame_info.type = 0;
+        frame_info.frame_time.seconds = 0;
+        frame_info.frame_time.nseconds = 0;
+        frame_info.stamp = 0;
+        frame_info.size = 0;
+        memset(frame_info.buffer, 0, kBlockSize);
 
         if (op_id_ < 0)
         {
@@ -105,7 +115,7 @@ void *FrameReader::Entry()
         ret = storage_list_record_fragments(op_id_, &start, &end, &frag_buffer, &count);
         if (ret != 0)
         {
-            fprintf(stderr, "[list frag]: error, start time is %d.%d\n", start.seconds, start.nseconds);
+            fprintf(stderr, "[list frag]: error, start time is %d.%d, ret is %d\n", start.seconds, start.nseconds, ret);
             continue;
         }
 
@@ -122,7 +132,7 @@ void *FrameReader::Entry()
         int rand_number = rand() % count;
         FRAGMENT_INFO_T rand_frag = frag_buffer[rand_number];
 
-        int read_rand_offset = rand() % (rand_frag.end_time.seconds - rand_frag.start_time.seconds + 60);
+        int read_rand_offset = rand() % (rand_frag.end_time.seconds - rand_frag.start_time.seconds);
 
         UTIME_T read_start_time;
         read_start_time.seconds = rand_frag.start_time.seconds + read_rand_offset;
