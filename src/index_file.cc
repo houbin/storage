@@ -95,7 +95,7 @@ int32_t IndexFile::AnalyzeAllEntry()
         uint32_t actual_crc = crc32c::Value(temp, length);
         assert(expected_crc == actual_crc);
 
-        ret = record_file->DecodeRecordFileInfoIndex(temp, sizeof(RecordFileInfo));
+        ret = record_file->DecodeRecordFileInfoIndex(temp, length);
         assert(ret == 0);
 
         string stream_info(record_file->stream_info_);
@@ -129,7 +129,8 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
         Log(logger_, "index_file is %p, buffer is %s, fwrite return %d, errno msg is %s", index_file_, buffer, ret, strerror(errno));
         assert(ret == (int)length);
     }
-    Log(logger_, "index file write ok, offset is %d, length is %d", offset, length);
+    fflush(index_file_);
+    Log(logger_, "index write file %sindex ok, offset is %d, length is %d", base_name_.c_str(), offset, length);
 
     return 0;
 }

@@ -87,7 +87,7 @@ void Logger::Logv(const char* format, va_list ap)
 
 int32_t NewLogger(const char* name, Logger **logger)
 {
-    FILE *f = fopen(name, "w");
+    FILE *f = fopen(name, "a");
     if (NULL == f)
     {
         return -ERR_OPEN_FILE;

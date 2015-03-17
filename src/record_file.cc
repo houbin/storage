@@ -18,7 +18,7 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"), write_fd_(-1), read_fd_(-1), read_count_(0),
-locked_(false), had_frame_(false), record_fragment_count_(0), frag_start_offset_(0), frag_end_offset_(0), record_offset_(0)
+locked_(false), had_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
 }
@@ -74,7 +74,6 @@ int32_t RecordFile::Clear()
     frag_end_time_ = time_zero;
     ZeroRecordFileTimes();
     this->frag_start_offset_ = 0;
-    this->frag_end_offset_ = 0;
     this->record_offset_ = 0;
 
     return 0;
@@ -130,27 +129,29 @@ int32_t RecordFile::ZeroRecordFileTimes()
 
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
 {
-    Log(logger_, "encode record file info index");
+    Log(logger_, "encode record file info index, stream info is %s, record_fragment_count_ is %d, start_time is %d.%d, end_time is %d.%d, \
+record_offset_ is %d", stream_info_.c_str(), record_fragment_count_, start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec,
+end_time_.tv_nsec, record_offset_);
 
     struct RecordFileInfo record_file_info;
     char *temp = record_file_info_buffer;
 
     uint32_t length = record_file_info_length - sizeof(record_file_info.length) - sizeof(record_file_info.crc);
     EncodeFixed32(temp, length);
-    temp += sizeof(record_file_info.length);
-    temp += sizeof(record_file_info.crc);
+    temp += 4;
+    temp += 4;
 
     char *crc_start = temp;
 
     memcpy(temp, stream_info_.c_str(), stream_info_.length());
-    temp += sizeof(record_file_info.stream_info);
+    temp += 64;
 
     *temp = locked_;
-    temp += sizeof(record_file_info.locked);
+    temp += 1;
 
     *temp = record_fragment_count_ & 0xff;
     *(temp+1) = record_fragment_count_ >> 8;
-    temp += sizeof(record_file_info.record_fragment_counts);
+    temp += 2;
 
     EncodeFixed32(temp, start_time_.tv_sec);
     temp += 4;
@@ -237,7 +238,8 @@ i_frame_start_time: %d.%d, i_frame_end_time: %d.%d, record_offset_: %d", stream_
 
 int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uint32_t record_frag_info_length)
 {
-    Log(logger_, "encode record frag info index");
+    Log(logger_, "encode record frag info index, start time: %d.%d, end time: %d.%d, frag start offset: %d, frag end offset: %d", 
+        frag_start_time_.tv_sec, frag_start_time_.tv_nsec, frag_end_time_.tv_sec, frag_end_time_.tv_nsec, frag_start_offset_, record_offset_);
 
     struct RecordFragmentInfo record_frag_info;
     char *temp = record_frag_info_buffer;
@@ -262,7 +264,7 @@ int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uin
 
     EncodeFixed32(temp, frag_start_offset_);
     temp += 4;
-    EncodeFixed32(temp, frag_end_offset_);
+    EncodeFixed32(temp, record_offset_);
     temp += 4;
 
     uint32_t crc = crc32c::Value(crc_start, length);
@@ -319,20 +321,6 @@ int32_t RecordFile::DecodeRecordFragInfoIndex(char *buffer, uint32_t length, Rec
 int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 {
     int32_t ret;
-
-    if (record_fragment_count_ == 1)
-    {
-        RecordFragmentInfo temp;
-
-        memset(&temp, 0, sizeof(RecordFragmentInfo));
-        temp.start_time = start_time_;
-        temp.end_time = end_time_;
-        temp.frag_start_offset = frag_start_offset_;
-        temp.frag_end_offset = frag_end_offset_;
-        
-        frag_info_queue.push_back(temp);
-        return 0;
-    }
 
     /* need to read fragment info in index file */ 
     IndexFile *index_file = NULL; 
@@ -494,7 +482,6 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     }
 
     ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
-    Log(logger_, "pread error, ret is %s", strerror(errno));
     assert(ret == (int)frame->size);
 
     return 0;
@@ -524,8 +511,8 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
         return -ERR_RECORD_NO_WRITE;
     }
 
-    EncodeRecordFileInfoIndex(record_file_info_buffer, record_file_info_length);
     EncodeRecordFragInfoIndex(record_frag_info_buffer, record_frag_info_length);
+    EncodeRecordFileInfoIndex(record_file_info_buffer, record_file_info_length);
     *record_frag_number = record_fragment_count_;
 
     return 0;
@@ -550,7 +537,7 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
         assert(record_fragment_count_ <= 256);
 
         // update start and end offset, zero times
-        frag_start_offset_ = frag_end_offset_ = record_offset_;
+        frag_start_offset_ = record_offset_;
 
         open_fd = true;
     }
@@ -566,14 +553,13 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     UpdateTimes(update);
 
     record_offset_ += length;
-    frag_end_offset_ = record_offset_;
 
     if (open_fd)
     {
         had_frame_ = true;
     }
 
-    Log(logger_, "write ok, file is %srecord_%05d, record offset is %d, write length is %d",
+    Log(logger_, "write file %srecord_%05d ok, record offset is %d, write length is %d",
                         base_name_.c_str(), number_, record_offset_, length);
 
     return 0;

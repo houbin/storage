@@ -65,7 +65,7 @@ int32_t RecordFileMap::GetRecordFile(UTime &time, RecordFile **record_file)
         RecordFile *record_file = riter->second;
         if (record_file->end_time_ < time)
         {
-            Log(logger_, "time > all file stamp, time is %d.%d, end file start time is %d.%d", time.tv_sec, time.tv_nsec,
+            Log(logger_, "time > all file stamp, time is %d.%d, end file end time is %d.%d", time.tv_sec, time.tv_nsec,
                     record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec);
             return -ERR_ITEM_NOT_FOUND;
         }
@@ -357,11 +357,11 @@ void RecordFileMap::Dump()
     {
         RecordFile *record_file = iter->second;
 
-        Log(logger_, "key is %d.%d, record file info: stream info %s, record_fragment_count %d, start_time %d.%d,\
-end_time %d.%d, i_frame_start_time %d.%d, i_frame_end_time %d.%d, record_offset %d", iter->first.tv_sec, iter->first.tv_nsec,
-record_file->stream_info_.c_str(), record_file->record_fragment_count_, record_file->start_time_.tv_sec, record_file->start_time_.tv_nsec,
-record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec, record_file->i_frame_start_time_.tv_sec, record_file->i_frame_start_time_.tv_nsec,
-record_file->i_frame_end_time_.tv_sec, record_file->i_frame_end_time_.tv_nsec);
+        Log(logger_, "record file info: stream info %s, record_fragment_count %d, start_time %d.%d,\
+end_time %d.%d, record_offset %d", record_file->stream_info_.c_str(), record_file->record_fragment_count_,
+record_file->start_time_.tv_sec, record_file->start_time_.tv_nsec,
+record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec, 
+record_file->record_offset_);
     }
 
     return;
@@ -578,13 +578,14 @@ int32_t RecordWriter::WriteRecordFileIndex(RecordFile *record_file, int r)
     index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
     index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
 
+again:
+
     // stopped
     if (r == -1)
     {
         return 0;
     }
 
-again:
     write_index_event_ = new C_WriteIndexTick(store_client_, NULL);
     store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event_);
 

@@ -90,7 +90,7 @@ void *FrameReader::Entry()
     FRAME_INFO_T frame_info = {0};
     frame_info.buffer = (char *)malloc(kBlockSize);
 
-    for (; i < 10000; i++)
+    for (; i < 1000000; i++)
     {
         frame_info.type = 0;
         frame_info.frame_time.seconds = 0;

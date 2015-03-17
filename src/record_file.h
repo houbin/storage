@@ -44,7 +44,6 @@ public:
     UTime frag_start_time_;
     UTime frag_end_time_;
     uint32_t frag_start_offset_;
-    uint32_t frag_end_offset_;
 
     uint32_t record_offset_;
 
