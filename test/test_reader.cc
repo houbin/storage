@@ -103,7 +103,11 @@ void *FrameReader::Entry()
         {
             uint32_t temp;
             ret = storage_open(stream_info_, 64, 0, &temp);
-            assert(ret == 0);
+            if (ret == -ERR_ITEM_NOT_FOUND)
+            {
+                sleep(10);
+                continue;
+            }
 
             op_id_ = (int32_t)temp;
         }
@@ -180,6 +184,7 @@ FreeResource:
             op_id_ = -1;
             sleep(10);
         }
+        sleep(10);
         continue;
     }
 }

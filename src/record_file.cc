@@ -328,7 +328,7 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
     assert(ret == 0); 
     
     uint32_t file_counts = index_file->GetFileCounts();
-    uint32_t frag_info_offset = file_counts * sizeof(RecordFileInfo) + number_ * sizeof(RecordFragmentInfo); 
+    uint32_t frag_info_offset = file_counts * sizeof(RecordFileInfo) + number_ * kStripeCount * sizeof(RecordFragmentInfo);
     uint32_t frag_info_length = sizeof(RecordFragmentInfo) * record_fragment_count_;
     
     char *record_frag_info_buffer = (char *)malloc(frag_info_length);
@@ -342,7 +342,7 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
         assert(ret != 0); 
     } 
     
-    Log(logger_, "record fragment count is %d", record_fragment_count_);
+    Log(logger_, "record file %sindex, number %d, record fragment count is %d", record_fragment_count_);
     for(int i = 0; i < record_fragment_count_; i++)
     {
         RecordFragmentInfo temp_frag_info = {0};
