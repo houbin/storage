@@ -117,7 +117,7 @@ void *FrameReader::Entry()
         uint32_t count = 0;
         fprintf(stderr, "\nlist record frag from %d.%d to %d.%d\n", start.seconds, start.nseconds, end.seconds, end.nseconds);
         ret = storage_list_record_fragments(op_id_, &start, &end, &frag_buffer, &count);
-        if (ret != 0)
+        if (ret != 0 || count == 0)
         {
             fprintf(stderr, "[list frag]: error, start time is %d.%d, ret is %d\n", start.seconds, start.nseconds, ret);
             continue;

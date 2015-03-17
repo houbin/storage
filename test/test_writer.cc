@@ -49,6 +49,7 @@ int FrameWriter::FillFrame(char *buffer, int frame_buffer_length)
     uint32_t crc_length = frame_buffer_length - 4;
     uint32_t crc = crc32c::Value(buffer, crc_length);
     EncodeFixed32(temp, crc);
+    //EncodeFixed32(temp, 0);
     temp += 4;
 
     return 0;

@@ -322,6 +322,8 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 {
     int32_t ret;
 
+    RWLock::RDLocker lock(rwlock_);
+
     /* need to read fragment info in index file */ 
     IndexFile *index_file = NULL; 
     ret = index_file_manager->Find(base_name_, &index_file); 
@@ -342,7 +344,6 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
         assert(ret != 0); 
     } 
     
-    Log(logger_, "record file %sindex, number %d, record fragment count is %d", record_fragment_count_);
     for(int i = 0; i < record_fragment_count_; i++)
     {
         RecordFragmentInfo temp_frag_info = {0};
