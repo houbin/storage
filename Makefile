@@ -4,7 +4,7 @@
 # #############################################################  
 # #set your own environment option  
 CC = g++
-CC_FLAG = -g -fPIC
+CC_FLAG = -g -fPIC -m32
 #   
 #   #set your inc and lib
 INC = -I./include -I./src/ -I./util
@@ -27,7 +27,7 @@ all:$(PRG)
 #all:$(STATIC_PRG)
 
 $(PRG):$(OBJ)
-	$(CC) -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)
+	$(CC) -m32 -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)
 
 $(STATIC_PRG):$(OBJ)
 	ar -crv $@ $(OBJ)
