@@ -397,7 +397,6 @@ int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
 {
     assert(header != NULL);
     assert(frame != NULL);
-    Log(logger_, "decode header");
     
     char *temp = header;
 
@@ -405,6 +404,7 @@ int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
     temp += 4;
     if (magic_code != kMagicCode)
     {
+        Log(logger_, "decode header, no magic code");
         return -ERR_NO_MAGIC_CODE;
     }
 
@@ -423,6 +423,8 @@ int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
     frame->size = DecodeFixed32(temp);
     temp += 4;
 
+    Log(logger_, "decode header ok, type %d, frame time %d.%d, stamp %d, size %d", frame->type, 
+    frame->frame_time.seconds, frame->frame_time.nseconds, frame->stamp, frame->size);
     return 0;
 }
 
@@ -466,7 +468,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     assert(read_fd_ >= 0);
     if (offset >= record_offset_)
     {
-        Log(logger_, "read reach to end");
+        Log(logger_, "offset %d, record offset %d, read reach to end");
         return -ERR_READ_REACH_TO_END;
     }
 
@@ -478,7 +480,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
         uint32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
-            return -ERR_READ_REACH_TO_END;
+            return ret;
         }
     }
 
@@ -628,7 +630,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         ret = DecodeHeader(header, &frame);
         if (ret == -ERR_NO_MAGIC_CODE)
         {
-            return -ERR_READ_REACH_TO_END;
+            return ret;
         }
 
         UTime frame_time(frame.frame_time.seconds, frame.frame_time.nseconds);

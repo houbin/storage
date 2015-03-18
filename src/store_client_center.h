@@ -99,6 +99,7 @@ public:
 class RecordReader
 {
 private:
+    Logger *logger_;
     StoreClient *store_client_;
     RecordFile *record_file_;
 
@@ -108,7 +109,7 @@ private:
     FRAME_INFO_T current_o_frame_;
 
 public:
-    RecordReader(StoreClient *store_client);
+    RecordReader(Logger *logger, StoreClient *store_client);
     int32_t Seek(UTime &stamp);
     int32_t ReadFrame(FRAME_INFO_T *frame_info);
     int32_t Close();

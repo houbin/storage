@@ -877,8 +877,8 @@ void RecordWriter::Shutdown()
 // ======================================================= //
 //                  record reader
 // ======================================================= //
-RecordReader::RecordReader(StoreClient *store_client)
-: store_client_(store_client), record_file_(NULL), read_offset_(0), read_end_offset_(0)
+RecordReader::RecordReader(Logger *logger, StoreClient *store_client)
+: logger_(logger), store_client_(store_client), record_file_(NULL), read_offset_(0), read_end_offset_(0)
 {
     memset((void *)&current_o_frame_, 0, sizeof(FRAME_INFO_T));
 }
@@ -957,6 +957,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 
     if (read_offset_ >= read_end_offset_)
     {
+        Log(logger_, "read offset %d, read end offset %d", read_offset_, read_end_offset_);
         return -ERR_READ_REACH_TO_END;
     }
 
@@ -1060,7 +1061,7 @@ int32_t StoreClient::OpenRead(uint32_t id)
     pair<map<uint32_t, RecordReader*>::iterator, bool> ret;
 
     Mutex::Locker lock(reader_mutex_);
-    RecordReader *record_reader = new RecordReader(this);
+    RecordReader *record_reader = new RecordReader(logger_, this);
     ret = record_readers_.insert(make_pair(id, record_reader));
     assert(ret.second == true);
 
@@ -1437,7 +1438,6 @@ int32_t StoreClientCenter::SeekRead(uint32_t id, UTime &stamp)
 int32_t StoreClientCenter::ReadFrame(uint32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "read frame, id is %d");
 
     int32_t ret;
     StoreClient *client = NULL;

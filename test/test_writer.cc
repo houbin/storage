@@ -71,7 +71,7 @@ int FrameWriter::WriteOFrame()
     frame.size = 100;
     frame.buffer = (char *)malloc(100);
 
-    fprintf(stderr, "stream %s, seq_ is %d, O frame\n", stream_info_, seq_);
+    //fprintf(stderr, "stream %s, seq_ is %d, O frame\n", stream_info_, seq_);
     FillFrame(frame.buffer, 100);
 
     ret = storage_write(op_id_, &frame);
@@ -156,7 +156,7 @@ void *FrameWriter::Entry()
             ret = storage_open(stream_info_, 64, 1, &temp_op_id);
             assert (ret == 0);
             op_id_ = (int32_t)temp_op_id;
-            fprintf(stderr, "storage open id %d\n", op_id_);
+            //fprintf(stderr, "storage open id %d\n", op_id_);
 
             WriteOFrame();
 
@@ -188,7 +188,7 @@ void *FrameWriter::Entry()
 
 void FrameWriter::Shutdown()
 {
-    fprintf(stderr, "Writer shutdown %d\n", id_);
+    //fprintf(stderr, "Writer shutdown %d\n", id_);
     
     Join();
 
