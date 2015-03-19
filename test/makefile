@@ -1,5 +1,5 @@
 CC = g++
-CC_FLAG = -g -rdynamic
+CC_FLAG = -g -rdynamic -m32
 
 INC =
 LIB = -L../ -lstorage -lpthread
@@ -11,7 +11,7 @@ OBJS = ./test_writer.o ./test_reader.o ../util/config.o  ./storage_main.o
 all:$(PRG)
 
 $(PRG):$(OBJS)
-	$(CC) -o $@ $(OBJS) $(LIB)
+	$(CC) -m32 -o $@ $(OBJS) $(LIB)
 
 .SUFFIXES: .cc
 %.o : %.cc

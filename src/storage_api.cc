@@ -102,7 +102,7 @@ void storage_init()
     return;
 }
 
-int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
+int32_t storage_open(char *stream_info, uint32_t size, int flags, int32_t *id)
 {
     assert(stream_info != NULL);
     assert(flags == 0 || flags == 1);
@@ -126,12 +126,12 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id)
     return 0;
 }
 
-int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info)
+int32_t storage_write(const int32_t id, FRAME_INFO_T *frame_info)
 {
     return store_client_center->WriteFrame(id, frame_info);
 }
 
-int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, const UTIME_T *end, 
+int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, const UTIME_T *end, 
         FRAGMENT_INFO_T **frag_info, uint32_t *count)
 {
     int32_t ret;
@@ -174,18 +174,18 @@ int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_t count
     return 0;
 }
 
-int32_t storage_seek(const uint32_t id, const UTIME_T *stamp)
+int32_t storage_seek(const int32_t id, const UTIME_T *stamp)
 {
     UTime time_stamp(stamp->seconds, stamp->nseconds);
     return store_client_center->SeekRead(id, time_stamp);
 }
 
-int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info)
+int32_t storage_read(const int32_t id, FRAME_INFO_T *frame_info)
 {
     return store_client_center->ReadFrame(id, frame_info);
 }
 
-void storage_close(const uint32_t id)
+void storage_close(const int32_t id)
 {
     int32_t ret;
     int flag;

@@ -47,7 +47,7 @@ int32_t RecordFile::OpenFd(bool for_write)
 
 int32_t RecordFile::Clear()
 {
-    Log(logger_, "clear record file index memory info");
+    //Log(logger_, "clear record file index memory info");
 
     if (this->write_fd_ >= 0)
     {
@@ -129,9 +129,9 @@ int32_t RecordFile::ZeroRecordFileTimes()
 
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
 {
-    Log(logger_, "encode record file info index, stream info is %s, record_fragment_count_ is %d, start_time is %d.%d, end_time is %d.%d, \
-record_offset_ is %d", stream_info_.c_str(), record_fragment_count_, start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec,
-end_time_.tv_nsec, record_offset_);
+//    Log(logger_, "encode record file info index, stream info is %s, record_fragment_count_ is %d, start_time is %d.%d, end_time is %d.%d, \
+//record_offset_ is %d", stream_info_.c_str(), record_fragment_count_, start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec,
+//end_time_.tv_nsec, record_offset_);
 
     struct RecordFileInfo record_file_info;
     char *temp = record_file_info_buffer;
@@ -184,7 +184,7 @@ end_time_.tv_nsec, record_offset_);
 
 int32_t RecordFile::DecodeRecordFileInfoIndex(char *buffer, uint32_t length)
 {
-    Log(logger_, "decode record file info index, length is %d", length);
+    //Log(logger_, "decode record file info index, length is %d", length);
     assert(buffer != NULL);
 
     char *temp = NULL;
@@ -228,18 +228,18 @@ int32_t RecordFile::DecodeRecordFileInfoIndex(char *buffer, uint32_t length)
 
     assert(temp <= buffer + length);
 
-    Log(logger_, "decode record file ok. stream info: %s, record_fragment_count: %d, start_time: %d.%d, end_time: %d.%d, \
-i_frame_start_time: %d.%d, i_frame_end_time: %d.%d, record_offset_: %d", stream_info_.c_str(), record_fragment_count_, 
-    start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec, end_time_.tv_nsec, i_frame_start_time_.tv_sec, 
-    i_frame_start_time_.tv_nsec, i_frame_end_time_.tv_sec, i_frame_end_time_.tv_nsec, record_offset_);
+//    Log(logger_, "decode record file ok. stream info: %s, record_fragment_count: %d, start_time: %d.%d, end_time: %d.%d, \
+//i_frame_start_time: %d.%d, i_frame_end_time: %d.%d, record_offset_: %d", stream_info_.c_str(), record_fragment_count_, 
+//    start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec, end_time_.tv_nsec, i_frame_start_time_.tv_sec, 
+//    i_frame_start_time_.tv_nsec, i_frame_end_time_.tv_sec, i_frame_end_time_.tv_nsec, record_offset_);
 
     return 0;
 }
 
 int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uint32_t record_frag_info_length)
 {
-    Log(logger_, "encode record frag info index, start time: %d.%d, end time: %d.%d, frag start offset: %d, frag end offset: %d", 
-        frag_start_time_.tv_sec, frag_start_time_.tv_nsec, frag_end_time_.tv_sec, frag_end_time_.tv_nsec, frag_start_offset_, record_offset_);
+//    Log(logger_, "encode record frag info index, start time: %d.%d, end time: %d.%d, frag start offset: %d, frag end offset: %d", 
+//        frag_start_time_.tv_sec, frag_start_time_.tv_nsec, frag_end_time_.tv_sec, frag_end_time_.tv_nsec, frag_start_offset_, record_offset_);
 
     struct RecordFragmentInfo record_frag_info;
     char *temp = record_frag_info_buffer;
@@ -310,9 +310,9 @@ int32_t RecordFile::DecodeRecordFragInfoIndex(char *buffer, uint32_t length, Rec
     frag_info.frag_end_offset = DecodeFixed32(temp);
     temp += 4;
 
-    Log(logger_, "decode record frag info index, time start %d.%d, end %d.%d. offset start %d, end %d",
-        frag_info.start_time.tv_sec, frag_info.start_time.tv_nsec, frag_info.end_time.tv_sec, frag_info.end_time.tv_nsec,
-        frag_info.frag_start_offset, frag_info.frag_end_offset);
+    //Log(logger_, "decode record frag info index, time start %d.%d, end %d.%d. offset start %d, end %d",
+    //    frag_info.start_time.tv_sec, frag_info.start_time.tv_nsec, frag_info.end_time.tv_sec, frag_info.end_time.tv_nsec,
+    //    frag_info.frag_start_offset, frag_info.frag_end_offset);
     assert(temp <= buffer + length);
     
     return 0;
@@ -366,7 +366,7 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 
 int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
-    Log(logger_, "get all record frag info index");
+    //Log(logger_, "get all record frag info index");
 
     int32_t ret;
 
@@ -374,7 +374,7 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
     ret = GetAllFragInfoEx(temp_queue);
     assert(ret == 0);
 
-    Log(logger_, "size of temp_queue is %d", temp_queue.size());
+    //Log(logger_, "size of temp_queue is %d", temp_queue.size());
 
     while(!temp_queue.empty())
     {
@@ -423,8 +423,8 @@ int32_t RecordFile::DecodeHeader(char *header, FRAME_INFO_T *frame)
     frame->size = DecodeFixed32(temp);
     temp += 4;
 
-    Log(logger_, "decode header ok, type %d, frame time %d.%d, stamp %d, size %d", frame->type, 
-    frame->frame_time.seconds, frame->frame_time.nseconds, frame->stamp, frame->size);
+    //Log(logger_, "decode header ok, type %d, frame time %d.%d, stamp %d, size %d", frame->type, 
+    //frame->frame_time.seconds, frame->frame_time.nseconds, frame->stamp, frame->size);
     return 0;
 }
 
@@ -461,7 +461,7 @@ int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start
 int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "read frame");
+    //Log(logger_, "read frame");
 
     int ret = 0;
 
@@ -490,23 +490,23 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     return 0;
 }
 
-bool RecordFile::CheckRecycle()
+bool RecordFile::CanRecycle()
 {
-    Log(logger_, "check recycle");
+    //Log(logger_, "check recycle");
 
     RWLock::RDLocker locker(rwlock_);
-    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == true)
+    if (read_fd_ < 0 && write_fd_ < 0 && locked_ == false)
     {
-        return false;
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_file_info_length, char *record_frag_info_buffer,
                                 uint32_t record_frag_info_length, uint32_t *record_frag_number)
 {
-    Log(logger_, "build index");
+    //Log(logger_, "build index");
 
     RWLock::RDLocker locker(rwlock_);
     if (had_frame_ == false)
@@ -526,7 +526,7 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     int ret;
     bool open_fd = false;
 
-    Log(logger_, "write file %srecord_%05d, offset is %d, length is %d", base_name_.c_str(), number_, record_offset_, length);
+    //Log(logger_, "write file %srecord_%05d, offset is %d, length is %d", base_name_.c_str(), number_, record_offset_, length);
 
     RWLock::WRLocker lock(rwlock_);
 
@@ -562,15 +562,15 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
         had_frame_ = true;
     }
 
-    Log(logger_, "write file %srecord_%05d ok, record offset is %d, write length is %d",
-                        base_name_.c_str(), number_, record_offset_, length);
+    //Log(logger_, "write file %srecord_%05d ok, record offset is %d, write length is %d",
+    //                    base_name_.c_str(), number_, record_offset_, length);
 
     return 0;
 }
 
 int32_t RecordFile::FinishWrite()
 {
-    Log(logger_, "finish write");
+    //Log(logger_, "finish write");
     
     RWLock::WRLocker lock(rwlock_);
     if (write_fd_ > 0)
@@ -590,7 +590,7 @@ int32_t RecordFile::FinishWrite()
 
 int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, uint32_t &seek_end_offset)
 {
-    Log(logger_, "get stamp offset");
+    //Log(logger_, "get stamp offset");
     int32_t ret = 0;
     uint32_t frag_start_offset = 0;
     uint32_t frag_end_offset = 0;
@@ -655,7 +655,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
 
 int32_t RecordFile::FinishRead()
 {
-    Log(logger_, "finish read");
+    //Log(logger_, "finish read");
 
     RWLock::WRLocker lock(rwlock_);
     read_count_--;

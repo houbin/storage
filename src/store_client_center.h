@@ -30,22 +30,25 @@ private:
     map<UTime, RecordFile*> record_file_map_;
     map<RecordFile*, map<UTime, RecordFile*>::iterator> file_search_map_;
 
+    int32_t FindStampRecordFile(UTime &stamp, RecordFile **record_file);
+    int32_t SelectFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, deque<FRAGMENT_INFO_T> &select_frag_info);
+    int32_t SelectFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info);
+    int32_t SelectFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info);
+    int32_t SelectAllFragInfo(deque<FRAGMENT_INFO_T> &all_frag_info, deque<FRAGMENT_INFO_T> &select_frag_info);
+
+    void Dump();
+
 public:
     RecordFileMap(Logger *logger);
-    bool IsEmpty();
 
-    int32_t GetRecordFile(UTime &time, RecordFile **record_file);
+    bool Empty();
+
     int32_t ListRecordFragments(UTime &time, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
     int32_t GetLastRecordFile(RecordFile **record_file);
     int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     int32_t EraseRecordFile(RecordFile *record_file);
 
-    int32_t GetFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &start);
-    int32_t GetFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &start, UTime &end);
-    int32_t GetFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file, UTime &end);
-    int32_t GetFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue, RecordFile *record_file);
-
-    void Dump();
+    int32_t SeekStampOffset(UTime &stamp, RecordFile **record_file, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
 
     void Shutdown();
 };
@@ -128,7 +131,7 @@ private:
     RecordWriter writer;
 
     Mutex reader_mutex_;
-    map<uint32_t, RecordReader*> record_readers_;
+    map<int32_t, RecordReader*> record_readers_;
 
 public:
     StoreClient(Logger *logger, string stream_info);
@@ -136,18 +139,18 @@ public:
     bool IsRecordFileEmpty();
     string GetStreamInfo();
 
-    int32_t OpenWrite(uint32_t id);
+    int32_t OpenWrite(int32_t id);
     int32_t EnqueueFrame(FRAME_INFO_T *frame);
-    int32_t CloseWrite(uint32_t id);
+    int32_t CloseWrite(int32_t id);
 
-    int32_t OpenRead(uint32_t id);
-    int32_t SeekRead(uint32_t id, UTime &stamp);
-    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
-    int32_t CloseRead(uint32_t id);
+    int32_t OpenRead(int32_t id);
+    int32_t SeekRead(int32_t id, UTime &stamp);
+    int32_t ReadFrame(int32_t id, FRAME_INFO_T *frame);
+    int32_t CloseRead(int32_t id);
 
     int32_t GetFreeFile(UTime &time, RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
-    int32_t GetRecordFile(UTime &stamp, RecordFile **record_file);
+    int32_t SeekReaderStampOffset(UTime &stamp, RecordFile **record_file, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
     int32_t PutRecordFile(UTime &stamp, RecordFile *record_file);
     int32_t RecycleRecordFile(RecordFile *record_file);
 
@@ -203,19 +206,19 @@ public:
     StoreClientCenter(Logger *logger);
 
     int32_t Init();
-    int32_t Open(int flags, uint32_t id, string &stream_info);
-    int32_t Close(uint32_t id, int flag);
+    int32_t Open(int flags, int32_t id, string &stream_info);
+    int32_t Close(int32_t id, int flag);
     int32_t AddStoreClient(string &stream_info, StoreClient **client);
 
-    int32_t GetStoreClient(uint32_t id, StoreClient **client);
+    int32_t GetStoreClient(int32_t id, StoreClient **client);
     int32_t FindStoreClient(string stream_info, StoreClient **client);
     int32_t RemoveStoreClient(StoreClient *client);
 
-    int32_t WriteFrame(uint32_t id, FRAME_INFO_T *frame);
-    int32_t SeekRead(uint32_t id, UTime &stamp);
-    int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
+    int32_t WriteFrame(int32_t id, FRAME_INFO_T *frame);
+    int32_t SeekRead(int32_t id, UTime &stamp);
+    int32_t ReadFrame(int32_t id, FRAME_INFO_T *frame);
 
-    int32_t ListRecordFragments(uint32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
+    int32_t ListRecordFragments(int32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t StartRecycle();

@@ -72,7 +72,7 @@ extern void storage_init();
  *          
  * 返回： 成功返回0，失败返回负数
  */
-extern int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_t *id);
+extern int32_t storage_open(char *stream_info, uint32_t size, int flags, int32_t *id);
 
 /* 功能： 通过id写入数据，
  * 输入：   id          操作的流id
@@ -80,7 +80,7 @@ extern int32_t storage_open(char *stream_info, uint32_t size, int flags, uint32_
  *
  * 返回： 成功返回0，失败返回负数
  */
-extern int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info);
+extern int32_t storage_write(const int32_t id, FRAME_INFO_T *frame_info);
 
 /* 功能： 获取指定时间段的录像段信息列表
  * 输入：   id          操作的视频流id
@@ -93,7 +93,7 @@ extern int32_t storage_write(const uint32_t id, FRAME_INFO_T *frame_info);
  *
  * 返回： 成功返回0，失败返回负数
  */
-extern int32_t storage_list_record_fragments(const uint32_t id, const UTIME_T *start, const UTIME_T *end, FRAGMENT_INFO_T **frag_info, uint32_t *count);
+extern int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, const UTIME_T *end, FRAGMENT_INFO_T **frag_info, uint32_t *count);
 
 /* 功能： 释放录像段内存
  * 输入：   frag_info   录像段数组头指针
@@ -109,7 +109,7 @@ extern int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_
  *
  * 返回： 成功返回0，失败返回负数
  */
-extern int32_t storage_seek(const uint32_t id, const UTIME_T *stamp);
+extern int32_t storage_seek(const int32_t id, const UTIME_T *stamp);
 
 /* 功能： 读取视频流数据
  * 输入：   id      操作的视频流id
@@ -118,7 +118,7 @@ extern int32_t storage_seek(const uint32_t id, const UTIME_T *stamp);
  *           
  * 返回： 读取的字节数（0表示没有读到数据），失败返回负数
  */
-extern int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info);
+extern int32_t storage_read(const int32_t id, FRAME_INFO_T *frame_info);
 
 /* 功能： 关闭视频流id
  * 输入：   id 需要关闭的视频流操作id
@@ -126,7 +126,7 @@ extern int32_t storage_read(const uint32_t id, FRAME_INFO_T *frame_info);
  * 输出：   无
  * 返回：   无
  */
-extern void storage_close(const uint32_t id);
+extern void storage_close(const int32_t id);
 
 /* 功能： 关闭storage模块
  * 输入：

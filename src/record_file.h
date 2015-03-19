@@ -50,7 +50,7 @@ public:
     RecordFile(Logger *logger, string base_name, uint32_t number);
 
     int32_t OpenFd(bool for_write);
-    bool CheckRecycle();
+    bool CanRecycle();
     int32_t Clear();
     int32_t UpdateTimes(BufferTimes &update);
     int32_t ZeroRecordFileTimes();

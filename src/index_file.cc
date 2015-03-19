@@ -117,7 +117,7 @@ int32_t IndexFile::AnalyzeAllEntry()
 
 int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
-    Log(logger_, "write file %sindex, offset is %d, length is %d", base_name_.c_str(), offset, length);
+    //Log(logger_, "write file %sindex, offset is %d, length is %d", base_name_.c_str(), offset, length);
     int ret = 0;
 
     Mutex::Locker lock(mutex_);
@@ -130,14 +130,14 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
         assert(ret == (int)length);
     }
     fflush(index_file_);
-    Log(logger_, "index write file %sindex ok, offset is %d, length is %d", base_name_.c_str(), offset, length);
+    //Log(logger_, "index write file %sindex ok, offset is %d, length is %d", base_name_.c_str(), offset, length);
 
     return 0;
 }
 
 int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 {
-    Log(logger_, "read length is %d, offset is %d", length, offset);
+    //Log(logger_, "read length is %d, offset is %d", length, offset);
     int ret;
 
     Mutex::Locker lock(mutex_);
@@ -151,14 +151,14 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
         assert(ret == (int)length);
     }
 
-    Log(logger_, "index file read, length is %d, offset is %d", length, offset);
+    //Log(logger_, "index file read, length is %d, offset is %d", length, offset);
 
     return 0;
 }
 
 int32_t IndexFile::Shutdown()
 {
-    Log(logger_, "shutdown");
+    //Log(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
     fclose(index_file_);
