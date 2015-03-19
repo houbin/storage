@@ -187,7 +187,7 @@ int32_t RecordFileMap::SelectAllFragInfo(deque<FRAGMENT_INFO_T> &all_frag_info, 
     return 0;
 }
 
-// need read lock
+// need read lock before call this function
 void RecordFileMap::Dump()
 {
     Log(logger_, "dump all record file in map");
@@ -302,8 +302,6 @@ int32_t RecordFileMap::GetLastRecordFile(RecordFile **record_file)
 int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
 {
     assert(record_file != NULL);
-    //Log(logger_, "push back record file, time %d.%d, base name is %s, number is %d", 
-     //   time.tv_sec, time.tv_nsec, record_file->base_name_.c_str(), record_file->number_);
 
     pair<map<UTime, RecordFile*>::iterator, bool> ret;
 
@@ -320,9 +318,55 @@ int32_t RecordFileMap::PutRecordFile(UTime &time, RecordFile *record_file)
     return 0;
 }
 
+int32_t RecordFileMap::OpenWriteRecordFile(RecordFile **record_file)
+{
+    assert(record_file != NULL);
+    int32_t ret;
+
+    RWLock::RDLocker locker(rwlock_);
+
+    map<UTime, RecordFile*>::reverse_iterator riter = record_file_map_.rbegin();
+    if (riter == record_file_map_.rend())
+    {
+        return -ERR_ITEM_NOT_FOUND;
+    }
+
+    *record_file = riter->second;
+    
+    ret = (*record_file)->OpenFd(true);
+    assert(ret == 0);
+
+    return 0;
+}
+
+int32_t RecordFile::AllocWriteRecordFile(UTime &stamp, RecordFile **record_file)
+{
+    assert(record_file != NULL);
+    int32_t ret;
+    pair<map<UTime, RecordFile*>::iterator, bool> ret;
+
+    RWLock::WRLocker lock(rwlock_);
+
+    ret = store_client_->GetFreeFile(stamp, record_file);
+    assert(ret == 0);
+
+    ret = record_file_map_.insert(make_pair(time, record_file));
+    if (ret.second == false)
+    {
+        assert("record file already exist" == 0);
+    }
+
+    map<UTime, RecordFile*>::iterator iter = ret.first;
+    file_search_map_.insert(make_pair(record_file, iter));
+
+    ret = (*record_file)->OpenFd(true);
+    assert(ret == 0);
+
+    return 0;
+}
+
 int32_t RecordFileMap::EraseRecordFile(RecordFile *record_file)
 {
-    //Log(logger_, "erase record file, record file is %p", record_file);
     RWLock::WRLocker locker(rwlock_);
 
     bool can_recycle = record_file->CanRecycle();
@@ -395,7 +439,6 @@ current_o_frame_(NULL), write_index_event_(NULL), stop_(false)
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
 {
     assert(write_op != NULL);
-    //Log(logger_, "writer enqueue write_op %p, seq is %d", write_op, kOpSeq++);
 
     Mutex::Locker lock(queue_mutex_);
     if (stop_)
@@ -413,7 +456,6 @@ int32_t RecordWriter::Enqueue(WriteOp *write_op)
 int32_t RecordWriter::Dequeue(WriteOp **write_op)
 {
     assert(write_op != NULL);
-   // Log(logger_, "writer dequeue write_op");
 
     *write_op = write_op_queue_.front();
     write_op_queue_.pop_front();
@@ -421,10 +463,9 @@ int32_t RecordWriter::Dequeue(WriteOp **write_op)
     return 0;
 }
 
-int32_t RecordWriter::EncodeHeader(char *header, FRAME_INFO_T *frame)
+int32_t RecordWriter::EncodeFrameHeader(char *header, FRAME_INFO_T *frame)
 {
     assert(header != NULL && frame != NULL);
-    Log(logger_, "encode header, header is %p, frame is %p", header, frame);
     char *temp = header;
 
     EncodeFixed32(temp, kMagicCode);
@@ -451,13 +492,12 @@ int32_t RecordWriter::EncodeHeader(char *header, FRAME_INFO_T *frame)
 int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *temp_buffer)
 {
     assert(frame != NULL);
-    Log(logger_, "encode frame, add_o_frame is %d, frame is %p", add_o_frame, frame);
 
     uint32_t write_offset = 0;
     if (add_o_frame)
     {
         char header[kHeaderSize] = {0}; 
-        EncodeHeader(header, current_o_frame_); 
+        EncodeFrameHeader(header, current_o_frame_); 
 
         memcpy(temp_buffer, header, kHeaderSize);
         write_offset += kHeaderSize;
@@ -466,7 +506,7 @@ int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *t
     }
 
     char header[kHeaderSize] = {0}; 
-    EncodeHeader(header, frame); 
+    EncodeFrameHeader(header, frame); 
 
     memcpy(temp_buffer + write_offset, header, kHeaderSize);
     write_offset += kHeaderSize;
@@ -478,8 +518,6 @@ int32_t RecordWriter::EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *t
 
 int32_t RecordWriter::UpdateBufferTimes(uint32_t type, UTime &time)
 {
-    Log(logger_, "update buffer times");
-
     if (buffer_times_.start_time == 0)
     {
         buffer_times_.start_time = time;
@@ -503,15 +541,12 @@ int32_t RecordWriter::UpdateBufferTimes(uint32_t type, UTime &time)
     return 0;
 }
 
-int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length)
+int32_t RecordWriter::WriteBuffer(uint32_t write_length)
 {
-    assert(record_file != NULL);
-    Log(logger_, "write buffer, write_length is %d, record file base name is %s, number is %d", 
-            write_length, record_file->base_name_.c_str(), record_file->number_);
-
+    assert(record_file_ != NULL);
     int32_t ret;
 
-    ret = record_file->Append(buffer_, write_length, buffer_times_);
+    ret = record_file_->Append(buffer_, write_length, buffer_times_);
     assert(ret == 0);
 
     memset(buffer_, 0, kBlockSize);
@@ -521,13 +556,12 @@ int32_t RecordWriter::WriteBuffer(RecordFile *record_file, uint32_t write_length
     return 0;
 }
 
-int32_t RecordWriter::BuildRecordFileIndex(RecordFile *record_file, char *record_file_info_buffer, uint32_t record_file_info_length,
+int32_t RecordWriter::BuildRecordFileIndex(char *record_file_info_buffer, uint32_t record_file_info_length,
                             char *record_frag_info_buffer, uint32_t record_frag_info_length, uint32_t *record_flag_info_number)
 {
-    Log(logger_, "build record file index");
-    assert(record_file != NULL);
+    assert(record_file_ != NULL);
 
-    return record_file->BuildIndex(record_file_info_buffer, record_file_info_length, 
+    return record_file_->BuildIndex(record_file_info_buffer, record_file_info_length, 
                                     record_frag_info_buffer, record_frag_info_length, record_flag_info_number);
 }
 
@@ -806,8 +840,9 @@ FreeResource:
 void RecordWriter::Start()
 {
     Log(logger_, "Start");
+    int32_t ret = 0;
 
-    /* alloc */
+    record_file_ = NULL;
     buffer_ = new char[kBlockSize];
     assert(buffer_ != NULL);
     write_offset_ = 0;
@@ -908,7 +943,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 
     if (record_file_ == NULL)
     {
-        return -ERR_SEEK_ERROR;
+        return -ERR_SEEK_FAILED;
     }
 
     while(read_offset_ < read_end_offset_)
@@ -916,33 +951,35 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
         ret = record_file_->ReadFrame(read_offset_, frame);
         if (ret != 0)
         {
+            Log(logger_, "read frame error, read_offset %d, ret %d", read_offset_, ret);
             return ret;
         }
 
         if (frame->type == JVN_DATA_O)
         {
-            if (current_o_frame_.type == JVN_DATA_O)
-            {
-                /* o frame no change */
-                if ((current_o_frame_.size == frame->size)
-                    && (memcmp(current_o_frame_.buffer, frame->buffer, frame->size)) == 0)
-                {
-                    read_offset_ += kHeaderSize;
-                    read_offset_ += frame->size;
-                    continue;
-                }
-            }
+           /* o frame no change */
+           if ((current_o_frame_.type == JVN_DATA_O)
+               && (current_o_frame_.size == frame->size)
+               && (memcmp(current_o_frame_.buffer, frame->buffer, frame->size)) == 0)
+           {
+               Log(logger_, "o frame not changed, so skip this o frame");
+               read_offset_ += kHeaderSize;
+               read_offset_ += frame->size;
+               continue;
+           }
             
             /* o frame have change */
             current_o_frame_.type = frame->type;
-            current_o_frame_.frame_time.seconds = frame->frame_time.seconds;
-            current_o_frame_.frame_time.nseconds = frame->frame_time.nseconds;
+            current_o_frame_.frame_time = frame->frame_time;
             current_o_frame_.stamp = frame->stamp;
             current_o_frame_.size = frame->size;
-            safe_free(current_o_frame_.buffer);
-            current_o_frame_.buffer = (char *)malloc(frame->size);
-            assert(current_o_frame_.buffer != NULL);
+            if (current_o_frame_.buffer == NULL)
+            {
+                current_o_frame_.buffer = (char *)malloc(frame->size);
+                assert(current_o_frame_.buffer != NULL);
+            }
             memcpy(current_o_frame_.buffer, frame->buffer, frame->size);
+            Log(logger_, "o frame changed");
         }
 
         break;
@@ -951,7 +988,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
     if (read_offset_ >= read_end_offset_)
     {
         Log(logger_, "read offset %d, read end offset %d", read_offset_, read_end_offset_);
-        return -ERR_READ_REACH_TO_END;
+        return -ERR_READ_OVER_THAN_END_OFFSET;
     }
 
     /* return frame */

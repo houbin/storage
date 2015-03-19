@@ -36,6 +36,7 @@ private:
     int32_t SelectFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info);
     int32_t SelectAllFragInfo(deque<FRAGMENT_INFO_T> &all_frag_info, deque<FRAGMENT_INFO_T> &select_frag_info);
 
+    int32_t PutRecordFile(UTime &time, RecordFile *record_file);
     void Dump();
 
 public:
@@ -43,11 +44,14 @@ public:
 
     bool Empty();
 
+    /* these functions juest get or put record file */
     int32_t ListRecordFragments(UTime &time, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
     int32_t GetLastRecordFile(RecordFile **record_file);
-    int32_t PutRecordFile(UTime &time, RecordFile *record_file);
-    int32_t EraseRecordFile(RecordFile *record_file);
 
+    /* these functions change states of record file */
+    int32_t OpenWriteRecordFile(RecordFile **record_file);
+    int32_t AllocWriteRecordFile(UTime &stamp, RecordFile **record_file);
+    int32_t EraseRecordFile(RecordFile *record_file);
     int32_t SeekStampOffset(UTime &stamp, RecordFile **record_file, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
 
     void Shutdown();
@@ -66,6 +70,7 @@ private:
     Cond queue_cond_;
     deque<WriteOp*> write_op_queue_;
 
+    RecordFile *record_file_;
     char *buffer_;
     uint32_t write_offset_;
     BufferTimes buffer_times_;
@@ -82,7 +87,7 @@ public:
     int32_t Enqueue(WriteOp *write_op);
     int32_t Dequeue(WriteOp **write_op);
 
-    int32_t EncodeHeader(char *buffer, FRAME_INFO_T *frame);
+    int32_t EncodeFrameHeader(char *buffer, FRAME_INFO_T *frame);
     int32_t EncodeFrame(bool add_o_frame, FRAME_INFO_T *frame, char *temp_buffer);
     int32_t UpdateBufferTimes(uint32_t type, UTime &time);
     int32_t WriteBuffer(RecordFile *record_file, uint32_t write_length);

@@ -24,7 +24,7 @@
 #define ERR_REACH_READ_THREHOLD     3002
 #define ERR_RECORD_NO_WRITE         3003
 #define ERR_NO_MAGIC_CODE           3004
-#define ERR_SEEK_ERROR              3005
+#define ERR_SEEK_FAILED             3005
 #define ERR_READ_REACH_TO_END       3006
 #define ERR_CRC_CHECK               3007
 #define ERR_STAMP_TOO_SMALL         3008
@@ -32,6 +32,7 @@
 #define ERR_TABLE_IS_EMPTY          3010
 #define ERR_NO_ITEM_FOUND           3011
 #define ERR_RECORD_FILE_BUSY        3012
+#define ERR_READ_OVER_THAN_END_OFFSET 3013
 
 
 #endif

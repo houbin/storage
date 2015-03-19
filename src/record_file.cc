@@ -33,11 +33,13 @@ int32_t RecordFile::OpenFd(bool for_write)
 
     if (for_write)
     {
+        assert(write_fd_ < 0);
         write_fd_ = open(record_file_path.c_str(), O_WRONLY);
         assert(write_fd_ >= 0);
     }
     else
     {
+        assert(read_fd_ < 0);
         read_fd_ = open(record_file_path.c_str(), O_RDONLY);
         assert(read_fd_ >= 0);
     }
