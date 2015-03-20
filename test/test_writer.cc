@@ -147,7 +147,7 @@ void *FrameWriter::Entry()
     int ret = 0;
     int type = 0;
     int length = 0;
-    uint32_t temp_op_id = 0;
+    int32_t temp_op_id = 0;
     
     for (int i = 0; i < 1000000; i++)
     {
@@ -155,7 +155,7 @@ void *FrameWriter::Entry()
         {
             ret = storage_open(stream_info_, 64, 1, &temp_op_id);
             assert (ret == 0);
-            op_id_ = (int32_t)temp_op_id;
+            op_id_ = temp_op_id;
             //fprintf(stderr, "storage open id %d\n", op_id_);
 
             WriteOFrame();

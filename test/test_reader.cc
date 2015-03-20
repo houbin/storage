@@ -101,7 +101,7 @@ void *FrameReader::Entry()
 
         if (op_id_ < 0)
         {
-            uint32_t temp;
+            int32_t temp;
             ret = storage_open(stream_info_, 64, 0, &temp);
             if (ret == -ERR_ITEM_NOT_FOUND)
             {
@@ -109,7 +109,7 @@ void *FrameReader::Entry()
                 continue;
             }
 
-            op_id_ = (int32_t)temp;
+            op_id_ = temp;
         }
 
         GenerateListRangeTime(start, end);

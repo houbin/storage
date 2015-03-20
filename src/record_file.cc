@@ -18,7 +18,7 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"), write_fd_(-1), read_fd_(-1), read_count_(0),
-locked_(false), had_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
+locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
 }
@@ -36,6 +36,11 @@ int32_t RecordFile::OpenFd(bool for_write)
         assert(write_fd_ < 0);
         write_fd_ = open(record_file_path.c_str(), O_WRONLY);
         assert(write_fd_ >= 0);
+        
+        lseek(write_fd_, record_offset_, SEEK_SET);
+        record_fragment_count_ += 1;
+        assert(record_fragment_count_ <= 256);
+        frag_start_offset_ = record_offset_;
     }
     else
     {
@@ -69,7 +74,7 @@ int32_t RecordFile::Clear()
     temp.swap(this->stream_info_);
 
     this->locked_ = false;
-    this->had_frame_ = false;
+    this->have_write_frame_ = false;
     this->record_fragment_count_ = 0;
     UTime time_zero(0, 0);
     frag_start_time_ = time_zero;
@@ -245,7 +250,7 @@ int32_t RecordFile::EncodeRecordFragInfoIndex(char *record_frag_info_buffer, uin
 
     struct RecordFragmentInfo record_frag_info;
     char *temp = record_frag_info_buffer;
-    
+
     uint32_t length = record_frag_info_length - sizeof(record_frag_info.length) - sizeof(record_frag_info.crc);
     EncodeFixed32(temp, length);
     temp += sizeof(record_frag_info.length);
@@ -463,7 +468,6 @@ int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start
 int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    //Log(logger_, "read frame");
 
     int ret = 0;
 
@@ -511,7 +515,7 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
     //Log(logger_, "build index");
 
     RWLock::RDLocker locker(rwlock_);
-    if (had_frame_ == false)
+    if (have_write_frame_ == false)
     {
         return -ERR_RECORD_NO_WRITE;
     }
@@ -526,26 +530,8 @@ int32_t RecordFile::BuildIndex(char *record_file_info_buffer, uint32_t record_fi
 int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &update)
 {
     int ret;
-    bool open_fd = false;
-
-    //Log(logger_, "write file %srecord_%05d, offset is %d, length is %d", base_name_.c_str(), number_, record_offset_, length);
 
     RWLock::WRLocker lock(rwlock_);
-
-    if (write_fd_ < 0)
-    {
-        int32_t ret = OpenFd(true);
-        assert(ret == 0);
-        lseek(write_fd_, record_offset_, SEEK_SET);
-
-        record_fragment_count_ += 1;
-        assert(record_fragment_count_ <= 256);
-
-        // update start and end offset, zero times
-        frag_start_offset_ = record_offset_;
-
-        open_fd = true;
-    }
 
     ret = write(write_fd_, write_buffer, length);
     if (ret != length)
@@ -556,24 +542,14 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 
     fdatasync(write_fd_);
     UpdateTimes(update);
-
     record_offset_ += length;
-
-    if (open_fd)
-    {
-        had_frame_ = true;
-    }
-
-    //Log(logger_, "write file %srecord_%05d ok, record offset is %d, write length is %d",
-    //                    base_name_.c_str(), number_, record_offset_, length);
+    have_write_frame_ = true;
 
     return 0;
 }
 
 int32_t RecordFile::FinishWrite()
 {
-    //Log(logger_, "finish write");
-    
     RWLock::WRLocker lock(rwlock_);
     if (write_fd_ > 0)
     {
@@ -581,18 +557,15 @@ int32_t RecordFile::FinishWrite()
         write_fd_ = -1;
     }
 
-    had_frame_ = false;
-
-    UTime temp(0, 0);
-    frag_start_time_ = temp;
-    frag_end_time_ = temp;
+    have_write_frame_ = false;
+    frag_start_time_ = 0;
+    frag_end_time_ = 0;
 
     return 0;
 }
 
 int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, uint32_t &seek_end_offset)
 {
-    //Log(logger_, "get stamp offset");
     int32_t ret = 0;
     uint32_t frag_start_offset = 0;
     uint32_t frag_end_offset = 0;
@@ -616,6 +589,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         {
             return -ERR_ITEM_NOT_FOUND;
         }
+
     }
     
     seek_end_offset = frag_end_offset;
@@ -657,8 +631,6 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
 
 int32_t RecordFile::FinishRead()
 {
-    //Log(logger_, "finish read");
-
     RWLock::WRLocker lock(rwlock_);
     read_count_--;
     assert(read_count_ >= 0);

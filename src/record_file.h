@@ -32,7 +32,7 @@ public:
     string stream_info_;
     bool locked_;
 
-    bool had_frame_;
+    bool have_write_frame_;
 
     uint16_t record_fragment_count_;
 
