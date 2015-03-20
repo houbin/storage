@@ -21,8 +21,8 @@ int32_t FrameReader::GenerateListRangeTime(UTIME_T &start, UTIME_T &end)
     struct timeval now;
 
     /* 生成过去2小时的一段时间 */
-    int a = rand() % 28800;
-    int b = rand() % 28800;
+    int a = rand() % 1800;
+    int b = rand() % 1800;
 
     if (a > b)
     {
@@ -69,11 +69,11 @@ int32_t FrameReader::CheckFrame(FRAME_INFO_T *frame_info)
 
     if (actual_crc != expect_crc)
     {
+        fprintf(stderr, "id %d, frame type %d, time of frame %d.%d, seq %d\n", id_, frame_info->type, frame_info->frame_time.seconds,
+                frame_info->frame_time.nseconds, seq);
         return -ERR_CRC_CHECK_FAILED;
     }
 
-    //fprintf(stderr, "id %d, frame type %d, time of frame %d.%d, seq %d\n", id_, frame_info->type, frame_info->frame_time.seconds,
-     //   frame_info->frame_time.nseconds, seq);
 
     return 0;
 }

@@ -335,10 +335,16 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
     IndexFile *index_file = NULL; 
     ret = index_file_manager->Find(base_name_, &index_file); 
     assert(ret == 0); 
+
+    uint16_t read_index_file_frag_count = record_fragment_count_;
+    if (have_write_frame_)
+    {
+        read_index_file_frag_count -= 1;
+    }
     
     uint32_t file_counts = index_file->GetFileCounts();
     uint32_t frag_info_offset = file_counts * sizeof(RecordFileInfo) + number_ * kStripeCount * sizeof(RecordFragmentInfo);
-    uint32_t frag_info_length = sizeof(RecordFragmentInfo) * record_fragment_count_;
+    uint32_t frag_info_length = sizeof(RecordFragmentInfo) * read_index_file_frag_count;
     
     char *record_frag_info_buffer = (char *)malloc(frag_info_length);
     assert(record_frag_info_buffer != NULL); 
@@ -350,8 +356,9 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
         Log(logger_, "index file read length is %d, offset is %d error", frag_info_length, frag_info_offset); 
         assert(ret != 0); 
     } 
+
     
-    for(int i = 0; i < record_fragment_count_; i++)
+    for(int i = 0; i < read_index_file_frag_count; i++)
     {
         RecordFragmentInfo temp_frag_info = {0};
         char *temp_buffer = record_frag_info_buffer + i * sizeof(RecordFragmentInfo);
@@ -359,12 +366,25 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
         ret = DecodeRecordFragInfoIndex(temp_buffer, sizeof(RecordFragmentInfo), temp_frag_info);
         if (ret == -ERR_CRC_CHECK)
         {
-            Log(logger_, "found crc check error, i is %d", i);
+            Log(logger_, "found crc check error, i %d, read_index_file_frag_count %d", i, read_index_file_frag_count);
             safe_free(record_frag_info_buffer);
             return 0;
         }
 
         frag_info_queue.push_back(temp_frag_info);
+    }
+
+    if (have_write_frame_)
+    {
+        RecordFragmentInfo temp_frag_info = {0};
+        temp_frag_info.start_time = frag_start_time_;
+        temp_frag_info.end_time = frag_end_time_;
+        temp_frag_info.frag_start_offset = frag_start_offset_;
+        temp_frag_info.frag_end_offset = record_offset_;
+
+        frag_info_queue.push_back(temp_frag_info);
+        Log(logger_, "have write frame, push (%d.%d, %d.%d) to frag info queue", frag_start_time_.tv_sec, frag_start_time_.tv_nsec, 
+                    frag_end_time_.tv_sec, frag_end_time_.tv_nsec);
     }
 
     safe_free(record_frag_info_buffer);

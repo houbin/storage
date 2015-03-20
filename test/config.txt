@@ -1,2 +1,2 @@
-frame_write_thread_count=0
+frame_write_thread_count=10
 frame_read_thread_count=1

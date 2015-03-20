@@ -12,8 +12,8 @@ uint64_t kOpSeq = 0;
 // ======================================================= //
 //                  record file map
 // ======================================================= //
-RecordFileMap::RecordFileMap(Logger *logger)
-: logger_(logger), rwlock_("RecordFileMap::rwlock")
+RecordFileMap::RecordFileMap(Logger *logger, StoreClient *store_client)
+: logger_(logger), store_client_(store_client), rwlock_("RecordFileMap::rwlock")
 {
 
 }
@@ -78,6 +78,8 @@ int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file
 
 int32_t RecordFileMap::SelectFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, deque<FRAGMENT_INFO_T> &select_frag_info)
 {
+    Log(logger_, "select frag info with start time %d.%d", start.tv_sec, start.tv_nsec);
+
     deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
     for(; iter != all_frag_info.end(); iter++)
     {
@@ -106,6 +108,8 @@ int32_t RecordFileMap::SelectFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &all_f
 int32_t RecordFileMap::SelectFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, UTime &end, 
                                                             deque<FRAGMENT_INFO_T> &select_frag_info)
 {
+    Log(logger_, "select frag info with start time %d.%d and end time %d.%d", start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
+
     deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
     for (; iter != all_frag_info.end(); iter++)
     {
@@ -154,6 +158,8 @@ int32_t RecordFileMap::SelectFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> 
 
 int32_t RecordFileMap::SelectFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info)
 {
+    Log(logger_, "select frag info with end time %d.%d", end.tv_sec, end.tv_nsec);
+
     deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
     for (; iter != all_frag_info.end(); iter++)
     {
@@ -176,6 +182,8 @@ int32_t RecordFileMap::SelectFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &all_fra
 
 int32_t RecordFileMap::SelectAllFragInfo(deque<FRAGMENT_INFO_T> &all_frag_info, deque<FRAGMENT_INFO_T> &select_frag_info)
 {
+    Log(logger_, "select all frag info");
+
     deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
     for (; iter != all_frag_info.end(); iter++)
     {
@@ -206,8 +214,6 @@ void RecordFileMap::Dump()
 
 int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
-    Log(logger_, "list record fragments from time %d.%d to %d.%d", start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
-
     int32_t ret;
     RecordFile *start_rf = NULL;
 
@@ -248,6 +254,18 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         deque<FRAGMENT_INFO_T> all_frag_info;
         ret = record_file->GetAllFragInfo(all_frag_info);
         assert (ret == 0);
+
+        /* debug: dump all frag info */
+        Log(logger_, "record file %srecord_%05d get all frag info, count is %d",
+                        record_file->base_name_.c_str(), record_file->number_, all_frag_info.size());
+        deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
+        int count = 0;
+        for (; iter != all_frag_info.end(); iter++)
+        {
+            FRAGMENT_INFO_T temp_frag = *iter;
+            Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, 
+                        temp_frag.start_time.seconds, temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
+        }
 
         /* start time landed in the record file */
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)
@@ -360,8 +378,10 @@ int32_t RecordFileMap::AllocWriteRecordFile(UTime &stamp, RecordFile **record_fi
     map<UTime, RecordFile*>::iterator iter = map_ret.first;
     file_search_map_.insert(make_pair(temp_file, iter));
 
-    ret = (*record_file)->OpenFd(true);
+    ret = temp_file->OpenFd(true);
     assert(ret == 0);
+
+    *record_file = temp_file;
 
     return 0;
 }
@@ -735,7 +755,7 @@ void *RecordWriter::Entry()
                 first_i_frame = true;
                 current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
                 current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
-                Log(logger_, "I frame, and already have O frame");
+                //Log(logger_, "I frame, and already have O frame");
             }
             else
             {
@@ -744,7 +764,7 @@ void *RecordWriter::Entry()
                     Log(logger_, "no I frame, continue");
                     goto FreeResource;
                 }
-                Log(logger_, "B or P frame");
+                //Log(logger_, "B or P frame");
             }
 
             if (add_o_frame)
@@ -864,9 +884,6 @@ FreeResource:
 
                 ret = WriteBuffer(kBlockSize);
                 assert(ret == 0);
-
-                DoWriteIndexEvent(false);
-                file_map_->FinishWriteRecordFile(record_file_);
             }
 
             break;
@@ -924,6 +941,8 @@ void RecordWriter::Stop()
     }
     safe_free(current_o_frame_);
 
+    DoWriteIndexEvent(false);
+    file_map_->FinishWriteRecordFile(record_file_);
     record_file_ = NULL;
 
     return;
@@ -1051,7 +1070,7 @@ void RecordReader::Shutdown()
 //                  store client
 // ======================================================= //
 StoreClient::StoreClient(Logger *logger, string stream_info)
-: logger_(logger), stream_info_(stream_info), record_file_map_(logger_), 
+: logger_(logger), stream_info_(stream_info), record_file_map_(logger_, this), 
  writer(logger_, &record_file_map_), reader_mutex_("StoreClient::read_mutex_")
 {
 
@@ -1224,9 +1243,7 @@ int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile *record_file)
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
 {
     Log(logger_, "recycle record file, record file is %p");
-    record_file_map_.EraseRecordFile(record_file);
-
-    return 0;
+    return record_file_map_.EraseRecordFile(record_file);
 }
 
 int32_t StoreClient::CloseRead(int32_t id)
@@ -1248,9 +1265,6 @@ int32_t StoreClient::CloseRead(int32_t id)
 
 int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
-    Log(logger_, "list record fragments, start is %d.%d, end is %d.%d",
-        start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec);
-    
     int32_t ret;
 
     ret = record_file_map_.ListRecordFragments(start, end, frag_info_queue);
@@ -1358,7 +1372,7 @@ int32_t StoreClientCenter::AddStoreClient(string &stream_info, StoreClient **cli
 int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
 {
     assert(client != NULL);
-    Log(logger_, "get store client, id is %d", id);
+    //Log(logger_, "get store client, id is %d", id);
 
     if (id >= MAX_STREAM_COUNTS)
     {
@@ -1451,7 +1465,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
 int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
+    //Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1522,23 +1536,12 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
     Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     Mutex::Locker lock(recycle_mutex_);
+
     RecycleItem recycle_item;
     recycle_item.store_client = store_client;
     recycle_item.record_file = record_file;
 
-    recycle_queue_.push_back(recycle_item);
-
-    return 0;
-}
-
-int32_t StoreClientCenter::StartRecycle()
-{
-    Log(logger_, "start to recycle");
-
-    Mutex::Locker lock(timer_lock);
-    C_Recycle *recycle_event = new C_Recycle(this);
-    assert(recycle_event != NULL);
-    timer.AddEventAfter(0, recycle_event);
+    recycle_queue_.insert(make_pair(record_file->end_time_, recycle_item));
 
     return 0;
 }
@@ -1547,11 +1550,10 @@ int32_t StoreClientCenter::Recycle()
 {
     uint32_t recycle_count = 0;
     int32_t ret = 0;
-    Log(logger_, "recycle");
 
     Mutex::Locker lock(recycle_mutex_);
     deque<RecycleItem>::iterator iter = recycle_queue_.begin();
-    while(iter != recycle_queue_.end() && recycle_count <= kFilesPerRecycle)
+    while(iter != recycle_queue_.end() && recycle_count >= kFilesPerRecycle)
     {
         RecycleItem recycle_item = *iter;
         RecordFile *record_file = recycle_item.record_file;

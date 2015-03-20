@@ -41,7 +41,7 @@ private:
     void Dump();
 
 public:
-    RecordFileMap(Logger *logger);
+    RecordFileMap(Logger *logger, StoreClient *store_client);
 
     bool Empty();
 
@@ -208,7 +208,8 @@ private:
     map<string, StoreClient*> client_search_map_;
     
     Mutex recycle_mutex_;
-    deque<RecycleItem> recycle_queue_;
+    // use recycle seq of record file as key
+    map<uint64_t, RecycleItem> recycle_queue_;
 
 public:
     Mutex timer_lock;
@@ -232,7 +233,6 @@ public:
     int32_t ListRecordFragments(int32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
 
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
-    int32_t StartRecycle();
     int32_t Recycle();
 
     void Shutdown();
