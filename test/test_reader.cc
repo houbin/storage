@@ -21,8 +21,8 @@ int32_t FrameReader::GenerateListRangeTime(UTIME_T &start, UTIME_T &end)
     struct timeval now;
 
     /* 生成过去2小时的一段时间 */
-    int a = rand() % 1800;
-    int b = rand() % 1800;
+    int a = rand() % 7200;
+    int b = rand() % 7200;
 
     if (a > b)
     {
@@ -145,6 +145,7 @@ void *FrameReader::Entry()
         read_start_time.seconds = rand_frag.start_time.seconds + read_rand_offset;
         read_start_time.nseconds = rand_frag.start_time.nseconds;
 
+        fprintf(stderr, "seek time is %d.%d", read_start_time.seconds, read_start_time.nseconds);
         ret = storage_seek(op_id_, &read_start_time);
         if (ret != 0)
         {

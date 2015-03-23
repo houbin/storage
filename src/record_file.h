@@ -47,6 +47,8 @@ public:
 
     uint32_t record_offset_;
 
+    uint64_t recycle_seq_;
+
     RecordFile(Logger *logger, string base_name, uint32_t number);
 
     int32_t OpenFd(bool for_write);

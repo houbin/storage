@@ -391,10 +391,19 @@ int32_t RecordFileMap::FinishWriteRecordFile(RecordFile *record_file)
     assert(record_file != NULL);
     int32_t ret;
 
-    RWLock::WRLocker lock(rwlock_);
+    // update record file in recycle queue
+    {
+        ret = store_client_center->UpdateRecordFileInRecycleQueue(store_client_, record_file);
+        assert(ret == 0);
+    }
 
-    ret = record_file->FinishWrite();
-    assert(ret == 0);
+    // finish write
+    {
+        RWLock::WRLocker lock(rwlock_);
+
+        ret = record_file->FinishWrite();
+        assert(ret == 0);
+    }
 
     return 0;
 }
@@ -1237,7 +1246,10 @@ int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile *record_file)
 {
     Log(logger_, "put record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
 
-    return record_file_map_.PutRecordFile(stamp, record_file);
+    record_file_map_.PutRecordFile(stamp, record_file);
+    store_client_center->AddToRecycleQueue(this, record_file);
+
+    return 0;
 }
 
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
@@ -1529,6 +1541,23 @@ int32_t StoreClientCenter::ListRecordFragments(int32_t id, UTime &start, UTime &
     return store_client->ListRecordFragments(start, end, frag_info_queue);
 }
 
+int32_t StoreClientCenter::UpdateRecordFileInRecycleQueue(StoreClient *store_client, RecordFile *record_file)
+{
+    assert(store_client != NULL);
+    assert(record_file != NULL);
+    Log(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+
+    int32_t ret;
+
+    ret = RemoveFromRecycleQueue(record_file);
+    assert (ret == 0);
+
+    ret = AddToRecycleQueue(store_client, record_file);
+    assert(ret == 0);
+
+    return 0;
+}
+
 int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)
 {
     assert(store_client != NULL);
@@ -1537,12 +1566,34 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
 
     Mutex::Locker lock(recycle_mutex_);
 
+    UTime end_time = record_file->end_time_;
+
     RecycleItem recycle_item;
     recycle_item.store_client = store_client;
     recycle_item.record_file = record_file;
 
-    recycle_queue_.insert(make_pair(record_file->end_time_, recycle_item));
+    multimap<UTime, RecycleItem>::iterator insert_iter = recycle_map_.insert(make_pair(end_time, recycle_item));
 
+    pair<map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator, bool> ret;
+    ret = recycle_item_search_map_.insert(make_pair(record_file, insert_iter));
+    assert(ret.second == true);
+
+    return 0;
+}
+
+int32_t StoreClientCenter::RemoveFromRecycleQueue(RecordFile *record_file)
+{
+    Mutex::Locker lock(recycle_mutex_);
+
+    map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator search_iter = recycle_item_search_map_.find(record_file);
+    assert(search_iter != recycle_item_search_map_.end());
+
+    multimap<UTime, RecycleItem>::iterator iter = search_iter->second;
+    assert(iter != recycle_map_.end());
+
+    recycle_map_.erase(iter);
+    recycle_item_search_map_.erase(search_iter);
+    
     return 0;
 }
 
@@ -1552,10 +1603,10 @@ int32_t StoreClientCenter::Recycle()
     int32_t ret = 0;
 
     Mutex::Locker lock(recycle_mutex_);
-    deque<RecycleItem>::iterator iter = recycle_queue_.begin();
-    while(iter != recycle_queue_.end() && recycle_count >= kFilesPerRecycle)
+    multimap<UTime, RecycleItem>::iterator iter = recycle_map_.begin();
+    while(iter != recycle_map_.end() && recycle_count < kFilesPerRecycle)
     {
-        RecycleItem recycle_item = *iter;
+        RecycleItem recycle_item = iter->second;
         RecordFile *record_file = recycle_item.record_file;
         StoreClient *store_client = recycle_item.store_client;
 
@@ -1577,19 +1628,17 @@ int32_t StoreClientCenter::Recycle()
             assert(ret == 0);
         }
 
-        deque<RecycleItem>::iterator del_iter = iter;
+        multimap<UTime, RecycleItem>::iterator del_iter = iter;
         iter++;
-        recycle_queue_.erase(del_iter);
+        recycle_map_.erase(del_iter);
+        recycle_item_search_map_.erase(record_file);
 
         /* add to free file table */
         free_file_table->Put(record_file);
         recycle_count++;
     }
 
-    if (iter == recycle_queue_.end())
-    {
-        Log(logger_, "recycle reached to end of recycle queue");
-    }
+    assert(iter != recycle_map_.end());
 
     return 0;
 }

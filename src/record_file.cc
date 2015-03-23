@@ -182,7 +182,7 @@ int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uin
 
     EncodeFixed32(temp, record_offset_);
     temp += 4;
-
+    
     uint32_t crc = crc32c::Value(crc_start, length);
     EncodeFixed32(crc_start - 4, crc);
 
@@ -506,6 +506,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
         uint32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
+            assert(ret == 0);
             return ret;
         }
     }
