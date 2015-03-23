@@ -156,7 +156,7 @@ void *FrameWriter::Entry()
             ret = storage_open(stream_info_, 64, 1, &temp_op_id);
             assert (ret == 0);
             op_id_ = temp_op_id;
-            //fprintf(stderr, "storage open id %d\n", op_id_);
+            fprintf(stderr, "storage open id %d\n", op_id_);
 
             WriteOFrame();
 
@@ -167,7 +167,7 @@ void *FrameWriter::Entry()
 
         if (i % 1234 == 1233)
         {
-            fprintf(stderr, "storage close id %d\n", op_id_);
+            fprintf(stderr, "storage close write id %d, i is %d\n", op_id_, i);
             storage_close(op_id_);
             op_id_ = -1;
             sleep(10);

@@ -145,7 +145,7 @@ void *FrameReader::Entry()
         read_start_time.seconds = rand_frag.start_time.seconds + read_rand_offset;
         read_start_time.nseconds = rand_frag.start_time.nseconds;
 
-        fprintf(stderr, "seek time is %d.%d", read_start_time.seconds, read_start_time.nseconds);
+        fprintf(stderr, "seek time is %d.%d\n", read_start_time.seconds, read_start_time.nseconds);
         ret = storage_seek(op_id_, &read_start_time);
         if (ret != 0)
         {
@@ -177,10 +177,12 @@ void *FrameReader::Entry()
                 goto FreeResource;
             }
         }
+        fprintf(stderr, "storage read ok");
 
 FreeResource:
         if (i % 1234 == 1233)
         {
+            fprintf(stderr, "storage close read id %d, i is %d", id_, i);
             storage_close(op_id_);
             op_id_ = -1;
             sleep(10);
@@ -193,9 +195,9 @@ FreeResource:
 
 void FrameReader::Shutdown()
 {
-    fprintf(stderr, "Reader shutdown %d\n", id_);
-
     Join();
+
+    fprintf(stderr, "Reader shutdown %d\n", id_);
     return;
 }
 

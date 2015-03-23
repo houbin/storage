@@ -404,6 +404,10 @@ int32_t RecordFileMap::FinishWriteRecordFile(RecordFile *record_file)
         assert(ret == 0);
     }
 
+    Log(logger_, "finish write record file %srecord_%05d, write offset %d, start time %d.%d, end time %d.%d", record_file->base_name_.c_str(),
+        record_file->number_, record_file->record_offset_, record_file->start_time_.tv_sec, record_file->start_time_.tv_nsec,
+        record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec);
+
     return 0;
 }
 
@@ -767,7 +771,7 @@ void *RecordWriter::Entry()
                 first_i_frame = true;
                 current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
                 current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
-                //Log(logger_, "I frame, and already have O frame");
+                Log(logger_, "I frame, and already have O frame");
             }
             else
             {
@@ -992,6 +996,9 @@ int32_t RecordReader::Seek(UTime &stamp)
     read_offset_ = seek_start_offset;
     read_end_offset_ = seek_end_offset;
 
+    Log(logger_, "seek record file %srecord_%05d, start offset %d, end offset %d", record_file_->base_name_.c_str(), 
+                    record_file_->number_, read_offset_, read_end_offset_);
+
     return 0;
 }
 
@@ -1052,6 +1059,9 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
     /* return frame */
     read_offset_ += kHeaderSize;
     read_offset_ += frame->size;
+
+    Log(logger_, "read frame record file %srecord_%05d, read_offset_ %d, record_offset_ %d", record_file_->base_name_.c_str(),
+                    record_file_->number_, read_offset_, record_file_->record_offset_);
 
     return 0;
 }
@@ -1165,7 +1175,6 @@ int32_t StoreClient::SeekRead(int32_t id, UTime &stamp)
 {
     int32_t ret;
     RecordReader *record_reader = NULL;
-    Log(logger_, "seek read id, id is %d", id);
 
     {
         Mutex::Locker lock(reader_mutex_);
@@ -1188,7 +1197,6 @@ int32_t StoreClient::SeekRead(int32_t id, UTime &stamp)
 int32_t StoreClient::ReadFrame(int32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "read frame, id is %d", id);
 
     int32_t ret = 0;
     RecordReader *record_reader = NULL;
@@ -1324,8 +1332,6 @@ int32_t StoreClientCenter::Init()
 int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
 {
     assert(flag == 0 || flag == 1);
-    Log(logger_, "open store client, flag is %d, id is %d, stream info is %s", 
-        flag, id, stream_info.c_str());
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1565,9 +1571,9 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
 {
     assert(store_client != NULL);
     assert(record_file != NULL);
-    Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     Mutex::Locker lock(recycle_mutex_);
+    Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     UTime end_time = record_file->end_time_;
 

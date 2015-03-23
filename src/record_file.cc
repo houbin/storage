@@ -503,7 +503,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     assert(ret == (int)kHeaderSize);
 
     {
-        uint32_t ret = DecodeHeader(header, frame);
+        int32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
             assert(ret == 0);
