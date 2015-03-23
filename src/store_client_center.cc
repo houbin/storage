@@ -31,7 +31,7 @@ int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file
 
     map<UTime, RecordFile*>::iterator iter_up;
 
-    if (Empty())
+    if (record_file_map_.empty())
     {
         return -ERR_TABLE_IS_EMPTY;
     }
@@ -217,13 +217,12 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
     int32_t ret;
     RecordFile *start_rf = NULL;
 
-    RWLock::RDLocker lock(rwlock_);
-
     if (Empty())
     {
         return -ERR_TABLE_IS_EMPTY;
     }
 
+    RWLock::RDLocker lock(rwlock_);
     ret = FindStampRecordFile(start, &start_rf);
     if (ret == -ERR_STAMP_TOO_SMALL)
     {
@@ -362,24 +361,24 @@ int32_t RecordFileMap::AllocWriteRecordFile(UTime &stamp, RecordFile **record_fi
     RecordFile *temp_file = NULL;
     pair<map<UTime, RecordFile*>::iterator, bool> map_ret;
 
-    RWLock::WRLocker lock(rwlock_);
-
     ret = store_client_->GetFreeFile(&temp_file);
     assert(ret == 0);
-
     temp_file->start_time_ = stamp;
 
-    map_ret = record_file_map_.insert(make_pair(stamp, temp_file));
-    if (map_ret.second == false)
     {
-        assert("record file already exist" == 0);
+        RWLock::WRLocker lock(rwlock_);
+        map_ret = record_file_map_.insert(make_pair(stamp, temp_file));
+        if (map_ret.second == false)
+        {
+            assert("record file already exist" == 0);
+        }
+    
+        map<UTime, RecordFile*>::iterator iter = map_ret.first;
+        file_search_map_.insert(make_pair(temp_file, iter));
+    
+        ret = temp_file->OpenFd(true);
+        assert(ret == 0);
     }
-
-    map<UTime, RecordFile*>::iterator iter = map_ret.first;
-    file_search_map_.insert(make_pair(temp_file, iter));
-
-    ret = temp_file->OpenFd(true);
-    assert(ret == 0);
 
     *record_file = temp_file;
 
@@ -435,8 +434,12 @@ int32_t RecordFileMap::SeekStampOffset(UTime &stamp, RecordFile **record_file, u
     assert(record_file != NULL);
     int32_t ret;
 
-    RWLock::WRLocker lock(rwlock_);
+    if (Empty())
+    {
+        return -ERR_TABLE_IS_EMPTY;
+    }
 
+    RWLock::WRLocker lock(rwlock_);
     ret = FindStampRecordFile(stamp, record_file);
     if (ret != 0)
     {
