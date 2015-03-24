@@ -506,7 +506,6 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
         int32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
-            assert(ret == 0);
             return ret;
         }
     }

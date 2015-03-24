@@ -57,8 +57,6 @@ int FrameWriter::FillFrame(char *buffer, int frame_buffer_length)
 
 int FrameWriter::WriteOFrame()
 {
-    seq_++;
-
     int32_t ret;
     FRAME_INFO_T frame = {0};
     struct timeval now;
@@ -92,8 +90,6 @@ int FrameWriter::WriteOFrame()
 
 int FrameWriter::WriteFrame()
 {
-    seq_++;
-
     int32_t ret;
     FRAME_INFO_T frame = {0};
     struct timeval now;
@@ -159,11 +155,13 @@ void *FrameWriter::Entry()
             fprintf(stderr, "storage open id %d\n", op_id_);
 
             WriteOFrame();
+            seq_++;
 
             continue;
         }
 
         WriteFrame();
+        seq_++;
 
         if (i % 1234 == 1233)
         {
