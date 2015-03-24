@@ -364,6 +364,7 @@ int32_t RecordFileMap::AllocWriteRecordFile(UTime &stamp, RecordFile **record_fi
     ret = store_client_->GetFreeFile(&temp_file);
     assert(ret == 0);
     temp_file->start_time_ = stamp;
+    temp_file->end_time_ = stamp;
 
     {
         RWLock::WRLocker lock(rwlock_);
