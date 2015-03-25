@@ -179,7 +179,6 @@ int32_t IndexFileManager::Init()
 
 int32_t IndexFileManager::ScanAllIndexFile()
 {
-    char buffer[1024] = {0};
     DIR *dp = NULL;
     struct dirent *entry = NULL;
     struct stat statbuf;
@@ -187,7 +186,6 @@ int32_t IndexFileManager::ScanAllIndexFile()
     dp = opendir("/jovision/mnt/");
     assert(dp != NULL);
 
-    getcwd(buffer, 1023);
     chdir("/jovision/mnt/");
     while((entry = readdir(dp)) != NULL)
     {
@@ -228,7 +226,6 @@ int32_t IndexFileManager::ScanAllIndexFile()
     }
 
     closedir(dp);
-    chdir(buffer);
     Log(logger_, "scan all index file end");
 
     return 0;

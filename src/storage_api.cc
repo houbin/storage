@@ -99,6 +99,22 @@ void storage_init()
     assert(index_file_manager != NULL);
     index_file_manager->Init();
 
+    char buffer[1024] = {0};
+    int cnt = readlink("/proc/self/exe", buffer, 1023);
+    assert(cnt > 0 && cnt <= 1023);
+
+    int i = 0;
+    for (i = cnt; i >= 0; i--)
+    {
+        if (buffer[i] == '/')
+        {
+            buffer[i+1] = 0;
+            break;
+        }
+    }
+    chdir(buffer);
+    Log(logger, "buffer is %s", buffer);
+
     return;
 }
 
