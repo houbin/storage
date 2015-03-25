@@ -778,10 +778,9 @@ void *RecordWriter::Entry()
             {
                 if (first_i_frame == false)
                 {
-                    Log(logger_, "no I frame, continue");
+                    Log(logger_, "no I frame, frame type is %d, continue", frame_type);
                     goto FreeResource;
                 }
-                //Log(logger_, "B or P frame");
             }
 
             if (add_o_frame)
@@ -1487,7 +1486,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
 int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    //Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
+    Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
 
     int32_t ret;
     StoreClient *client = NULL;

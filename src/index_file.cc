@@ -42,8 +42,6 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     fclose(file_count_handle);
 
     file_counts_ = atoi(file_count_str);
-
-    Log(logger, "%s file count %d", base_name_.c_str(), file_counts_);
 }
 
 uint32_t IndexFile::GetFileCounts()
@@ -181,15 +179,15 @@ int32_t IndexFileManager::Init()
 
 int32_t IndexFileManager::ScanAllIndexFile()
 {
+    char buffer[1024] = {0};
     DIR *dp = NULL;
     struct dirent *entry = NULL;
     struct stat statbuf;
 
-    Log(logger_, "scan all index file");
-
     dp = opendir("/jovision/mnt/");
     assert(dp != NULL);
 
+    getcwd(buffer, 1023);
     chdir("/jovision/mnt/");
     while((entry = readdir(dp)) != NULL)
     {
@@ -205,6 +203,21 @@ int32_t IndexFileManager::ScanAllIndexFile()
             IndexFile *index_file = NULL;
             string base_name("/jovision/mnt/");
             base_name = base_name + entry->d_name + "/";
+
+            /* test if dir is legal */
+            string temp_file_count_file = base_name + "file_count";
+            FILE *fp = NULL;
+            fp = fopen(temp_file_count_file.c_str(), "r");
+            if (fp == NULL)
+            {
+                continue;
+            }
+            else
+            {
+                fclose(fp);
+                fp = NULL;
+            }
+
             index_file = new IndexFile(logger_, base_name);
             assert(index_file != NULL);
 
@@ -215,6 +228,7 @@ int32_t IndexFileManager::ScanAllIndexFile()
     }
 
     closedir(dp);
+    chdir(buffer);
     Log(logger_, "scan all index file end");
 
     return 0;
