@@ -757,14 +757,14 @@ void *RecordWriter::Entry()
                 current_o_frame_ = frame;
                 frame = temp;                
                 
-                Log(logger_, "O frame, replace current o frame");
+                LOG_WARN(logger_, "O frame, replace current o frame");
                 goto FreeResource;
             }
             else if (frame_type == JVN_DATA_I)
             {
                 if (current_o_frame_ == NULL)
                 {
-                    Log(logger_, "I frame, but no O frame");
+                    LOG_WARN(logger_, "I frame, but no O frame");
                     goto FreeResource;
                 }
 
@@ -772,13 +772,13 @@ void *RecordWriter::Entry()
                 first_i_frame = true;
                 current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
                 current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
-                Log(logger_, "I frame, and already have O frame");
+                LOG_INFO(logger_, "I frame, and already have O frame");
             }
             else
             {
                 if (first_i_frame == false)
                 {
-                    Log(logger_, "no I frame, frame type is %d, continue", frame_type);
+                    LOG_INFO(logger_, "no I frame, frame type is %d, continue", frame_type);
                     goto FreeResource;
                 }
             }
@@ -1189,7 +1189,10 @@ int32_t StoreClient::SeekRead(int32_t id, UTime &stamp)
     }
 
     ret = record_reader->Seek(stamp);
-    assert(ret == 0);
+    if (ret != 0)
+    {
+        return ret;
+    }
 
     return 0;
 }

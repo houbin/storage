@@ -211,7 +211,7 @@ int32_t storage_seek(const int32_t id, const UTIME_T *stamp)
     int32_t ret = store_client_center->SeekRead(id, time_stamp);
     if (ret != 0)
     {
-        LOG_WARN(logger, "storage seek %d error, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
+        LOG_WARN(logger, "storage seek %d error, stamp is %d.%d, ret %d", id, stamp->seconds, stamp->nseconds, ret);
         return ret;
     }
 
