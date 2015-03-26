@@ -85,7 +85,6 @@ void storage_init()
     
     ret = NewLogger("/tmp/storage.log", &logger);
     assert(ret == 0);
-    Logger::SetLogLevel(Logger::WARN);
 
     id_center = new IdCenter(logger);
     assert(id_center != NULL);
@@ -132,14 +131,14 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, int32_t *id)
     ret = id_center->ApplyForId(key_info, flags, id);
     if (ret != 0)
     {
-        LOG_WARN(logger, "apply id error, stream %s, flag %d", stream_info, flags);
+        LOG_WARN(logger, "apply id error, stream %s, flag %d, ret %d", stream_info, flags, ret);
         return ret;
     }
 
     ret = store_client_center->Open(flags, *id, key_info);
     if (ret != 0)
     {
-        LOG_WARN(logger, "open failed, stream %s, flag %d, id %d", stream_info, flags, *id);
+        LOG_WARN(logger, "open error, stream info [%s], flag %d, id %d, ret %d", stream_info, flags, *id, ret);
         id_center->ReleaseId(*id);
         return ret;
     }
@@ -221,13 +220,13 @@ int32_t storage_seek(const int32_t id, const UTIME_T *stamp)
 
 int32_t storage_read(const int32_t id, FRAME_INFO_T *frame_info)
 {
-    LOG_INFO(logger, "storage read id %d", id);
+    LOG_DEBUG(logger, "storage read id %d", id);
 
     int32_t ret;
     ret = store_client_center->ReadFrame(id, frame_info);
     if (ret != 0)
     {
-        LOG_WARN(logger, "storage read %d", id);
+        LOG_WARN(logger, "storage read error, id %d, ret %d", id, ret);
         return ret; 
     }
 

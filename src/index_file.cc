@@ -249,7 +249,7 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
 
 int32_t IndexFileManager::Find(string base_name, IndexFile **index_file)
 {
-    Log(logger_, "find index file %s", base_name.c_str());
+    LOG_DEBUG(logger_, "find index file %s", base_name.c_str());
 
     Mutex::Locker lock(mutex_);
     map<string, IndexFile*>::iterator iter = index_file_map_.find(base_name);

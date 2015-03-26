@@ -494,24 +494,45 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     assert(read_fd_ >= 0);
     if (offset >= record_offset_)
     {
-        Log(logger_, "offset %d, record offset %d, read reach to end");
+        LOG_ERROR(logger_, "offset %d, record offset %d, read reach to end");
         return -ERR_READ_REACH_TO_END;
     }
 
     char header[kHeaderSize] = {0};
     ret = pread(read_fd_, header, kHeaderSize, offset);
+    if (ret < 0)
+    {
+        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        return ret;
+    }
+    else if (ret == 0)
+    {
+        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, kHeaderSize);
+        return -ERR_READ_REACH_TO_END;
+    }
     assert(ret == (int)kHeaderSize);
 
     {
         int32_t ret = DecodeHeader(header, frame);
         if (ret != 0)
         {
+            LOG_ERROR(logger_, "decode header error, ret is %d", ret);
             return ret;
         }
     }
 
     ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
-    assert(ret == (int)frame->size);
+    if (ret < 0)
+    {
+        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        return ret;
+    }
+    else if (ret == 0)
+    {
+        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, frame->size);
+        return -ERR_READ_REACH_TO_END;
+    }
+    assert(ret == frame->size);
 
     return 0;
 }

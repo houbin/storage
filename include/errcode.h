@@ -33,6 +33,7 @@
 #define ERR_NO_ITEM_FOUND           3011
 #define ERR_RECORD_FILE_BUSY        3012
 #define ERR_READ_OVER_THAN_END_OFFSET 3013
+#define ERR_STREAM_NOT_WRITE        3014
 
 
 #endif
