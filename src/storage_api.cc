@@ -84,6 +84,7 @@ void storage_init()
     
     ret = NewLogger("/tmp/storage.log", &logger);
     assert(ret == 0);
+    Logger::SetLogLevel(Logger::WARN);
 
     id_center = new IdCenter(logger);
     assert(id_center != NULL);
@@ -113,7 +114,7 @@ void storage_init()
         }
     }
     chdir(buffer);
-    Log(logger, "buffer is %s", buffer);
+    LOG_INFO(logger, "storage init ok");
 
     return;
 }
@@ -122,6 +123,7 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, int32_t *id)
 {
     assert(stream_info != NULL);
     assert(flags == 0 || flags == 1);
+    LOG_INFO(logger, "storage open stream %s, flag %d", stream_info, flags);
 
     int32_t ret;
     string key_info(stream_info);
@@ -129,27 +131,34 @@ int32_t storage_open(char *stream_info, uint32_t size, int flags, int32_t *id)
     ret = id_center->ApplyForId(key_info, flags, id);
     if (ret != 0)
     {
+        LOG_WARN(logger, "apply id error, stream %s, flag %d", stream_info, flags);
         return ret;
     }
 
     ret = store_client_center->Open(flags, *id, key_info);
     if (ret != 0)
     {
+        LOG_WARN(logger, "open failed, stream %s, flag %d, id %d", stream_info, flags, *id);
         id_center->ReleaseId(*id);
         return ret;
     }
 
+    LOG_INFO(logger, "storage open stream %s ok, flag %d, id %d", stream_info, flags, *id);
     return 0;
 }
 
 int32_t storage_write(const int32_t id, FRAME_INFO_T *frame_info)
 {
+    LOG_TRACE(logger, "storage write id %d, frame type %d, time %d.%d, stamp %"PRIu64", size %d", id, frame_info->type,
+                         frame_info->frame_time.seconds, frame_info->frame_time.nseconds, frame_info->stamp, frame_info->size);
     return store_client_center->WriteFrame(id, frame_info);
 }
 
 int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, const UTIME_T *end, 
         FRAGMENT_INFO_T **frag_info, uint32_t *count)
 {
+    LOG_INFO(logger, "list record fragments, id %d, start %d.%d, end %d.%d", id, start->seconds, start->nseconds, end->seconds, end->nseconds);
+
     int32_t ret;
     UTime start_time(start->seconds, start->nseconds);
     UTime end_time(end->seconds, end->nseconds);
@@ -158,12 +167,15 @@ int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, co
     ret = store_client_center->ListRecordFragments(id, start_time, end_time, frag_info_queue);
     if (ret != 0)
     {
+        LOG_WARN(logger, "list record fragments error, ret %d, id %d, start %d.%d, end %d.%d", 
+                ret, id, start->seconds, start->nseconds, end->seconds, end->nseconds);
         return ret;
     }
     
     *count = frag_info_queue.size();
     if (*count == 0)
     {
+        LOG_INFO(logger, "list record fragments, count is 0");
         *frag_info = NULL;
         return 0;
     }
@@ -184,6 +196,7 @@ int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, co
 
 int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_t count)
 {
+    LOG_INFO(logger, "storage free record fragments memory, frag info is %p, count is %d", frag_info, count);
     delete frag_info;
     frag_info = NULL;
 
@@ -192,34 +205,62 @@ int32_t storage_free_record_fragments(FRAGMENT_INFO_T *frag_info, uint32_t count
 
 int32_t storage_seek(const int32_t id, const UTIME_T *stamp)
 {
+    LOG_INFO(logger, "storage seek %d, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
+
     UTime time_stamp(stamp->seconds, stamp->nseconds);
-    return store_client_center->SeekRead(id, time_stamp);
+    int32_t ret = store_client_center->SeekRead(id, time_stamp);
+    if (ret != 0)
+    {
+        LOG_WARN(logger, "storage seek %d error, stamp is %d.%d", id, stamp->seconds, stamp->nseconds);
+        return ret;
+    }
+
+    return 0;
 }
 
 int32_t storage_read(const int32_t id, FRAME_INFO_T *frame_info)
 {
-    return store_client_center->ReadFrame(id, frame_info);
+    LOG_INFO(logger, "storage read id %d", id);
+
+    int32_t ret;
+    ret = store_client_center->ReadFrame(id, frame_info);
+    if (ret != 0)
+    {
+        LOG_WARN(logger, "storage read %d", id);
+        return ret; 
+    }
+
+    return 0;
 }
 
 void storage_close(const int32_t id)
 {
     int32_t ret;
     int flag;
+
+    LOG_INFO(logger, "storage close id %d", id);
     
     ret = id_center->GetFlag(id, flag);
     if (ret != 0)
     {
+        LOG_WARN(logger, "get flag error, id %d, ret %d", id, ret);
         return;
     }
 
     id_center->ReleaseId(id);
     ret = store_client_center->Close(id, flag);
+    if (ret != 0)
+    {
+        LOG_WARN(logger, "close id error, id %d, flag %d, ret %d", id, flag, ret);
+    }
 
     return;
 }
 
 void storage_shutdown()
 {
+    LOG_INFO(logger, "storage shutdown");
+
     id_center->Shutdown();
     delete id_center;
     id_center = NULL;

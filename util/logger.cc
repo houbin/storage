@@ -1,8 +1,23 @@
+#include <stdlib.h>
 #include "logger.h"
 #include "../include/errcode.h"
 
 namespace util
 {
+
+Logger::LogLevel init_log_level()
+{
+    if (::getenv("storage_log_debug"))
+    {
+        return Logger::DEBUG;
+    }
+    else
+    {
+        return Logger::WARN;
+    }
+}
+
+Logger::LogLevel g_loglevel = init_log_level();
 
 void Logger::Logv(const char* format, va_list ap)
 {
@@ -81,6 +96,13 @@ void Logger::Logv(const char* format, va_list ap)
         
         break;
     }
+
+    return;
+}
+
+void Logger::SetLogLevel(Logger::LogLevel level)
+{
+    g_loglevel = level;
 
     return;
 }
