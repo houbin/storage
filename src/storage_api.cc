@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "../util/logger.h"
 #include "../include/storage_api.h"
 #include "config_opts.h"
