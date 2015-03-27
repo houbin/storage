@@ -254,7 +254,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         ret = record_file->GetAllFragInfo(all_frag_info);
         assert (ret == 0);
 
-        /* debug: dump all frag info */
+        /* 
         Log(logger_, "record file %srecord_%05d get all frag info, count is %d",
                         record_file->base_name_.c_str(), record_file->number_, all_frag_info.size());
         deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
@@ -265,6 +265,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
             Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, 
                         temp_frag.start_time.seconds, temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
         }
+        */
 
         /* start time landed in the record file */
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)
@@ -714,7 +715,7 @@ int32_t RecordWriter::DoWriteIndexEvent(bool again)
     {
         write_index_event_ = new C_WriteIndexTick(this);
         store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event_);
-        Log(logger_, "reset write index, write_index_event_ is %p", write_index_event_);
+        LOG_INFO(logger_, "reset write index, write_index_event_ is %p", write_index_event_);
     }
 
     return 0;
@@ -757,14 +758,14 @@ void *RecordWriter::Entry()
                 current_o_frame_ = frame;
                 frame = temp;                
                 
-                Log(logger_, "O frame, replace current o frame");
+                LOG_WARN(logger_, "O frame, replace current o frame");
                 goto FreeResource;
             }
             else if (frame_type == JVN_DATA_I)
             {
                 if (current_o_frame_ == NULL)
                 {
-                    Log(logger_, "I frame, but no O frame");
+                    LOG_WARN(logger_, "I frame, but no O frame");
                     goto FreeResource;
                 }
 
@@ -772,13 +773,13 @@ void *RecordWriter::Entry()
                 first_i_frame = true;
                 current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
                 current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
-                Log(logger_, "I frame, and already have O frame");
+                LOG_INFO(logger_, "I frame, and already have O frame");
             }
             else
             {
                 if (first_i_frame == false)
                 {
-                    Log(logger_, "no I frame, frame type is %d, continue", frame_type);
+                    LOG_INFO(logger_, "no I frame, frame type is %d, continue", frame_type);
                     goto FreeResource;
                 }
             }
@@ -1016,7 +1017,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
         ret = record_file_->ReadFrame(read_offset_, frame);
         if (ret != 0)
         {
-            Log(logger_, "read frame error, read_offset %d, ret %d", read_offset_, ret);
+            LOG_WARN(logger_, "read frame error, read_offset %d, ret %d", read_offset_, ret);
             return ret;
         }
 
@@ -1027,7 +1028,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
                && (current_o_frame_.size == frame->size)
                && (memcmp(current_o_frame_.buffer, frame->buffer, frame->size)) == 0)
            {
-               Log(logger_, "o frame not changed, so skip this o frame");
+               LOG_INFO(logger_, "o frame not changed, so skip this o frame");
                read_offset_ += kHeaderSize;
                read_offset_ += frame->size;
                continue;
@@ -1044,7 +1045,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
                 assert(current_o_frame_.buffer != NULL);
             }
             memcpy(current_o_frame_.buffer, frame->buffer, frame->size);
-            Log(logger_, "o frame changed");
+            LOG_INFO(logger_, "o frame changed");
         }
 
         break;
@@ -1052,7 +1053,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
 
     if (read_offset_ >= read_end_offset_)
     {
-        Log(logger_, "read offset %d, read end offset %d", read_offset_, read_end_offset_);
+        LOG_ERROR(logger_, "read offset %d, read end offset %d", read_offset_, read_end_offset_);
         return -ERR_READ_OVER_THAN_END_OFFSET;
     }
 
@@ -1060,7 +1061,7 @@ int32_t RecordReader::ReadFrame(FRAME_INFO_T *frame)
     read_offset_ += kHeaderSize;
     read_offset_ += frame->size;
 
-    Log(logger_, "read frame record file %srecord_%05d, read_offset_ %d, record_offset_ %d", record_file_->base_name_.c_str(),
+    LOG_DEBUG(logger_, "read frame record file %srecord_%05d, read_offset_ %d, record_offset_ %d", record_file_->base_name_.c_str(),
                     record_file_->number_, read_offset_, record_file_->record_offset_);
 
     return 0;
@@ -1189,7 +1190,10 @@ int32_t StoreClient::SeekRead(int32_t id, UTime &stamp)
     }
 
     ret = record_reader->Seek(stamp);
-    assert(ret == 0);
+    if (ret != 0)
+    {
+        return ret;
+    }
 
     return 0;
 }
@@ -1206,6 +1210,7 @@ int32_t StoreClient::ReadFrame(int32_t id, FRAME_INFO_T *frame)
         map<int32_t, RecordReader*>::iterator iter = record_readers_.find(id);
         if (iter == record_readers_.end())
         {
+            LOG_WARN(logger_, "find record reader error, id %d", id);
             return -ERR_ITEM_NOT_FOUND;
         }
         record_reader = iter->second;
@@ -1214,6 +1219,7 @@ int32_t StoreClient::ReadFrame(int32_t id, FRAME_INFO_T *frame)
     ret = record_reader->ReadFrame(frame);
     if (ret != 0)
     {
+        LOG_WARN(logger_, "read frame error, id %d", id);
         return ret;
     }
 
@@ -1415,12 +1421,13 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
 {
     assert(client != NULL);
 
-    Log(logger_, "find store client, stream info is %s", stream_info.c_str());
+    LOG_DEBUG(logger_, "find store client, stream info is %s", stream_info.c_str());
 
     RWLock::RDLocker lock(rwlock_);
     map<string, StoreClient*>::iterator iter = client_search_map_.find(stream_info);
     if (iter == client_search_map_.end())
     {
+        LOG_WARN(logger_, "find stream info error, stream info [%s]", stream_info.c_str());
         return -ERR_ITEM_NOT_FOUND;
     }
 
@@ -1486,7 +1493,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
 int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    Log(logger_, "write frame, id is %d, frame %p, buffer size is %d", id, frame, frame->size);
+    LOG_DEBUG(logger_, "write frame, id %d, frame %p, buffer size %d", id, frame, frame->size);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1494,6 +1501,7 @@ int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
     ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
+        LOG_WARN(logger_, "get store client error, id %d, ret %d", id, ret);
         return ret;
     }
 
@@ -1502,7 +1510,7 @@ int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 
 int32_t StoreClientCenter::SeekRead(int32_t id, UTime &stamp)
 {
-    Log(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp.tv_sec, stamp.tv_nsec);
+    LOG_INFO(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp.tv_sec, stamp.tv_nsec);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -1510,6 +1518,7 @@ int32_t StoreClientCenter::SeekRead(int32_t id, UTime &stamp)
     ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
+        LOG_WARN(logger_, "get store client error, id %d, ret %d", id, ret);
         return ret;
     }
 
@@ -1526,6 +1535,7 @@ int32_t StoreClientCenter::ReadFrame(int32_t id, FRAME_INFO_T *frame)
     ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
+        LOG_WARN(logger_, "get store client error, id %d, ret %d", id, ret);
         return ret;
     }
 
@@ -1543,7 +1553,7 @@ int32_t StoreClientCenter::ListRecordFragments(int32_t id, UTime &start, UTime &
     ret = GetStoreClient(id, &store_client);
     if (ret != 0)
     {
-        Log(logger_, "get store client return %d", ret);
+        LOG_WARN(logger_, "get store client return %d", ret);
         return ret;
     }
 
@@ -1554,7 +1564,7 @@ int32_t StoreClientCenter::UpdateRecordFileInRecycleQueue(StoreClient *store_cli
 {
     assert(store_client != NULL);
     assert(record_file != NULL);
-    Log(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+    LOG_INFO(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     int32_t ret;
 
@@ -1573,7 +1583,7 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
     assert(record_file != NULL);
 
     Mutex::Locker lock(recycle_mutex_);
-    Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+    LOG_INFO(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     UTime end_time = record_file->end_time_;
 

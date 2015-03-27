@@ -11,14 +11,14 @@ namespace util
 
 void SafeTimer::Init()
 {
-    Log(logger_, "init");
+    LOG_INFO(logger_, "init");
     thread_ = new SafeTimerThread(this);
     thread_->Create();
 }
 
 void SafeTimer::Shutdown()
 {
-    Log(logger_, "shutdown");
+    LOG_INFO(logger_, "shutdown");
     if (thread_ != NULL)
     {
         CancelAllEvents();
@@ -41,7 +41,7 @@ typedef std::map<Context*, scheduled_map_t::iterator> event_lookup_map_t;
 
 void SafeTimer::TimerThread()
 {
-    Log(logger_, "TimerThread starting");
+    LOG_INFO(logger_, "TimerThread starting");
 
     mutex_.Lock();
     while (!stop_)
@@ -61,7 +61,7 @@ void SafeTimer::TimerThread()
 
             //mutex_.Unlock();
 
-            Log(logger_, "TimerThread executing %p", callback);
+            LOG_INFO(logger_, "TimerThread executing %p", callback);
             callback->Complete(0);
 
             //mutex_.Lock();
@@ -72,7 +72,7 @@ void SafeTimer::TimerThread()
             break;
         }
 
-        Log(logger_, "TimerThread going to sleep");
+        LOG_INFO(logger_, "TimerThread going to sleep");
 
         if(schedule_.empty())
         {
@@ -83,10 +83,10 @@ void SafeTimer::TimerThread()
             cond_.WaitUtil(mutex_, schedule_.begin()->first);
         }
 
-        Log(logger_, "TimerThread awake");
+        LOG_INFO(logger_, "TimerThread awake");
     }
 
-    Log(logger_, "TimerThread exiting");
+    LOG_INFO(logger_, "TimerThread exiting");
     mutex_.Unlock();
 
     return;
@@ -106,7 +106,7 @@ void SafeTimer::AddEventAfter(double seconds, Context *callback)
 void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
     UTime now = GetClockNow();
-    Log(logger_, "AddEventAfter %d.%d -> %p, now is %d.%d", t.tv_sec, t.tv_nsec, callback, now.tv_sec, now.tv_nsec);
+    LOG_INFO(logger_, "AddEventAfter %d.%d -> %p, now is %d.%d", t.tv_sec, t.tv_nsec, callback, now.tv_sec, now.tv_nsec);
 
     if (stop_)
     {
@@ -132,16 +132,16 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
 
 void SafeTimer::DoEvent(Context *callback)
 {
-    Log(logger_, "do event, callback is %p", callback);
+    LOG_INFO(logger_, "do event, callback is %p", callback);
 
     map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
     if (p == events_.end())
     {
-        Log(logger_, "CancelEvents %p not found", callback);
+        LOG_WARN(logger_, "CancelEvents %p not found", callback);
         return;
     }
 
-    Log(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
+    LOG_INFO(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
     Context *ct = p->first;
 
     events_.erase(p);
@@ -154,7 +154,7 @@ void SafeTimer::DoEvent(Context *callback)
 
 void SafeTimer::DoAllEvents()
 {
-    Log(logger_, "do all events");
+    LOG_INFO(logger_, "do all events");
 
     while (!schedule_.empty())
     {
@@ -174,16 +174,14 @@ void SafeTimer::DoAllEvents()
 
 bool SafeTimer::CancelEvent(Context *callback)
 {
-    Log(logger_, "cancle event %p", callback);
-
     map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
     if (p == events_.end())
     {
-        Log(logger_, "CancelEvents %p not found", callback);
+        LOG_WARN(logger_, "CancelEvents %p not found", callback);
         return false;
     }
 
-    Log(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
+    LOG_DEBUG(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
     Context *ct = p->first;
 
     events_.erase(p);
@@ -199,12 +197,12 @@ bool SafeTimer::CancelEvent(Context *callback)
 
 bool SafeTimer::CancelAllEvents()
 {
-    Log(logger_, "cancle all events");
+    LOG_INFO(logger_, "cancle all events");
 
     while(!events_.empty())
     {
         map<Context*, multimap<UTime, Context*>::iterator>::iterator p = events_.begin();
-        Log(logger_, "cancelled %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, p->first);
+        LOG_INFO(logger_, "cancelled %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, p->first);
 
         Context *ct = p->first;
         events_.erase(p);

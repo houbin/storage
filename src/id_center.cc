@@ -1,6 +1,7 @@
 #include "id_center.h"
 #include "../include/errcode.h"
 #include "config_opts.h"
+#include "../include/storage.h"
 
 namespace storage
 {
@@ -42,6 +43,14 @@ int32_t IdCenter::ApplyForId(string key_info, int flags, int32_t *id)
         {
             return -ERR_REACH_READ_THREHOLD;
         }
+
+        StoreClient *store_client = NULL;
+        int32_t ret = 0;
+        ret = store_client_center->FindStoreClient(key_info, &store_client);
+        if (ret != 0)
+        {
+            return -ERR_STREAM_NOT_WRITE;
+        }
     }
 
     /* get id */
@@ -72,7 +81,7 @@ int32_t IdCenter::ApplyForId(string key_info, int flags, int32_t *id)
 
 int32_t IdCenter::ReleaseId(int32_t id)
 {
-    Log(logger_, "release id, id is %d");
+    LOG_INFO(logger_, "release id, id %d", id);
 
     Mutex::Locker lock(mutex_);
 

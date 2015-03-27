@@ -16,7 +16,7 @@ FreeFileTable::FreeFileTable(Logger *logger)
 int32_t FreeFileTable::Put(RecordFile *record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "put record file %p", record_file);
+    LOG_DEBUG(logger_, "put record file %p", record_file);
 
     int32_t ret;
     DiskInfo *disk_info = NULL;
@@ -30,12 +30,12 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
         disk_info = new struct DiskInfo;
         assert(disk_info != NULL);
         disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
-        Log(logger_, "not found disk info");
+        LOG_DEBUG(logger_, "not found disk info");
     }
     else
     {
         disk_info = iter->second;
-        Log(logger_, "found disk info");
+        LOG_DEBUG(logger_, "found disk info");
     }
 
     assert(disk_info != NULL);
@@ -59,7 +59,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "get record file");
+    LOG_INFO(logger_, "get record file");
 
     int32_t ret;
 
