@@ -144,7 +144,6 @@ void *FrameWriter::Entry()
     int type = 0;
     int length = 0;
     int32_t temp_op_id = 0;
-    assert(1 == 0);
     
     for (int i = 0; i < 1000000; i++)
     {

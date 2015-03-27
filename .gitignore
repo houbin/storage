@@ -1,3 +1,4 @@
 *.[oa]
 *.so
 libstorage.so
+storage_test

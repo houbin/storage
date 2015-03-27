@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>
 #include "../util/logger.h"
 #include "../include/storage_api.h"
 #include "config_opts.h"
@@ -79,10 +80,46 @@ int32_t storage_formate_disk(char *disk)
     return pclose(fp);
 }
 
+void storage_handle_signal(int signum)
+{
+    if (signum != SIGUSR1)
+    {
+        return;
+    }
+
+    char *p = NULL;
+    p = getenv("storage_log_level");
+    if (p == NULL)
+    {
+        LOG_WARN(logger, "getenv failed, no env of \"storage_log_level\"");
+        return;
+    }
+
+    int log_level = atoi(p);
+    logger->SetLogLevel((Logger::LogLevel)log_level);
+    LOG_WARN(logger, "logger set log level to %d", log_level);
+
+    return;
+}
+
+void storage_register_signal(int signum)
+{
+    struct sigaction act;
+    
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = storage_handle_signal;
+    act.sa_flags = 0;
+    
+    int ret = sigaction(signum, &act, NULL);
+    assert(ret == 0);
+
+    return;
+}
+
 void storage_init()
 {
     int32_t ret;
-    
+
     ret = NewLogger("/tmp/storage.log", &logger);
     assert(ret == 0);
 
@@ -116,6 +153,7 @@ void storage_init()
     chdir(buffer);
     LOG_INFO(logger, "storage init ok");
 
+    storage_register_signal(SIGUSR1);
     return;
 }
 
