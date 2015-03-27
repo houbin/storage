@@ -59,7 +59,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "get record file");
+    LOG_INFO(logger_, "get record file");
 
     int32_t ret;
 

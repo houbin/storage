@@ -254,7 +254,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         ret = record_file->GetAllFragInfo(all_frag_info);
         assert (ret == 0);
 
-        /* debug: dump all frag info */
+        /* 
         Log(logger_, "record file %srecord_%05d get all frag info, count is %d",
                         record_file->base_name_.c_str(), record_file->number_, all_frag_info.size());
         deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
@@ -265,6 +265,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
             Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, 
                         temp_frag.start_time.seconds, temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
         }
+        */
 
         /* start time landed in the record file */
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)
@@ -714,7 +715,7 @@ int32_t RecordWriter::DoWriteIndexEvent(bool again)
     {
         write_index_event_ = new C_WriteIndexTick(this);
         store_client_center->timer.AddEventAfter(WRITE_INDEX_INTERVAL, write_index_event_);
-        Log(logger_, "reset write index, write_index_event_ is %p", write_index_event_);
+        LOG_INFO(logger_, "reset write index, write_index_event_ is %p", write_index_event_);
     }
 
     return 0;
@@ -1563,7 +1564,7 @@ int32_t StoreClientCenter::UpdateRecordFileInRecycleQueue(StoreClient *store_cli
 {
     assert(store_client != NULL);
     assert(record_file != NULL);
-    Log(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+    LOG_INFO(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     int32_t ret;
 
@@ -1582,7 +1583,7 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
     assert(record_file != NULL);
 
     Mutex::Locker lock(recycle_mutex_);
-    Log(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+    LOG_INFO(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     UTime end_time = record_file->end_time_;
 
