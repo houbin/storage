@@ -26,7 +26,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     index_file_ = fopen(file_path.c_str(), "rb+");
     if (index_file_ == NULL)
     {
-        Log(logger_, "fopen %s error, errno msg is %s", file_path.c_str(), strerror(errno));
+        LOG_FATAL(logger_, "fopen error, base name [%s], errno msg is %s", file_path.c_str(), strerror(errno));
         assert(index_file_ != NULL);
     }
 
@@ -65,7 +65,7 @@ int32_t IndexFile::AnalyzeAllEntry()
     ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts_, index_file_);
     if (ret != file_counts_)
     {
-        Log(logger_, "ret is %d, errno msg is %s", ret, strerror(errno));
+        LOG_FATAL(logger_, "fread error, ret is %d, errno msg is [%s]", ret, strerror(errno));
         assert(ret == file_counts_);
     }
 
@@ -109,13 +109,13 @@ int32_t IndexFile::AnalyzeAllEntry()
     }
 
     safe_free(record_file_info_buffer);
-    Log(logger_, "analyze all entry end");
+    LOG_INFO(logger_, "analyze all entry end");
     return 0;
 }
 
 int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
-    //Log(logger_, "write file %sindex, offset is %d, length is %d", base_name_.c_str(), offset, length);
+    LOG_DEBUG(logger_, "index file write, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
     int ret = 0;
 
     Mutex::Locker lock(mutex_);
@@ -124,18 +124,19 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
     ret = fwrite(buffer, 1, length, index_file_);
     if (ret != length)
     {
-        Log(logger_, "index_file is %p, buffer is %s, fwrite return %d, errno msg is %s", index_file_, buffer, ret, strerror(errno));
+        LOG_FATAL(logger_, "fwrite error, index file %sindex, ret %d, length %u, errno msg is [%s]", 
+                                base_name_.c_str(), ret, length, strerror(errno));
         assert(ret == (int)length);
     }
     fflush(index_file_);
-    //Log(logger_, "index write file %sindex ok, offset is %d, length is %d", base_name_.c_str(), offset, length);
+    LOG_DEBUG(logger_, "index file write ok, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
 
     return 0;
 }
 
 int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 {
-    //Log(logger_, "read length is %d, offset is %d", length, offset);
+    LOG_DEBUG(logger_, "index file read, base name %s, length is %u, offset is %u", base_name_.c_str(), length, offset);
     int ret;
 
     Mutex::Locker lock(mutex_);
@@ -145,18 +146,19 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
     ret = fread(buffer, 1, length, index_file_);
     if (ret != length)
     {
-        Log(logger_, "index_file is %p, fread return %d, errno msg is %s", index_file_, ret, strerror(errno));
+        LOG_ERROR(logger_, "fread error, base name %sindex, ret %d, length %u, errno msg is [%s]", 
+                                base_name_.c_str(), ret, length, strerror(errno));
         assert(ret == (int)length);
     }
 
-    //Log(logger_, "index file read, length is %d, offset is %d", length, offset);
+    LOG_DEBUG(logger_, "index file read ok , length is %d, offset is %d", length, offset);
 
     return 0;
 }
 
 int32_t IndexFile::Shutdown()
 {
-    //Log(logger_, "shutdown");
+    LOG_INFO(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
     fclose(index_file_);
@@ -221,19 +223,19 @@ int32_t IndexFileManager::ScanAllIndexFile()
 
             index_file_map_.insert(make_pair(base_name, index_file));
 
-            Log(logger_, "insert index file %s", base_name.c_str());
+            LOG_INFO(logger_, "insert index file ok, base name %s", base_name.c_str());
         }
     }
 
     closedir(dp);
-    Log(logger_, "scan all index file end");
+    LOG_INFO(logger_, "scan all index file end");
 
     return 0;
 }
 
 int32_t IndexFileManager::AnalyzeAllIndexFile()
 {
-    Log(logger_, "analyze all index file");
+    LOG_INFO(logger_, "analyze all index file");
 
     map<string, IndexFile*>::iterator iter = index_file_map_.begin();
     for(; iter != index_file_map_.end(); iter++)
@@ -242,20 +244,20 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
         index_file->AnalyzeAllEntry();
     }
 
-    Log(logger_, "analyze all index file end");
+    LOG_INFO(logger_, "analyze all index file end");
 
     return 0;
 }
 
 int32_t IndexFileManager::Find(string base_name, IndexFile **index_file)
 {
-    LOG_DEBUG(logger_, "find index file %s", base_name.c_str());
+    LOG_DEBUG(logger_, "find index file, base name %s", base_name.c_str());
 
     Mutex::Locker lock(mutex_);
     map<string, IndexFile*>::iterator iter = index_file_map_.find(base_name);
     if (iter == index_file_map_.end())
     {
-        Log(logger_, "not found");
+        LOG_WARN(logger_, "find index file failed, base name %s", base_name.c_str());
         return -ERR_ITEM_NOT_FOUND;
     }
 
@@ -266,7 +268,7 @@ int32_t IndexFileManager::Find(string base_name, IndexFile **index_file)
 
 int32_t IndexFileManager::Shutdown()
 {
-    Log(logger_, "shutdown");
+    LOG_INFO(logger_, "shutdown");
     
     Mutex::Locker lock(mutex_);
     while (!index_file_map_.empty())
@@ -279,7 +281,7 @@ int32_t IndexFileManager::Shutdown()
         delete index_file;
     }
 
-    Log(logger_, "shutdown end");
+    LOG_INFO(logger_, "shutdown end");
 
     return 0;
 }

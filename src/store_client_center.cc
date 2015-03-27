@@ -1320,7 +1320,7 @@ void StoreClient::Shutdown()
 // ======================================================= //
 StoreClientCenter::StoreClientCenter(Logger *logger)
 : logger_(logger), rwlock_("StoreClientCenter::RWLock"), recycle_mutex_("StoreClientCenter::RecycleMutex"),
-timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
+recycle_event_(NULL), timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 {
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
@@ -1616,6 +1616,25 @@ int32_t StoreClientCenter::RemoveFromRecycleQueue(RecordFile *record_file)
     return 0;
 }
 
+int32_t StoreClientCenter::StartRecycle()
+{
+    LOG_DEBUG(logger_, "start recycle");
+
+    Mutex::Locker lock(timer_lock);
+    
+    if (recycle_event_ != NULL)
+    {
+        return 0;
+    }
+
+    recycle_event_ = new C_Recycle(this);
+    assert(recycle_event_ != NULL);
+
+    timer.AddEventAfter(0, recycle_event_);
+
+    return 0;
+}
+
 int32_t StoreClientCenter::Recycle()
 {
     uint32_t recycle_count = 0;
@@ -1635,6 +1654,7 @@ int32_t StoreClientCenter::Recycle()
         ret = store_client->RecycleRecordFile(record_file);
         if (ret == -ERR_RECORD_FILE_BUSY)
         {
+            LOG_DEBUG(logger_, "recycle continue, record file %srecord_%05d is using", record_file->base_name_.c_str(), record_file->number_);
             iter++;
             continue;
         }
@@ -1645,6 +1665,7 @@ int32_t StoreClientCenter::Recycle()
         {
             ret = store_client_center->RemoveStoreClient(store_client);
             assert(ret == 0);
+            LOG_DEBUG(logger_, "remove store client %d", store_client);
         }
 
         multimap<UTime, RecycleItem>::iterator del_iter = iter;
@@ -1659,6 +1680,7 @@ int32_t StoreClientCenter::Recycle()
 
     assert(iter != recycle_map_.end());
 
+    recycle_event_ = NULL;
     return 0;
 }
 

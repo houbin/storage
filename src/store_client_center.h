@@ -212,6 +212,8 @@ private:
     multimap<UTime, RecycleItem> recycle_map_;
     map<RecordFile*, multimap<UTime, RecycleItem>::iterator> recycle_item_search_map_;
 
+    C_Recycle *recycle_event_;
+
 public:
     Mutex timer_lock;
     SafeTimer timer;
@@ -236,6 +238,7 @@ public:
     int32_t UpdateRecordFileInRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
     int32_t RemoveFromRecycleQueue(RecordFile *record_file);
+    int32_t StartRecycle();
     int32_t Recycle();
 
     void Shutdown();

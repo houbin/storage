@@ -13,21 +13,52 @@ FreeFileTable::FreeFileTable(Logger *logger)
 
 }
 
+uint32_t FreeFileTable::CountRecordFiles()
+{
+    uint32_t sum = 0;
+
+    map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
+    for (; iter != disk_free_file_info_.end(); iter++)
+    {
+        DiskInfo *disk_info = iter->second;
+        
+        sum += disk_info->free_file_queue.size();
+    }
+
+    return sum;
+}
+
+int32_t FreeFileTable::TryRecycle()
+{
+    uint32_t sum_files = 0;
+    uint32_t write_stream_counts = 0;
+
+    sum_files = CountRecordFiles();
+    write_stream_counts = stream_to_disk_map_.size();
+
+    if (sum_files <= write_stream_counts * 2)
+    {
+        store_client_center->StartRecycle();
+        return 0;
+    }
+
+    return 0;
+}
+
 int32_t FreeFileTable::Put(RecordFile *record_file)
 {
     assert(record_file != NULL);
-    LOG_DEBUG(logger_, "put record file %p", record_file);
+    LOG_DEBUG(logger_, "put free record file %srecord_%05d", record_file->base_name_.c_str(), record_file->number_);
 
     int32_t ret;
     DiskInfo *disk_info = NULL;
 
     Mutex::Locker lock(mutex_);
-
     string disk_base_name(record_file->base_name_);
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
     if (iter == disk_free_file_info_.end())
     {
-        disk_info = new struct DiskInfo;
+        disk_info = new DiskInfo;
         assert(disk_info != NULL);
         disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
         LOG_DEBUG(logger_, "not found disk info");
@@ -59,7 +90,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    LOG_INFO(logger_, "get record file");
+    LOG_DEBUG(logger_, "get free record file, stream info [%s]", stream_info.c_str());
 
     int32_t ret;
 
@@ -77,8 +108,9 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
         {
             *record_file = disk_info->free_file_queue.front();
             disk_info->free_file_queue.pop_front();
-            
-            return 0;
+            LOG_DEBUG(logger_, "get free record file %srecord_%05d", (*record_file)->base_name_.c_str(), (*record_file)->number_);
+
+            goto end;
         }
         else
         {
@@ -90,13 +122,15 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
     ret = GetNewDiskFreeFile(stream_info, record_file);
     assert(ret == 0);
 
+end:
+    TryRecycle();
     return 0;
 }
 
 int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "get new disk free file, stream info is %s", stream_info.c_str());
+    LOG_DEBUG(logger_, "get new disk free file, stream info %s", stream_info.c_str());
 
     DiskInfo *valid_disk_info = NULL;
     string disk_str;
@@ -126,16 +160,21 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
 
         if (valid_disk_info == NULL)
         {
-            store_client_center->Recycle();
+            LOG_DEBUG(logger_, "no useful disk, start recycle");
+            mutex_.Unlock();
+            store_client_center->StartRecycle();
+            mutex_.Lock();
             cond_.Wait(mutex_);
+            continue;
         }
         else
         {
+            LOG_DEBUG(logger_, "find useful disk, disk_str %s", disk_str.c_str());
             break;
         }
     }
 
-    // update disk info
+    // get record file and update disk info
     *record_file = valid_disk_info->free_file_queue.front();
     valid_disk_info->free_file_queue.pop_front();
     valid_disk_info->writing_streams.insert(stream_info);
@@ -150,12 +189,13 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
         stream_to_disk_map_.insert(make_pair(stream_info, disk_str));
     }
 
+    LOG_DEBUG(logger_, "get new disk record file %srecord_%05d", (*record_file)->base_name_.c_str(), (*record_file)->number_);
     return 0;
 }
 
 int32_t FreeFileTable::Close(string stream_info)
 {
-    Log(logger_, "close stream %s", stream_info.c_str());
+    LOG_DEBUG(logger_, "close stream %s", stream_info.c_str());
 
     string disk_base_name;
 
@@ -179,7 +219,7 @@ int32_t FreeFileTable::Close(string stream_info)
 
 int32_t FreeFileTable::Shutdown()
 {
-    Log(logger_, "shutdown");
+    LOG_DEBUG(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
     while(!disk_free_file_info_.empty())

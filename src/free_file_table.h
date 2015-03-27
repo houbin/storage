@@ -33,6 +33,9 @@ private:
     map<string, DiskInfo*> disk_free_file_info_; /* disk base name -> disk info, and disk base name == record file base name */
     map<string, string> stream_to_disk_map_; /* stream info -> disk base name */
 
+    uint32_t CountRecordFiles();
+    int32_t TryRecycle();
+
 public:
     FreeFileTable(Logger *logger);
 
