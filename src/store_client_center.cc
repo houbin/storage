@@ -230,6 +230,12 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         map<UTime, RecordFile*>::iterator iter = record_file_map_.begin();
         assert(iter != record_file_map_.end());
         start_rf = iter->second;
+        
+        /* check end time of this find */
+        if (end < start_rf->end_time_)
+        {
+            return 0;
+        }
     }
     else if (ret == -ERR_STAMP_TOO_BIG)
     {
@@ -254,7 +260,6 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         ret = record_file->GetAllFragInfo(all_frag_info);
         assert (ret == 0);
 
-        /* 
         Log(logger_, "record file %srecord_%05d get all frag info, count is %d",
                         record_file->base_name_.c_str(), record_file->number_, all_frag_info.size());
         deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
@@ -265,7 +270,6 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
             Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, 
                         temp_frag.start_time.seconds, temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
         }
-        */
 
         /* start time landed in the record file */
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)
