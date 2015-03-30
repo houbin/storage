@@ -9,7 +9,6 @@
 #include "config_opts.h"
 #include "free_file_table.h"
 #include "index_file.h"
-#include "../include/storage.h"
 #include "store_client_center.h"
 
 using namespace util;
@@ -97,7 +96,7 @@ void storage_handle_signal(int signum)
 
     int log_level = atoi(p);
     logger->SetLogLevel((Logger::LogLevel)log_level);
-    LOG_WARN(logger, "logger set log level to %d", log_level);
+    LOG_INFO(logger, "logger set log level to %d", log_level);
 
     return;
 }
@@ -221,7 +220,7 @@ int32_t storage_list_record_fragments(const int32_t id, const UTIME_T *start, co
     FRAGMENT_INFO_T *frag_info_buffer = new FRAGMENT_INFO_T[*count];
     assert(frag_info_buffer != NULL);
 
-    for (int i = 0; i < *count; i++)
+    for (int i = 0; i < (int)*count; i++)
     {
         frag_info_buffer[i] = frag_info_queue.front();
         frag_info_queue.pop_front();

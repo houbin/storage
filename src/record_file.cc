@@ -9,7 +9,7 @@
 #include "store_types.h"
 #include "record_file.h"
 #include "index_file.h"
-#include "../include/storage.h"
+#include "storage.h"
 
 using namespace util;
 
@@ -136,10 +136,6 @@ int32_t RecordFile::ZeroRecordFileTimes()
 
 int32_t RecordFile::EncodeRecordFileInfoIndex(char *record_file_info_buffer, uint32_t record_file_info_length)
 {
-//    Log(logger_, "encode record file info index, stream info is %s, record_fragment_count_ is %d, start_time is %d.%d, end_time is %d.%d, \
-//record_offset_ is %d", stream_info_.c_str(), record_fragment_count_, start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec,
-//end_time_.tv_nsec, record_offset_);
-
     struct RecordFileInfo record_file_info;
     char *temp = record_file_info_buffer;
 
@@ -235,10 +231,10 @@ int32_t RecordFile::DecodeRecordFileInfoIndex(char *buffer, uint32_t length)
 
     assert(temp <= buffer + length);
 
-//    Log(logger_, "decode record file ok. stream info: %s, record_fragment_count: %d, start_time: %d.%d, end_time: %d.%d, \
-//i_frame_start_time: %d.%d, i_frame_end_time: %d.%d, record_offset_: %d", stream_info_.c_str(), record_fragment_count_, 
-//    start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec, end_time_.tv_nsec, i_frame_start_time_.tv_sec, 
-//    i_frame_start_time_.tv_nsec, i_frame_end_time_.tv_sec, i_frame_end_time_.tv_nsec, record_offset_);
+//    Log(logger_, "decode record file ok. stream info: %s, record_fragment_count: %d, start_time: %d.%d, end_time: %d.%d, \ ///
+//i_frame_start_time: %d.%d, i_frame_end_time: %d.%d, record_offset_: %d", stream_info_.c_str(), record_fragment_count_, ///
+//    start_time_.tv_sec, start_time_.tv_nsec, end_time_.tv_sec, end_time_.tv_nsec, i_frame_start_time_.tv_sec, ///
+//    i_frame_start_time_.tv_nsec, i_frame_end_time_.tv_sec, i_frame_end_time_.tv_nsec, record_offset_);///
 
     return 0;
 }
@@ -408,7 +404,8 @@ int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
         RecordFragmentInfo temp_frag = temp_queue.front();
         temp_queue.pop_front();
 
-        FRAGMENT_INFO_T frag_info = {0};
+        FRAGMENT_INFO_T frag_info;
+        memset(&frag_info, 0, sizeof(FRAGMENT_INFO_T));
         frag_info.start_time.seconds = temp_frag.start_time.tv_sec;
         frag_info.start_time.nseconds = temp_frag.start_time.tv_nsec;
         frag_info.end_time.seconds = temp_frag.end_time.tv_sec;
@@ -532,7 +529,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
         LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, frame->size);
         return -ERR_READ_REACH_TO_END;
     }
-    assert(ret == frame->size);
+    assert(ret == (int)frame->size);
 
     return 0;
 }
@@ -575,7 +572,7 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     RWLock::WRLocker lock(rwlock_);
 
     ret = write(write_fd_, write_buffer, length);
-    if (ret != length)
+    if (ret != (int)length)
     {
         Log(logger_, "write return %d, errno msg is %s", ret, strerror(errno));
         assert(ret == (int)length);
@@ -642,7 +639,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         FRAME_INFO_T frame = {0};
         
         ret = pread(read_fd_, header, kHeaderSize, stamp_offset);
-        assert(ret == kHeaderSize);
+        assert(ret == (int)kHeaderSize);
 
         ret = DecodeHeader(header, &frame);
         if (ret == -ERR_NO_MAGIC_CODE)

@@ -8,8 +8,9 @@
 #include "index_file.h"
 #include "record_file.h"
 #include "../util/coding.h"
-#include "../include/storage.h"
 #include "../util/crc32c.h"
+#include "storage.h"
+#include "store_client.h"
 
 using namespace util;
 
@@ -122,7 +123,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
     ret = fseek(index_file_, offset, SEEK_SET);
     assert(ret != -1);
     ret = fwrite(buffer, 1, length, index_file_);
-    if (ret != length)
+    if (ret != (int)length)
     {
         LOG_FATAL(logger_, "fwrite error, index file %sindex, ret %d, length %u, errno msg is [%s]", 
                                 base_name_.c_str(), ret, length, strerror(errno));
@@ -144,7 +145,7 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
     assert(ret != -1);
 
     ret = fread(buffer, 1, length, index_file_);
-    if (ret != length)
+    if (ret != (int)length)
     {
         LOG_ERROR(logger_, "fread error, base name %sindex, ret %d, length %u, errno msg is [%s]", 
                                 base_name_.c_str(), ret, length, strerror(errno));
