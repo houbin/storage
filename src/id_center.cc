@@ -1,7 +1,7 @@
 #include "id_center.h"
 #include "../include/errcode.h"
 #include "config_opts.h"
-#include "../include/storage.h"
+#include "storage.h"
 
 namespace storage
 {

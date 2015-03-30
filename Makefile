@@ -4,7 +4,7 @@
 # #############################################################  
 # #set your own environment option  
 CC = g++
-CC_FLAG = -g -fPIC -m32
+CC_FLAG = -g -O2 -Wall -Wno-unused-parameter -Werror -fPIC -m32
 #   
 #   #set your inc and lib
 INC = -I./include -I./src/ -I./util
@@ -15,11 +15,12 @@ PRG = libstorage.so
 STATIC_PRG = libstorage.a
 OBJ = src/free_file_table.o src/id_center.o src/index_file.o src/record_file.o src/storage_api.o \
 src/store_client_center.o util/clock.o util/coding.o util/cond.o util/crc32c.o util/logger.o \
-util/mutex.o util/thread.o util/timer.o
+util/mutex.o util/thread.o util/timer.o src/record_writer.o src/record_reader.o src/store_client.o 
 
 DEPS = src/free_file_table.d src/id_center.d src/index_file.d src/record_file.d src/storage_api.d \
 src/store_client_center.d util/clock.d util/coding.d util/cond.d util/crc32c.d util/logger.d \
-util/mutex.d util/thread.d util/timer.d
+util/mutex.d util/thread.d util/timer.d src/record_writer.d src/record_reader.d \
+src/store_client.d
 
 #all target
 #all:$(PRG) $(STATIC_PRG)

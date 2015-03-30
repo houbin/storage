@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "free_file_table.h"
 #include "config_opts.h"
-#include "../include/storage.h"
+#include "storage.h"
 #include "index_file.h"
 
 namespace storage
@@ -77,6 +77,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     assert(index_file != NULL);
 
     struct RecordFileInfo record_file_info = {0};
+    memset(&record_file_info, 0, sizeof(RecordFileInfo));
     int32_t write_offset = record_file->number_ * sizeof(struct RecordFileInfo);
     index_file->Write(write_offset, (char *)&record_file_info, sizeof(struct RecordFileInfo));
     record_file->Clear();
