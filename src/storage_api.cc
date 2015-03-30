@@ -96,7 +96,7 @@ void storage_handle_signal(int signum)
 
     int log_level = atoi(p);
     logger->SetLogLevel((Logger::LogLevel)log_level);
-    LOG_WARN(logger, "logger set log level to %d", log_level);
+    LOG_INFO(logger, "logger set log level to %d", log_level);
 
     return;
 }

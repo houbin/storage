@@ -36,6 +36,7 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
         ret = FindStoreClient(stream_info, &client);
         if (ret != 0)
         {
+            LOG_WARN(logger_, "find store client error, stream info %s, ret %d", stream_info.c_str(), ret);
             return -ERR_ITEM_NOT_FOUND;
         }
 
@@ -45,6 +46,7 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
         }
 
         ret = client->OpenRead(id);
+        LOG_DEBUG(logger_, "open read ok, id %d, flag %d, stream info %s", id, flag, stream_info.c_str());
     }
     else
     {
@@ -59,6 +61,8 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
                 clients_[id] = client;
                 client_search_map_.insert(make_pair(stream_info, client));
             }
+
+            LOG_DEBUG(logger_, "no store client, so new store client, id %d, flag %d, stream info %s", id, flag, stream_info.c_str());
         }
         else
         {
@@ -67,15 +71,16 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
         }
 
         ret = client->OpenWrite(id);
+        LOG_DEBUG(logger_, "open write ok, id %d, flag %d, stream info %s", id, flag, stream_info.c_str());
     }
-
-    Log(logger_, "open store client, flag is %d, id is %d, ret is %d", flag, id, ret);
 
     return ret;
 }
 
 int32_t StoreClientCenter::AddStoreClient(string &stream_info, StoreClient **client)
 {
+    LOG_DEBUG(logger_, "add store client, stream info %s", stream_info.c_str());
+
     *client = new StoreClient(logger_, stream_info);
     assert(*client != NULL);
 
@@ -88,11 +93,10 @@ int32_t StoreClientCenter::AddStoreClient(string &stream_info, StoreClient **cli
 int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
 {
     assert(client != NULL);
-    //Log(logger_, "get store client, id is %d", id);
 
     if (id >= MAX_STREAM_COUNTS)
     {
-        Log(logger_, "id %d exceed max stream id", id);
+        LOG_WARN(logger_, "id %d exceed max stream id", id);
         return -ERR_ITEM_NOT_FOUND;
     }
 
@@ -100,8 +104,11 @@ int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
     *client = clients_[id];
     if (*client == NULL)
     {
+        LOG_WARN(logger_, "store client is NULL, id %d not exist", id);
         return -ERR_ITEM_NOT_FOUND;
     }
+
+    LOG_DEBUG(logger_, "get store client ok, id is %d", id);
 
     return 0;
 }
@@ -109,8 +116,6 @@ int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
 int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **client)
 {
     assert(client != NULL);
-
-    LOG_DEBUG(logger_, "find store client, stream info is %s", stream_info.c_str());
 
     RWLock::RDLocker lock(rwlock_);
     map<string, StoreClient*>::iterator iter = client_search_map_.find(stream_info);
@@ -121,6 +126,7 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
     }
 
     *client = iter->second;
+    LOG_DEBUG(logger_, "find store client ok, stream info is %s", stream_info.c_str());
 
     return 0;
 }
@@ -128,7 +134,6 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
 int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
 {
     assert(client != NULL);
-    Log(logger_, "remove store client, client is %p", client);
     
     RWLock::WRLocker lock(rwlock_);
 
@@ -141,13 +146,13 @@ int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
     delete client;
     client = NULL;
 
+    LOG_DEBUG(logger_, "remove store client ok, client is %p", client);
     return 0;
 }
 
 int32_t StoreClientCenter::Close(int32_t id, int flag)
 {
     assert(flag == 0 || flag == 1);
-    Log(logger_, "close store client %d, flag is %d", id, flag);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -155,18 +160,25 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
     ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
-        Log(logger_, "get store client %d error, ret is %d", id, ret);
+        LOG_WARN(logger_, "get store client error, id %d, ret %d", id, ret);
         return ret;
     }
 
     if (flag == 0)
     {
         ret = client->CloseRead(id);
+        if (ret != 0)
+        {
+            LOG_ERROR(logger_, "close read error, id %d, ret %d", id, ret);
+        }
     }
     else
     {
         ret = client->CloseWrite(id);
-
+        if (ret != 0)
+        {
+            LOG_ERROR(logger_, "close write error, id %d, ret %d", id, ret);
+        }
     }
 
     {
@@ -174,7 +186,8 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
         clients_[id] = NULL;
     }
 
-    Log(logger_, "close store client %d, return ret %d", id, ret);
+    if (ret == 0)
+        LOG_DEBUG(logger_, "close store client ok, id %d, ret %d", id, ret);
 
     return ret;
 }
@@ -182,7 +195,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
 int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
-    LOG_DEBUG(logger_, "write frame, id %d, frame %p, buffer size %d", id, frame, frame->size);
+    LOG_TRACE(logger_, "write frame, id %d, frame %p, buffer size %d", id, frame, frame->size);
 
     int32_t ret;
     StoreClient *client = NULL;
@@ -199,8 +212,6 @@ int32_t StoreClientCenter::WriteFrame(int32_t id, FRAME_INFO_T *frame)
 
 int32_t StoreClientCenter::SeekRead(int32_t id, UTime &stamp)
 {
-    LOG_INFO(logger_, "seek read, id is %d, stamp is %d.%d", id, stamp.tv_sec, stamp.tv_nsec);
-
     int32_t ret;
     StoreClient *client = NULL;
 
@@ -211,7 +222,15 @@ int32_t StoreClientCenter::SeekRead(int32_t id, UTime &stamp)
         return ret;
     }
 
-    return client->SeekRead(id, stamp);
+    ret = client->SeekRead(id, stamp);
+    if (ret != 0)
+    {
+        LOG_WARN(logger_, "seek frame error, id %d, ret %d", id, ret);
+        return ret;
+    }
+
+    LOG_DEBUG(logger_, "seek read ok, id %d, stamp %d.%d", id, stamp.tv_sec, stamp.tv_nsec);
+    return 0;
 }
 
 int32_t StoreClientCenter::ReadFrame(int32_t id, FRAME_INFO_T *frame)
@@ -228,7 +247,15 @@ int32_t StoreClientCenter::ReadFrame(int32_t id, FRAME_INFO_T *frame)
         return ret;
     }
 
-    return client->ReadFrame(id, frame);
+    ret = client->ReadFrame(id, frame);
+    if (ret != 0)
+    {
+        LOG_WARN(logger_, "read frame error, id %d, ret %d", id, ret);
+        return ret;
+    }
+
+    LOG_TRACE(logger_, "read frame ok, id %d", id);
+    return 0;
 }
 
 int32_t StoreClientCenter::ListRecordFragments(int32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue)
@@ -242,18 +269,28 @@ int32_t StoreClientCenter::ListRecordFragments(int32_t id, UTime &start, UTime &
     ret = GetStoreClient(id, &store_client);
     if (ret != 0)
     {
-        LOG_WARN(logger_, "get store client return %d", ret);
+        LOG_WARN(logger_, "get store client error, id %d, start time %d.%d, end time %d.%d, ret %d", 
+                    id, start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec, ret);
         return ret;
     }
 
-    return store_client->ListRecordFragments(start, end, frag_info_queue);
+    ret = store_client->ListRecordFragments(start, end, frag_info_queue);
+    if (ret != 0)
+    {
+        LOG_WARN(logger_, "list record fragments error, id %d, start time %d.%d, end time %d.%d, ret %d",
+                    id, start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec, ret);
+        return ret;
+    }
+
+    LOG_DEBUG(logger_, "list record fragments ok, id %d, start time %d.%d, end time %d.%d, ret %d",
+                id, start.tv_sec, start.tv_nsec, end.tv_sec, end.tv_nsec, ret);
+    return 0;
 }
 
 int32_t StoreClientCenter::UpdateRecordFileInRecycleQueue(StoreClient *store_client, RecordFile *record_file)
 {
     assert(store_client != NULL);
     assert(record_file != NULL);
-    LOG_INFO(logger_, "remove from recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     int32_t ret;
 
@@ -272,7 +309,7 @@ int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFi
     assert(record_file != NULL);
 
     Mutex::Locker lock(recycle_mutex_);
-    LOG_INFO(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+    LOG_DEBUG(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
 
     UTime end_time = record_file->end_time_;
 
@@ -307,8 +344,6 @@ int32_t StoreClientCenter::RemoveFromRecycleQueue(RecordFile *record_file)
 
 int32_t StoreClientCenter::StartRecycle()
 {
-    LOG_DEBUG(logger_, "start recycle");
-
     Mutex::Locker lock(timer_lock);
     
     if (recycle_event_ != NULL)
