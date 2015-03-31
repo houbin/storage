@@ -86,15 +86,25 @@ void storage_handle_signal(int signum)
         return;
     }
 
-    char *p = NULL;
-    p = getenv("storage_log_level");
-    if (p == NULL)
+    int fd;
+    fd = open("/tmp/storage_log_level", O_RDONLY);
+    if (fd == -1)
     {
-        LOG_WARN(logger, "getenv failed, no env of \"storage_log_level\"");
+        LOG_WARN(logger, "no storage_log_level config file");
         return;
     }
 
-    int log_level = atoi(p);
+    char buffer[32] = {0};
+    int ret = read(fd, buffer, 31);
+    if (ret <= 0)
+    {
+        LOG_WARN(logger, "read config file error");
+        return;
+    }
+
+    LOG_ERROR(logger, "buffer is %s", buffer);
+
+    int log_level = atoi(buffer);
     logger->SetLogLevel((Logger::LogLevel)log_level);
     LOG_INFO(logger, "logger set log level to %d", log_level);
 

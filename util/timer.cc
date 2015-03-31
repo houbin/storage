@@ -61,7 +61,7 @@ void SafeTimer::TimerThread()
 
             //mutex_.Unlock();
 
-            LOG_INFO(logger_, "TimerThread executing %p", callback);
+            LOG_DEBUG(logger_, "TimerThread executing %p", callback);
             callback->Complete(0);
 
             //mutex_.Lock();
@@ -72,7 +72,7 @@ void SafeTimer::TimerThread()
             break;
         }
 
-        LOG_INFO(logger_, "TimerThread going to sleep");
+        LOG_DEBUG(logger_, "TimerThread going to sleep");
 
         if(schedule_.empty())
         {
@@ -83,10 +83,10 @@ void SafeTimer::TimerThread()
             cond_.WaitUtil(mutex_, schedule_.begin()->first);
         }
 
-        LOG_INFO(logger_, "TimerThread awake");
+        LOG_DEBUG(logger_, "TimerThread awake");
     }
 
-    LOG_INFO(logger_, "TimerThread exiting");
+    LOG_DEBUG(logger_, "TimerThread exiting");
     mutex_.Unlock();
 
     return;
@@ -106,7 +106,7 @@ void SafeTimer::AddEventAfter(double seconds, Context *callback)
 void SafeTimer::AddEventAt(UTime t, Context* callback)
 {
     UTime now = GetClockNow();
-    LOG_INFO(logger_, "AddEventAfter %d.%d -> %p, now is %d.%d", t.tv_sec, t.tv_nsec, callback, now.tv_sec, now.tv_nsec);
+    LOG_DEBUG(logger_, "AddEventAfter %d.%d -> %p, now is %d.%d", t.tv_sec, t.tv_nsec, callback, now.tv_sec, now.tv_nsec);
 
     if (stop_)
     {

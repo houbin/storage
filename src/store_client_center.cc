@@ -148,6 +148,29 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
     return 0;
 }
 
+int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
+{
+    assert(client != NULL);
+
+    if (id >= MAX_STREAM_COUNTS)
+    {
+        LOG_WARN(logger_, "id %d exceed max stream id", id);
+        return -ERR_ITEM_NOT_FOUND;
+    }
+
+    RWLock::RDLocker lock(rwlock_);
+    *client = clients_[id];
+    if (*client == NULL)
+    {
+        LOG_WARN(logger_, "store client is NULL, id %d not exist", id);
+        return -ERR_ITEM_NOT_FOUND;
+    }
+
+    LOG_DEBUG(logger_, "get store client ok, id is %d", id);
+
+    return 0;
+}
+
 int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
 {
     assert(client != NULL);

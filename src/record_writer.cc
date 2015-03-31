@@ -273,14 +273,14 @@ void *RecordWriter::Entry()
                 current_o_frame_ = frame;
                 frame = temp;                
                 
-                LOG_WARN(logger_, "O frame, replace current o frame");
+                LOG_INFO(logger_, "O frame, replace current o frame");
                 goto FreeResource;
             }
             else if (frame_type == JVN_DATA_I)
             {
                 if (current_o_frame_ == NULL)
                 {
-                    LOG_WARN(logger_, "I frame, but no O frame");
+                    LOG_INFO(logger_, "I frame, but no O frame");
                     goto FreeResource;
                 }
 
@@ -288,7 +288,7 @@ void *RecordWriter::Entry()
                 first_i_frame = true;
                 current_o_frame_->frame_time.seconds = frame->frame_time.seconds;
                 current_o_frame_->frame_time.nseconds = frame->frame_time.nseconds;
-                LOG_INFO(logger_, "I frame, and already have O frame");
+                LOG_DEBUG(logger_, "I frame, and already have O frame");
             }
             else
             {
