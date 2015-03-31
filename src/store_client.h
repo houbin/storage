@@ -8,6 +8,7 @@
 #include "../util/logger.h"
 #include "../util/thread.h"
 #include "../util/rwlock.h"
+#include "../util/atomic.h"
 #include "store_types.h"
 #include "free_file_table.h"
 #include "record_writer.h"
@@ -73,11 +74,17 @@ private:
     Mutex reader_mutex_;
     map<int32_t, RecordReader*> record_readers_;
 
+    AtomicInt32 use_count_;
+
 public:
     StoreClient(Logger *logger, string stream_info);
 
-    bool IsRecordFileEmpty();
+    bool CheckRecycle();
     string GetStreamInfo();
+
+    void IncUse();
+    void DecUse();
+    int32_t GetUseCount();
 
     int32_t OpenWrite(int32_t id);
     int32_t EnqueueFrame(FRAME_INFO_T *frame);
@@ -90,15 +97,12 @@ public:
 
     int32_t GetFreeFile(RecordFile **record_file);
     int32_t GetLastRecordFile(RecordFile **record_file);
-    int32_t SeekReaderStampOffset(UTime &stamp, RecordFile **record_file, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
     int32_t PutRecordFile(UTime &stamp, RecordFile *record_file);
     int32_t RecycleRecordFile(RecordFile *record_file);
 
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
     int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
-
-    void Shutdown();
 };
 
 }

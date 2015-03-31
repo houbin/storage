@@ -45,6 +45,10 @@ private:
 
     C_Recycle *recycle_event_;
 
+    int32_t FindStoreClientUnlocked(string stream_info, StoreClient **client);
+    int32_t GetStoreClientUnlocked(int32_t id, StoreClient **client);
+    int32_t RemoveStoreClient(StoreClient *client);
+
 public:
     Mutex timer_lock;
     SafeTimer timer;
@@ -56,9 +60,8 @@ public:
     int32_t Close(int32_t id, int flag);
     int32_t AddStoreClient(string &stream_info, StoreClient **client);
 
-    int32_t GetStoreClient(int32_t id, StoreClient **client);
     int32_t FindStoreClient(string stream_info, StoreClient **client);
-    int32_t RemoveStoreClient(StoreClient *client);
+    int32_t GetStoreClient(int32_t id, StoreClient **client);
 
     int32_t WriteFrame(int32_t id, FRAME_INFO_T *frame);
     int32_t SeekRead(int32_t id, UTime &stamp);

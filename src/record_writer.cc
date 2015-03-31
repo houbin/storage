@@ -7,10 +7,16 @@ namespace storage
 
 RecordWriter::RecordWriter(Logger *logger,RecordFileMap *file_map)
 : logger_(logger), file_map_(file_map), queue_mutex_("RecordWriter::queue_mutex"),
-record_file_mutex_("RecordWriter::record_file_mutex"), record_file_(NULL), buffer_(NULL), buffer_write_offset_(0),
+writer_mutex_("RecordWriter::record_file_mutex"), record_file_(NULL), buffer_(NULL), buffer_write_offset_(0),
 current_o_frame_(NULL), write_index_event_(NULL), stop_(false)
 {
     memset((void *)&buffer_times_, 0, sizeof(BufferTimes));
+}
+
+bool RecordWriter::IsStopped()
+{
+    Mutex::Locker lock(queue_mutex_);
+    return stop_;
 }
 
 int32_t RecordWriter::Enqueue(WriteOp *write_op)
@@ -148,7 +154,7 @@ int32_t RecordWriter::WriteRecordFileIndex(int r)
 
     {
         // build index data
-        Mutex::Locker lock(record_file_mutex_);
+        Mutex::Locker lock(writer_mutex_);
 
         if (record_file_ == NULL)
         {
@@ -165,18 +171,18 @@ int32_t RecordWriter::WriteRecordFileIndex(int r)
 
         base_name = record_file_->base_name_;
         number = record_file_->number_;
-
-        ret = index_file_manager->Find(base_name, &index_file);
-        assert(ret == 0 && index_file != NULL);
-        file_counts = index_file->GetFileCounts();
-
-        file_info_write_offset = number * sizeof(RecordFileInfo);
-        frag_info_write_offset = file_counts * sizeof(RecordFileInfo) + 
-                                 number * kStripeCount * sizeof(RecordFragmentInfo) + 
-                                 (record_frag_info_number -1) * sizeof(RecordFragmentInfo);
-        index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
-        index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
     }
+
+    ret = index_file_manager->Find(base_name, &index_file);
+    assert(ret == 0 && index_file != NULL);
+    file_counts = index_file->GetFileCounts();
+
+    file_info_write_offset = number * sizeof(RecordFileInfo);
+    frag_info_write_offset = file_counts * sizeof(RecordFileInfo) + 
+                             number * kStripeCount * sizeof(RecordFragmentInfo) + 
+                             (record_frag_info_number -1) * sizeof(RecordFragmentInfo);
+    index_file->Write(frag_info_write_offset, (char *)&record_frag_info_buffer, sizeof(struct RecordFragmentInfo));
+    index_file->Write(file_info_write_offset, (char *)&record_file_info_buffer, sizeof(struct RecordFileInfo));
 
 again:
 
@@ -299,7 +305,6 @@ void *RecordWriter::Entry()
             }
 
             {
-                Mutex::Locker lock(record_file_mutex_);
                 if (record_file_ == NULL)
                 {
                     RecordFile *temp_file = NULL;
@@ -310,7 +315,9 @@ void *RecordWriter::Entry()
                         assert(ret == 0 && temp_file != NULL);
                     }
 
+                    writer_mutex_.Lock();
                     record_file_ = temp_file;
+                    writer_mutex_.Unlock();
                 }
             }
 
@@ -359,12 +366,14 @@ void *RecordWriter::Entry()
 
                 {
                     // alloc new record file
-                    Mutex::Locker lock(record_file_mutex_);
                     RecordFile *record_file = NULL;
                     UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
                     ret = file_map_->AllocWriteRecordFile(stamp, &record_file);
                     assert(ret == 0 && record_file != NULL);
+
+                    writer_mutex_.Lock();
                     record_file_ = record_file;
+                    writer_mutex_.Unlock();
                 }
 
                 uint32_t temp_buffer_write_offset = 0;

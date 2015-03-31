@@ -27,8 +27,8 @@ int32_t RecordReader::Seek(UTime &stamp)
     read_offset_ = seek_start_offset;
     read_end_offset_ = seek_end_offset;
 
-    Log(logger_, "seek record file %srecord_%05d, start offset %d, end offset %d", record_file_->base_name_.c_str(), 
-                    record_file_->number_, read_offset_, read_end_offset_);
+    LOG_DEBUG(logger_, "seek record file %srecord_%05d, start offset %d, end offset %d", record_file_->base_name_.c_str(), 
+                            record_file_->number_, read_offset_, read_end_offset_);
 
     return 0;
 }

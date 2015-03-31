@@ -36,7 +36,8 @@ private:
     Cond queue_cond_;
     deque<WriteOp*> write_op_queue_;
 
-    Mutex record_file_mutex_;
+    // protect blow variable
+    Mutex writer_mutex_;
     RecordFile *record_file_;
 
     char *buffer_;
@@ -51,6 +52,8 @@ private:
 
 public:
     RecordWriter(Logger *logger, RecordFileMap *file_map_);
+
+    bool IsStopped();
 
     int32_t Enqueue(WriteOp *write_op);
     int32_t Dequeue(WriteOp **write_op);

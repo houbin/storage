@@ -618,16 +618,11 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
             assert(ret == 0);
         }
     
-    }
-
-    {
-        RWLock::RDLocker lock(rwlock_);
         ret = GetStampStartAndEndOffset(stamp, frag_start_offset, frag_end_offset);
         if (ret != 0)
         {
             return -ERR_ITEM_NOT_FOUND;
         }
-
     }
     
     seek_end_offset = frag_end_offset;

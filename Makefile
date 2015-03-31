@@ -4,7 +4,8 @@
 # #############################################################  
 # #set your own environment option  
 CC = g++
-CC_FLAG = -g -O2 -Wall -Wno-unused-parameter -Werror -fPIC -m32
+CC_FLAG = -g -O2 -Wall -Wno-unused-parameter -Werror -fPIC -m32 
+#-march=i686
 #   
 #   #set your inc and lib
 INC = -I./include -I./src/ -I./util

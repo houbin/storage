@@ -403,7 +403,7 @@ int32_t RecordFileMap::FinishWriteRecordFile(RecordFile *record_file)
         assert(ret == 0);
     }
 
-    Log(logger_, "finish write record file %srecord_%05d, write offset %d, start time %d.%d, end time %d.%d", record_file->base_name_.c_str(),
+    LOG_DEBUG(logger_, "finish write record file %srecord_%05d, write offset %d, start time %d.%d, end time %d.%d", record_file->base_name_.c_str(),
         record_file->number_, record_file->record_offset_, record_file->start_time_.tv_sec, record_file->start_time_.tv_nsec,
         record_file->end_time_.tv_sec, record_file->end_time_.tv_nsec);
 
@@ -489,16 +489,45 @@ void RecordFileMap::Shutdown()
 
     return;
 }
+
 StoreClient::StoreClient(Logger *logger, string stream_info)
 : logger_(logger), stream_info_(stream_info), record_file_map_(logger_, this), 
- writer(logger_, &record_file_map_), reader_mutex_("StoreClient::read_mutex_")
+ writer(logger_, &record_file_map_), reader_mutex_("StoreClient::read_mutex_"), use_count_()
 {
 
 }
 
-bool StoreClient::IsRecordFileEmpty()
+bool StoreClient::CheckRecycle()
 {
-    return record_file_map_.Empty();
+    // some one use this client ?
+    if (GetUseCount() > 0)
+    {
+        return false;
+    }
+
+    if (!record_file_map_.Empty())
+    {
+        return false;
+    }
+
+    return true;
+}
+
+void StoreClient::IncUse()
+{
+    use_count_.Inc();
+    return;
+}
+
+void StoreClient::DecUse()
+{
+    use_count_.Dec();
+    return;
+}
+
+int32_t StoreClient::GetUseCount()
+{
+    return use_count_.Get();
 }
 
 string StoreClient::GetStreamInfo()
@@ -651,11 +680,6 @@ int32_t StoreClient::GetLastRecordFile(RecordFile **record_file)
     return record_file_map_.GetLastRecordFile(record_file);
 }
 
-int32_t StoreClient::SeekReaderStampOffset(UTime &stamp, RecordFile **record_file, uint32_t &seek_start_offset, uint32_t &seek_end_offset)
-{
-    return record_file_map_.SeekStampOffset(stamp, record_file, seek_start_offset, seek_end_offset);
-}
-
 int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile *record_file)
 {
     Log(logger_, "put record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
@@ -676,6 +700,7 @@ int32_t StoreClient::CloseRead(int32_t id)
 {
     Log(logger_, "close read id %d");
 
+    Mutex::Locker lock(reader_mutex_);
     map<int32_t, RecordReader*>::iterator iter = record_readers_.find(id);
     if (iter == record_readers_.end())
     {
@@ -685,6 +710,7 @@ int32_t StoreClient::CloseRead(int32_t id)
     RecordReader *record_reader = iter->second;
     record_reader->Close();
     delete record_reader;
+    record_readers_.erase(id);
 
     return 0;
 }
@@ -701,15 +727,6 @@ int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMEN
     }
 
     return 0;
-}
-
-void StoreClient::Shutdown()
-{
-    writer.Shutdown();
-    record_file_map_.Shutdown();
-
-    //TODO reader shutdown
-    return;
 }
 
 }
