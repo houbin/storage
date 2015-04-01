@@ -86,6 +86,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 
     disk_info->free_file_queue.push_back(record_file);
     cond_.Signal();
+    LOG_INFO(logger_, "put free record file ok, record file %srecord_%05d", record_file->base_name_.c_str(), record_file->number_);
 
     return 0;
 }
@@ -131,6 +132,8 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 end:
     
     TryRecycle();
+    LOG_INFO(logger_, "get free record file ok, stream info [%s], record_file %srecord_%05d", stream_info.c_str(), (*record_file)->base_name_.c_str(),
+                        (*record_file)->number_);
     return 0;
 }
 
@@ -251,6 +254,13 @@ int32_t FreeFileTable::Shutdown()
     }
     
     return 0;
+}
+
+void FreeFileTable::Dump()
+{
+    LOG_INFO(logger_, "free file table record file sum %d", CountRecordFiles());
+
+    return;
 }
 
 }

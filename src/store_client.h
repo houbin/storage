@@ -44,6 +44,7 @@ public:
     RecordFileMap(Logger *logger, StoreClient *store_client);
 
     bool Empty();
+    int32_t GetRecordFileNumbers();
 
     /* these functions just get or put record file */
     int32_t PutRecordFile(UTime &time, RecordFile *record_file);
@@ -81,6 +82,7 @@ public:
 
     bool CheckRecycle();
     string GetStreamInfo();
+    int32_t GetRecordFileNumbers();
 
     void IncUse();
     void DecUse();
@@ -103,6 +105,8 @@ public:
     int32_t WriteRecordFileIndex(RecordFile *record_file, int r);
 
     int32_t ListRecordFragments(UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
+
+    void Dump();
 };
 
 }

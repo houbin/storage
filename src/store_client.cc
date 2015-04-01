@@ -17,6 +17,12 @@ bool RecordFileMap::Empty()
     return record_file_map_.empty();
 }
 
+int32_t RecordFileMap::GetRecordFileNumbers()
+{
+    RWLock::RDLocker lock(rwlock_);
+    return record_file_map_.size();
+}
+
 int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file)
 {
     assert(record_file != NULL);
@@ -539,6 +545,11 @@ string StoreClient::GetStreamInfo()
     return stream_info_;
 }
 
+int32_t StoreClient::GetRecordFileNumbers()
+{
+    return record_file_map_.GetRecordFileNumbers();
+}
+
 int32_t StoreClient::OpenWrite(int32_t id)
 {
     Log(logger_, "open write, id is %d", id);
@@ -727,6 +738,13 @@ int32_t StoreClient::ListRecordFragments(UTime &start, UTime &end, deque<FRAGMEN
     }
 
     return 0;
+}
+
+void StoreClient::Dump()
+{
+    LOG_INFO(logger_, "store client %s, has %d record files, writer stopped: %d, reader number: %d, use_count: %d", 
+                stream_info_.c_str(), record_file_map_.GetRecordFileNumbers(), writer.IsStopped(), record_readers_.size(), GetUseCount());
+    return;
 }
 
 }

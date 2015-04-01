@@ -475,21 +475,23 @@ void StoreClientCenter::Shutdown()
     return;
 }
 
-int32_t StoreClientCenter::DumpClientSearchMap()
+void StoreClientCenter::Dump()
 {
+    int32_t record_file_sum = 0;
+
     RWLock::RDLocker lock(rwlock_);
 
+    LOG_INFO(logger_, "####store client center dump start");
     map<string, StoreClient*>::iterator iter = client_search_map_.begin();
     for (; iter != client_search_map_.end(); iter++)
     {
-        string temp = iter->first;
         StoreClient *store_client = iter->second;
-        string stream_info = store_client->GetStreamInfo();
-        fprintf(stderr, "stream info is %s, storeclient is %p, stream info of store client is %s\n", temp.c_str(), store_client,
-            stream_info.c_str());
+        store_client->Dump();
+        record_file_sum += store_client->GetRecordFileNumbers();
     }
+    LOG_INFO(logger_, "####store client center dump end, record file sum %d, recycle queue file sum %d", record_file_sum, recycle_map_.size());
 
-    return 0;
+    return;
 }
 
 }

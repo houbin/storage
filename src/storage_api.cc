@@ -81,32 +81,36 @@ int32_t storage_formate_disk(char *disk)
 
 void storage_handle_signal(int signum)
 {
-    if (signum != SIGUSR1)
+    if (signum == SIGUSR1)
     {
-        return;
-    }
+        int fd;
+        fd = open("/tmp/storage_log_level", O_RDONLY);
+        if (fd == -1)
+        {
+            LOG_WARN(logger, "no storage_log_level config file");
+            return;
+        }
 
-    int fd;
-    fd = open("/tmp/storage_log_level", O_RDONLY);
-    if (fd == -1)
+        char buffer[32] = {0};
+        int ret = read(fd, buffer, 31);
+        if (ret <= 0)
+        {
+            LOG_WARN(logger, "read config file error");
+            return;
+        }
+
+        LOG_ERROR(logger, "buffer is %s", buffer);
+
+        int log_level = atoi(buffer);
+        logger->SetLogLevel((Logger::LogLevel)log_level);
+        LOG_INFO(logger, "logger set log level to %d", log_level);
+    }
+    else if (signum == SIGUSR2)
     {
-        LOG_WARN(logger, "no storage_log_level config file");
-        return;
+        store_client_center->Dump();
+        free_file_table->Dump();
+        index_file_manager->Dump();
     }
-
-    char buffer[32] = {0};
-    int ret = read(fd, buffer, 31);
-    if (ret <= 0)
-    {
-        LOG_WARN(logger, "read config file error");
-        return;
-    }
-
-    LOG_ERROR(logger, "buffer is %s", buffer);
-
-    int log_level = atoi(buffer);
-    logger->SetLogLevel((Logger::LogLevel)log_level);
-    LOG_INFO(logger, "logger set log level to %d", log_level);
 
     return;
 }

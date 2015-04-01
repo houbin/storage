@@ -46,6 +46,8 @@ public:
 
     int32_t Close(string stream_info);
     int32_t Shutdown();
+
+    void Dump();
 };
 
 }

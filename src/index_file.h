@@ -51,6 +51,9 @@ public:
     int32_t Init();
     int32_t Find(string base_name, IndexFile **index_file);
     int32_t Shutdown();
+
+    int32_t GetFileNumbers();
+    void Dump();
 };
 
 }

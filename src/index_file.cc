@@ -287,5 +287,26 @@ int32_t IndexFileManager::Shutdown()
     return 0;
 }
 
+int32_t IndexFileManager::GetFileNumbers()
+{
+    int32_t sum = 0;
+    Mutex::Locker lock(mutex_);
+    
+    map<string, IndexFile*>::iterator iter = index_file_map_.begin();
+    for (; iter != index_file_map_.end(); iter++)
+    {
+        IndexFile *index_file = iter->second;
+        sum += index_file->GetFileCounts();
+    }
+
+    return sum;
+}
+
+void IndexFileManager::Dump()
+{
+    LOG_INFO(logger, "index file manager record file sum %d", GetFileNumbers());
+    return;
+}
+
 }
 

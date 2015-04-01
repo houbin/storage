@@ -77,7 +77,7 @@ public:
 
     void Shutdown();
 
-    int32_t DumpClientSearchMap();
+    void Dump();
 };
 
 class C_Recycle : public Context
