@@ -231,9 +231,11 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         start_rf = iter->second;
         
         /* check end time of this find */
-        if (end < start_rf->end_time_)
+        if (end < start_rf->start_time_)
         {
-            return 0;
+            LOG_INFO(logger_, "end time %d.%d < first_record_file start time %d.%d", end.tv_sec, end.tv_nsec,
+                                start_rf->start_time_.tv_sec, start_rf->start_time_.tv_nsec);
+            return -ERR_NO_ITEM_FOUND;
         }
     }
     else if (ret == -ERR_STAMP_TOO_BIG)
