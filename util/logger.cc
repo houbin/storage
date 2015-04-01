@@ -13,7 +13,7 @@ Logger::LogLevel init_log_level()
     }
     else
     {
-        return Logger::INFO;
+        return Logger::DEBUG;
     }
 }
 

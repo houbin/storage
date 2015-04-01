@@ -536,14 +536,13 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 
 bool RecordFile::CanRecycle()
 {
-    //Log(logger_, "check recycle");
-
     RWLock::RDLocker locker(rwlock_);
     if (read_fd_ < 0 && write_fd_ < 0 && locked_ == false)
     {
         return true;
     }
 
+    LOG_DEBUG(logger_, "can't recycle record file, belong [%s], read_fd %d, write_fd %d", stream_info_.c_str(), read_fd_, write_fd_);
     return false;
 }
 
