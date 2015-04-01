@@ -379,6 +379,10 @@ int32_t RecordFileMap::AllocWriteRecordFile(UTime &stamp, RecordFile **record_fi
         assert(ret == 0);
     }
 
+    /* used to recycle */
+    ret = store_client_center->AddToRecycleQueue(store_client_, temp_file);
+    assert(ret == 0);
+
     *record_file = temp_file;
 
     return 0;
@@ -663,10 +667,6 @@ int32_t StoreClient::GetFreeFile(RecordFile **record_file)
     assert(ret == 0 && free_file != NULL);
 
     free_file->stream_info_ = stream_info_;
-
-    /* used to recycle */
-    ret = store_client_center->AddToRecycleQueue(this, free_file);
-    assert(ret == 0);
 
     *record_file = free_file;
     return 0;

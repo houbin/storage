@@ -33,8 +33,10 @@ int32_t FreeFileTable::TryRecycle()
     uint32_t sum_files = 0;
     uint32_t write_stream_counts = 0;
 
+    mutex_.Lock();
     sum_files = CountRecordFiles();
     write_stream_counts = stream_to_disk_map_.size();
+    mutex_.Unlock();
 
     if (sum_files <= write_stream_counts * 2)
     {
@@ -95,7 +97,7 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 
     int32_t ret;
 
-    Mutex::Locker lock(mutex_);
+    mutex_.Lock();
     map<string, string>::iterator stream_iter = stream_to_disk_map_.find(stream_info);
     if (stream_iter != stream_to_disk_map_.end())
     {
@@ -116,6 +118,7 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
         else
         {
             // stream migrated to other disk
+            LOG_INFO(logger_, "stream %s migrate to another disk", stream_info.c_str());
             disk_info->writing_streams.erase(stream_info);
         }
     }
@@ -123,7 +126,10 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
     ret = GetNewDiskFreeFile(stream_info, record_file);
     assert(ret == 0);
 
+    mutex_.Unlock();
+
 end:
+    
     TryRecycle();
     return 0;
 }

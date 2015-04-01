@@ -193,7 +193,7 @@ int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
     delete client;
     client = NULL;
 
-    LOG_DEBUG(logger_, "remove store client ok, client is %p", client);
+    LOG_INFO(logger_, "remove store client ok, client is %p", client);
     return 0;
 }
 
@@ -432,13 +432,12 @@ int32_t StoreClientCenter::Recycle()
 
         assert(ret == 0);
 
-        ret = store_client_center->RemoveStoreClient(store_client);
+        ret = RemoveStoreClient(store_client);
         if (ret != 0)
         {
             iter++;
             continue;
         }
-        LOG_DEBUG(logger_, "remove store client %d", store_client);
 
         multimap<UTime, RecycleItem>::iterator del_iter = iter;
         iter++;
