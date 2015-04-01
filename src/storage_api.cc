@@ -80,8 +80,7 @@ int32_t storage_formate_disk(char *disk)
 }
 
 void storage_handle_signal(int signum)
-{
-    if (signum == SIGUSR1)
+{ if (signum == SIGUSR1)
     {
         int fd;
         fd = open("/tmp/storage_log_level", O_RDONLY);
@@ -167,6 +166,7 @@ void storage_init()
     LOG_INFO(logger, "storage init ok");
 
     storage_register_signal(SIGUSR1);
+    storage_register_signal(SIGUSR2);
     return;
 }
 
