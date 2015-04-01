@@ -166,12 +166,12 @@ int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
         return -ERR_ITEM_NOT_FOUND;
     }
 
-    LOG_DEBUG(logger_, "get store client ok, id is %d", id);
+    LOG_TRACE(logger_, "get store client ok, id is %d", id);
 
     return 0;
 }
 
-int32_t StoreClientCenter::RemoveStoreClient(StoreClient *client)
+int32_t StoreClientCenter::TryRemoveStoreClient(StoreClient *client)
 {
     assert(client != NULL);
 
@@ -432,13 +432,6 @@ int32_t StoreClientCenter::Recycle()
 
         assert(ret == 0);
 
-        ret = RemoveStoreClient(store_client);
-        if (ret != 0)
-        {
-            iter++;
-            continue;
-        }
-
         multimap<UTime, RecycleItem>::iterator del_iter = iter;
         iter++;
         recycle_map_.erase(del_iter);
@@ -447,6 +440,8 @@ int32_t StoreClientCenter::Recycle()
         /* add to free file table */
         free_file_table->Put(record_file);
         recycle_count++;
+
+        TryRemoveStoreClient(store_client);
     }
 
     recycle_event_ = NULL;

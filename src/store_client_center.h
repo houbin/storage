@@ -47,7 +47,7 @@ private:
 
     int32_t FindStoreClientUnlocked(string stream_info, StoreClient **client);
     int32_t GetStoreClientUnlocked(int32_t id, StoreClient **client);
-    int32_t RemoveStoreClient(StoreClient *client);
+    int32_t TryRemoveStoreClient(StoreClient *client);
 
 public:
     Mutex timer_lock;
