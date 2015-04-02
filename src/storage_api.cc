@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "../util/logger.h"
+#include "../util/config.h"
 #include "../include/storage_api.h"
 #include "config_opts.h"
 #include "free_file_table.h"
@@ -20,6 +21,7 @@ IdCenter *id_center = NULL;
 StoreClientCenter *store_client_center = NULL;
 FreeFileTable *free_file_table = NULL;
 IndexFileManager *index_file_manager = NULL;
+Config *config = NULL;
 
 extern "C"
 {
@@ -131,8 +133,16 @@ void storage_register_signal(int signum)
 void storage_init()
 {
     int32_t ret;
+    string log_dir = "/var/log/storage/storage.log";
+    int32_t log_level = 2;
 
-    ret = NewLogger("/tmp/storage.log", &logger);
+    config = new Config("/jovision/storage.conf");
+    assert(config != NULL);
+
+    log_dir = config->Read("log_dir", log_dir);
+    log_level = config->Read("log_level", log_level);
+    ret = NewLogger(log_dir.c_str(), &logger);
+    logger->SetLogLevel((Logger::LogLevel)log_level);
     assert(ret == 0);
 
     id_center = new IdCenter(logger);

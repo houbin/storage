@@ -420,12 +420,12 @@ int32_t StoreClientCenter::Recycle()
         assert(record_file != NULL);
         assert(store_client != NULL);
 
-        LOG_DEBUG(logger_, "recycle record file %srecord_%05d, store_client info [%s]", record_file->base_name_.c_str(), 
+        LOG_INFO(logger_, "recycle record file %srecord_%05d, store_client info [%s]", record_file->base_name_.c_str(), 
                             record_file->number_, store_client->GetStreamInfo().c_str());
         ret = store_client->RecycleRecordFile(record_file);
         if (ret == -ERR_RECORD_FILE_BUSY)
         {
-            LOG_DEBUG(logger_, "recycle continue, record file %srecord_%05d is using", record_file->base_name_.c_str(), record_file->number_);
+            LOG_INFO(logger_, "recycle continue, record file %srecord_%05d is using", record_file->base_name_.c_str(), record_file->number_);
             iter++;
             continue;
         }
