@@ -687,7 +687,7 @@ void RecordFile::DumpQueue(deque<RecordFragmentInfo> &temp_queue)
     for (; iter != temp_queue.end(); iter++)
     {
         RecordFragmentInfo temp = *iter;
-        LOG_INFO(logger_, "fragment %d: start time %d.%d, end time %d.%d, start offset %d, end offset %d", temp.start_time.tv_sec,
+        LOG_INFO(logger_, "fragment %d: start time %d.%d, end time %d.%d, start offset %d, end offset %d", count, temp.start_time.tv_sec,
             temp.start_time.tv_nsec, temp.end_time.tv_sec, temp.end_time.tv_nsec, temp.frag_start_offset, temp.frag_end_offset);
 
         count ++;
