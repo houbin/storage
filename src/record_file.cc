@@ -383,6 +383,8 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
                     frag_end_time_.tv_sec, frag_end_time_.tv_nsec);
     }
 
+    DumpQueue(frag_info_queue);
+
     safe_free(record_frag_info_buffer);
     return 0;
 }
@@ -673,6 +675,25 @@ int32_t RecordFile::FinishRead()
     }
 
     return 0;
+}
+
+void RecordFile::DumpQueue(deque<RecordFragmentInfo> &temp_queue)
+{
+    int32_t count = 0;
+    LOG_INFO(logger_, "############# dump queue size %d #############", temp_queue.size());
+
+    deque<RecordFragmentInfo>::iterator iter = temp_queue.begin();
+    for (; iter != temp_queue.end(); iter++)
+    {
+        RecordFragmentInfo temp = *iter;
+        LOG_INFO(logger_, "fragment %d: start time %d.%d, end time %d.%d, start offset %d, end offset %d", temp.start_time.tv_sec,
+            temp.start_time.tv_nsec, temp.end_time.tv_sec, temp.end_time.tv_nsec, temp.frag_start_offset, temp.frag_end_offset);
+
+        count ++;
+    }
+
+    LOG_INFO(logger_, "############# dump queue end #############");
+    return ;
 }
 
 }

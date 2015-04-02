@@ -77,6 +77,8 @@ public:
     int32_t SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, uint32_t &seek_end_offset);
     int32_t ReadFrame(uint32_t id, FRAME_INFO_T *frame);
     int32_t FinishRead();
+
+    void DumpQueue(deque<RecordFragmentInfo> &temp_queue);
 };
 
 }
