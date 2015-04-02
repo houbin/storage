@@ -385,6 +385,11 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 
     DumpQueue(frag_info_queue);
 
+    LOG_INFO(logger_, "############## record file info ###############");
+    LOG_INFO(logger_, "start time %d.%d, end time %d.%d, start offset %d, end offset %d", start_time_.tv_sec, start_time_.tv_nsec,
+                end_time_.tv_sec, end_time_.tv_nsec, 0, record_offset_);
+    LOG_INFO(logger, "############## record file info end ############");
+
     safe_free(record_frag_info_buffer);
     return 0;
 }
