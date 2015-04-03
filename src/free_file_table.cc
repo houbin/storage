@@ -202,6 +202,21 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
     return 0;
 }
 
+int32_t FreeFileTable::UpdateDiskWritingStream(string stream_info, RecordFile *record_file)
+{
+    string disk_base_name = record_file->base_name_;
+
+    Mutex::Locker lock(mutex_);
+    stream_to_disk_map_.insert(make_pair(stream_info, disk_base_name));
+    map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
+    assert(iter != disk_free_file_info_.end());
+    DiskInfo *temp_disk_info = iter->second;
+    assert(temp_disk_info != NULL);
+    temp_disk_info->writing_streams.insert(stream_info);
+
+    return 0;
+}
+
 int32_t FreeFileTable::Close(string stream_info)
 {
     LOG_DEBUG(logger_, "close stream %s", stream_info.c_str());

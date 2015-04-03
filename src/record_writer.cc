@@ -314,6 +314,7 @@ void *RecordWriter::Entry()
                         ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
                         assert(ret == 0 && temp_file != NULL);
                     }
+                    free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
 
                     writer_mutex_.Lock();
                     record_file_ = temp_file;

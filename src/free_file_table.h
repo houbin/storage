@@ -43,6 +43,7 @@ public:
     int32_t Get(string stream_info, RecordFile **record_file);
 
     int32_t GetNewDiskFreeFile(string stream_info, RecordFile **record_file);
+    int32_t UpdateDiskWritingStream(string stream_info, RecordFile *record_file);
 
     int32_t Close(string stream_info);
     int32_t Shutdown();
