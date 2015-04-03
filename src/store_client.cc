@@ -23,7 +23,7 @@ int32_t RecordFileMap::GetRecordFileNumbers()
     return record_file_map_.size();
 }
 
-int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file)
+int32_t RecordFileMap::FindStampInOrLowerRecordFile(UTime &time, RecordFile **record_file)
 {
     assert(record_file != NULL);
     //Log(logger_, "find stamp %d.%d", time.tv_sec, time.tv_nsec);
@@ -43,6 +43,7 @@ int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file
         {
             Log(logger_, "time < all file stamp, find time is %d.%d, but first file start time is %d.%d", 
             time.tv_sec, time.tv_nsec, iter->first.tv_sec, iter->first.tv_nsec);
+            *record_file = iter->second;
             return -ERR_STAMP_TOO_SMALL;
         }
     }
@@ -68,8 +69,18 @@ int32_t RecordFileMap::FindStampRecordFile(UTime &time, RecordFile **record_file
     }
     else
     {
+        map<UTime, RecordFile*>::iterator back_iter = iter_up;
         iter_up--;
-        *record_file = iter_up->second;
+        RecordFile * temp_file = iter_up->second;
+
+        if (temp_file->start_time_ <= time && time <= temp_file->end_time_)
+        {
+            *record_file = temp_file;
+        }
+        else
+        {
+            *record_file = back_iter->second;
+        }
     }
 
     return 0;
@@ -222,7 +233,7 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
     }
 
     RWLock::RDLocker lock(rwlock_);
-    ret = FindStampRecordFile(start, &start_rf);
+    ret = FindStampInOrLowerRecordFile(start, &start_rf);
     if (ret == -ERR_STAMP_TOO_SMALL)
     {
         // use first record file as start record file
@@ -455,7 +466,7 @@ int32_t RecordFileMap::SeekStampOffset(UTime &stamp, RecordFile **record_file, u
     }
 
     RWLock::WRLocker lock(rwlock_);
-    ret = FindStampRecordFile(stamp, record_file);
+    ret = FindStampInOrLowerRecordFile(stamp, record_file);
     if (ret != 0)
     {
         Log(logger_, "not find stamp %d.%d, ret is %d", stamp.tv_sec, stamp.tv_nsec, ret);

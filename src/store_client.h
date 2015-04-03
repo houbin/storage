@@ -32,7 +32,7 @@ private:
     map<UTime, RecordFile*> record_file_map_;
     map<RecordFile*, map<UTime, RecordFile*>::iterator> file_search_map_;
 
-    int32_t FindStampRecordFile(UTime &stamp, RecordFile **record_file);
+    int32_t FindStampInOrLowerRecordFile(UTime &stamp, RecordFile **record_file);
     int32_t SelectFragInfoWithStartTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, deque<FRAGMENT_INFO_T> &select_frag_info);
     int32_t SelectFragInfoWithStartAndEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info);
     int32_t SelectFragInfoWithEndTime(deque<FRAGMENT_INFO_T> &all_frag_info, UTime &end, deque<FRAGMENT_INFO_T> &select_frag_info);
