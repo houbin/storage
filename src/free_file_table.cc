@@ -127,9 +127,8 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
     ret = GetNewDiskFreeFile(stream_info, record_file);
     assert(ret == 0);
 
-    mutex_.Unlock();
-
 end:
+    mutex_.Unlock();
     
     TryRecycle();
     LOG_INFO(logger_, "get free record file ok, stream info [%s], record_file %srecord_%05d", stream_info.c_str(), (*record_file)->base_name_.c_str(),
