@@ -416,12 +416,14 @@ FreeResource:
         {
             if (buffer_write_offset_ != 0 && record_file_ != NULL)
             {
-                Log(logger_, "stop_, write left data");
+                LOG_INFO(logger_, "stop_, write left data");
 
+                queue_mutex_.Unlock();
                 ret = WriteBuffer(kBlockSize);
                 assert(ret == 0);
                 DoWriteIndexEvent(false);
                 file_map_->FinishWriteRecordFile(record_file_);
+                queue_mutex_.Lock();
             }
 
             break;
