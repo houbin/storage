@@ -7,9 +7,163 @@ namespace storage
 
 uint64_t kOpSeq = 0;
 
+RecordRecycle::RecordRecycle(Logger *logger, StoreClientCenter *client_center)
+: logger_(logger), client_center_(client_center), mutex_("RecordRecycle::mutex"), stop_(false)
+{
+
+}
+
+void RecordRecycle::Init()
+{
+    Create();
+    return;
+}
+
+int32_t RecordRecycle::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)
+{
+    assert(store_client != NULL);
+    assert(record_file != NULL);
+
+    Mutex::Locker lock(mutex_);
+    LOG_DEBUG(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
+
+    UTime end_time = record_file->end_time_;
+
+    RecycleItem recycle_item;
+    recycle_item.store_client = store_client;
+    recycle_item.record_file = record_file;
+
+    multimap<UTime, RecycleItem>::iterator insert_iter = recycle_map_.insert(make_pair(end_time, recycle_item));
+
+    pair<map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator, bool> ret;
+    ret = recycle_item_search_map_.insert(make_pair(record_file, insert_iter));
+    assert(ret.second == true);
+
+    return 0;
+}
+
+int32_t RecordRecycle::RemoveFromRecycleQueue(RecordFile *record_file)
+{
+    Mutex::Locker lock(mutex_);
+
+    map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator search_iter = recycle_item_search_map_.find(record_file);
+    assert(search_iter != recycle_item_search_map_.end());
+
+    multimap<UTime, RecycleItem>::iterator iter = search_iter->second;
+    assert(iter != recycle_map_.end());
+
+    recycle_map_.erase(iter);
+    recycle_item_search_map_.erase(search_iter);
+    
+    return 0;
+}
+
+int32_t RecordRecycle::UpdateRecordFile(StoreClient *store_client, RecordFile *record_file)
+{
+    assert(store_client != NULL);
+    assert(record_file != NULL);
+
+    int32_t ret;
+
+    ret = RemoveFromRecycleQueue(record_file);
+    assert (ret == 0);
+
+    ret = AddToRecycleQueue(store_client, record_file);
+    assert(ret == 0);
+
+    return 0;
+}
+
+int32_t RecordRecycle::StartRecycle()
+{
+    Mutex::Locker lock(mutex_);
+    cond_.Signal();
+
+    return 0;
+}
+
+void *RecordRecycle::Entry()
+{
+    int32_t ret = 0;
+
+    mutex_.Lock();
+    while (true)
+    {
+        uint32_t recycle_count = 0;
+        multimap<UTime, RecycleItem>::iterator iter = recycle_map_.begin();
+        while (recycle_count < kFilesPerRecycle && iter != recycle_map_.end() && !stop_)
+        {
+            RecycleItem recycle_item = iter->second;
+            RecordFile *record_file = recycle_item.record_file;
+            StoreClient *store_client = recycle_item.store_client;
+
+            assert(record_file != NULL);
+            assert(store_client != NULL);
+
+            LOG_INFO(logger_, "recycle record file %srecord_%05d, store_client info [%s]", record_file->base_name_.c_str(), 
+                                record_file->number_, store_client->GetStreamInfo().c_str());
+
+            ret = store_client->RecycleRecordFile(record_file);
+            if (ret == -ERR_RECORD_FILE_BUSY)
+            {
+                LOG_INFO(logger_, "recycle continue, record file %srecord_%05d is using", record_file->base_name_.c_str(), record_file->number_);
+                iter++;
+                continue;
+            }
+
+            assert(ret == 0);
+
+            multimap<UTime, RecycleItem>::iterator del_iter = iter;
+            iter++;
+            recycle_map_.erase(del_iter);
+            recycle_item_search_map_.erase(record_file);
+
+            /* add to free file table */
+            free_file_table->Put(record_file);
+            recycle_count++;
+
+            client_center_->TryRemoveStoreClient(store_client);
+        }
+
+        if (iter == recycle_map_.end())
+        {
+            LOG_INFO(logger_, "recycle entry reached to end of recycle_map_");
+        }
+
+        if (stop_)
+        {
+            break;
+        }
+        
+        cond_.Wait(mutex_);
+    }
+
+    mutex_.Unlock();
+
+    return 0;
+}
+
+void RecordRecycle::Shutdown()
+{
+    LOG_INFO(logger_, "record recycle shutdown");
+    mutex_.Lock();
+    stop_ = true;
+    cond_.Signal();
+    mutex_.Unlock();
+    Join();
+
+    return;
+}
+
+void RecordRecycle::Dump()
+{
+    LOG_INFO(logger_, "############# record recycle map have %d record files #############", recycle_map_.size());
+
+    return;
+}
+
 StoreClientCenter::StoreClientCenter(Logger *logger)
-: logger_(logger), rwlock_("StoreClientCenter::RWLock"), recycle_mutex_("StoreClientCenter::RecycleMutex"),
-recycle_event_(NULL), timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
+: logger_(logger), rwlock_("StoreClientCenter::RWLock"), timer_lock("StoreClientCenter::timer_lock"), timer(logger_, timer_lock)
 {
     clients_.resize(MAX_STREAM_COUNTS, 0);
 }
@@ -332,122 +486,6 @@ int32_t StoreClientCenter::ListRecordFragments(int32_t id, UTime &start, UTime &
     return 0;
 }
 
-int32_t StoreClientCenter::UpdateRecordFileInRecycleQueue(StoreClient *store_client, RecordFile *record_file)
-{
-    assert(store_client != NULL);
-    assert(record_file != NULL);
-
-    int32_t ret;
-
-    ret = RemoveFromRecycleQueue(record_file);
-    assert (ret == 0);
-
-    ret = AddToRecycleQueue(store_client, record_file);
-    assert(ret == 0);
-
-    return 0;
-}
-
-int32_t StoreClientCenter::AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file)
-{
-    assert(store_client != NULL);
-    assert(record_file != NULL);
-
-    Mutex::Locker lock(recycle_mutex_);
-    LOG_DEBUG(logger_, "add to recycle queue, store_client is %p, record_file is %p", store_client, record_file);
-
-    UTime end_time = record_file->end_time_;
-
-    RecycleItem recycle_item;
-    recycle_item.store_client = store_client;
-    recycle_item.record_file = record_file;
-
-    multimap<UTime, RecycleItem>::iterator insert_iter = recycle_map_.insert(make_pair(end_time, recycle_item));
-
-    pair<map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator, bool> ret;
-    ret = recycle_item_search_map_.insert(make_pair(record_file, insert_iter));
-    assert(ret.second == true);
-
-    return 0;
-}
-
-int32_t StoreClientCenter::RemoveFromRecycleQueue(RecordFile *record_file)
-{
-    Mutex::Locker lock(recycle_mutex_);
-
-    map<RecordFile*, multimap<UTime, RecycleItem>::iterator>::iterator search_iter = recycle_item_search_map_.find(record_file);
-    assert(search_iter != recycle_item_search_map_.end());
-
-    multimap<UTime, RecycleItem>::iterator iter = search_iter->second;
-    assert(iter != recycle_map_.end());
-
-    recycle_map_.erase(iter);
-    recycle_item_search_map_.erase(search_iter);
-    
-    return 0;
-}
-
-int32_t StoreClientCenter::StartRecycle()
-{
-    Mutex::Locker lock(timer_lock);
-    
-    if (recycle_event_ != NULL)
-    {
-        return 0;
-    }
-
-    recycle_event_ = new C_Recycle(this);
-    assert(recycle_event_ != NULL);
-
-    timer.AddEventAfter(0, recycle_event_);
-
-    return 0;
-}
-
-int32_t StoreClientCenter::Recycle()
-{
-    uint32_t recycle_count = 0;
-    int32_t ret = 0;
-
-    Mutex::Locker lock(recycle_mutex_);
-    multimap<UTime, RecycleItem>::iterator iter = recycle_map_.begin();
-    while(iter != recycle_map_.end() && recycle_count < kFilesPerRecycle)
-    {
-        RecycleItem recycle_item = iter->second;
-        RecordFile *record_file = recycle_item.record_file;
-        StoreClient *store_client = recycle_item.store_client;
-
-        assert(record_file != NULL);
-        assert(store_client != NULL);
-
-        LOG_INFO(logger_, "recycle record file %srecord_%05d, store_client info [%s]", record_file->base_name_.c_str(), 
-                            record_file->number_, store_client->GetStreamInfo().c_str());
-        ret = store_client->RecycleRecordFile(record_file);
-        if (ret == -ERR_RECORD_FILE_BUSY)
-        {
-            LOG_INFO(logger_, "recycle continue, record file %srecord_%05d is using", record_file->base_name_.c_str(), record_file->number_);
-            iter++;
-            continue;
-        }
-
-        assert(ret == 0);
-
-        multimap<UTime, RecycleItem>::iterator del_iter = iter;
-        iter++;
-        recycle_map_.erase(del_iter);
-        recycle_item_search_map_.erase(record_file);
-
-        /* add to free file table */
-        free_file_table->Put(record_file);
-        recycle_count++;
-
-        TryRemoveStoreClient(store_client);
-    }
-
-    recycle_event_ = NULL;
-    return 0;
-}
-
 void StoreClientCenter::Shutdown()
 {
     {
@@ -476,7 +514,7 @@ void StoreClientCenter::Dump()
 
     RWLock::RDLocker lock(rwlock_);
 
-    LOG_INFO(logger_, "####store client center dump start");
+    LOG_INFO(logger_, "############ store client center dump start ##############");
     map<string, StoreClient*>::iterator iter = client_search_map_.begin();
     for (; iter != client_search_map_.end(); iter++)
     {
@@ -484,7 +522,7 @@ void StoreClientCenter::Dump()
         store_client->Dump();
         record_file_sum += store_client->GetRecordFileNumbers();
     }
-    LOG_INFO(logger_, "####store client center dump end, record file sum %d, recycle queue file sum %d", record_file_sum, recycle_map_.size());
+    LOG_INFO(logger_, "############ store client center dump end, record file sum %d", record_file_sum);
 
     return;
 }

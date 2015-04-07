@@ -420,6 +420,8 @@ FreeResource:
 
                 ret = WriteBuffer(kBlockSize);
                 assert(ret == 0);
+                DoWriteIndexEvent(false);
+                file_map_->FinishWriteRecordFile(record_file_);
             }
 
             break;
@@ -474,8 +476,6 @@ void RecordWriter::Stop()
     }
     safe_free(current_o_frame_);
 
-    DoWriteIndexEvent(false);
-    file_map_->FinishWriteRecordFile(record_file_);
     record_file_ = NULL;
 
     return;

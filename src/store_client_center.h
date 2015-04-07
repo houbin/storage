@@ -7,6 +7,7 @@
 #include "../include/storage_api.h"
 #include "../util/logger.h"
 #include "../util/rwlock.h"
+#include "../util/thread.h"
 #include "store_types.h"
 #include "config_opts.h"
 #include "id_center.h"
@@ -20,6 +21,7 @@ namespace storage
 {
 
 class RecordFile;
+class StoreClientCenter;
 
 typedef struct recycle_item
 {
@@ -27,7 +29,37 @@ typedef struct recycle_item
     StoreClient *store_client;
 }RecycleItem;
 
-class C_Recycle;
+class RecordRecycle : public Thread
+{
+private:
+    Logger *logger_;
+    StoreClientCenter *client_center_;
+
+    Mutex mutex_;
+    Cond cond_;
+    // use end time of record file as key
+    multimap<UTime, RecycleItem> recycle_map_;
+    map<RecordFile*, multimap<UTime, RecycleItem>::iterator> recycle_item_search_map_;
+
+    bool stop_;
+
+public:
+    RecordRecycle(Logger *logger, StoreClientCenter *client_center);
+
+    void Init();
+
+    int32_t UpdateRecordFile(StoreClient *store_client, RecordFile *record_file);
+    int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
+    int32_t RemoveFromRecycleQueue(RecordFile *record_file);
+    int32_t StartRecycle();
+
+    void *Entry();
+
+    void Shutdown();
+
+    void Dump();
+};
+
 class StoreClientCenter
 {
 private:
@@ -38,16 +70,8 @@ private:
     vector<StoreClient*> clients_;
     map<string, StoreClient*> client_search_map_;
     
-    Mutex recycle_mutex_;
-    // use end time of record file as key
-    multimap<UTime, RecycleItem> recycle_map_;
-    map<RecordFile*, multimap<UTime, RecycleItem>::iterator> recycle_item_search_map_;
-
-    C_Recycle *recycle_event_;
-
     int32_t FindStoreClientUnlocked(string stream_info, StoreClient **client);
     int32_t GetStoreClientUnlocked(int32_t id, StoreClient **client);
-    int32_t TryRemoveStoreClient(StoreClient *client);
 
 public:
     Mutex timer_lock;
@@ -68,34 +92,11 @@ public:
     int32_t ReadFrame(int32_t id, FRAME_INFO_T *frame);
 
     int32_t ListRecordFragments(int32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
-
-    int32_t UpdateRecordFileInRecycleQueue(StoreClient *store_client, RecordFile *record_file);
-    int32_t AddToRecycleQueue(StoreClient *store_client, RecordFile *record_file);
-    int32_t RemoveFromRecycleQueue(RecordFile *record_file);
-    int32_t StartRecycle();
-    int32_t Recycle();
+    int32_t TryRemoveStoreClient(StoreClient *client);
 
     void Shutdown();
 
     void Dump();
-};
-
-class C_Recycle : public Context
-{
-public:
-    StoreClientCenter *store_client_center_;
-
-    C_Recycle(StoreClientCenter *store_client_center)
-    : store_client_center_(store_client_center)
-    {
-    
-    }
-
-    void Finish(int r)
-    {
-        store_client_center_->Recycle();
-        return;
-    }
 };
 
 }

@@ -22,6 +22,7 @@ StoreClientCenter *store_client_center = NULL;
 FreeFileTable *free_file_table = NULL;
 IndexFileManager *index_file_manager = NULL;
 Config *config = NULL;
+RecordRecycle *record_recycle = NULL;
 
 extern "C"
 {
@@ -85,7 +86,7 @@ void storage_handle_signal(int signum)
 { if (signum == SIGUSR1)
     {
         int fd;
-        fd = open("/tmp/storage_log_level", O_RDONLY);
+        fd = open("/jovision/storage.conf", O_RDONLY);
         if (fd == -1)
         {
             LOG_WARN(logger, "no storage_log_level config file");
@@ -109,6 +110,7 @@ void storage_handle_signal(int signum)
     else if (signum == SIGUSR2)
     {
         store_client_center->Dump();
+        record_recycle->Dump();
         free_file_table->Dump();
         index_file_manager->Dump();
     }
@@ -151,6 +153,10 @@ void storage_init()
     store_client_center = new StoreClientCenter(logger);
     assert(store_client_center != NULL);
     store_client_center->Init();
+
+    record_recycle = new RecordRecycle(logger, store_client_center);
+    assert(record_recycle != NULL);
+    record_recycle->Init();
 
     free_file_table = new FreeFileTable(logger);
     assert(free_file_table != NULL);

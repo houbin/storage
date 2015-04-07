@@ -40,7 +40,7 @@ int32_t FreeFileTable::TryRecycle()
 
     if (sum_files <= write_stream_counts * 2)
     {
-        store_client_center->StartRecycle();
+        record_recycle->StartRecycle();
         return 0;
     }
 
@@ -171,7 +171,7 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
         {
             LOG_DEBUG(logger_, "no useful disk, start recycle");
             mutex_.Unlock();
-            store_client_center->StartRecycle();
+            record_recycle->StartRecycle();
             mutex_.Lock();
             cond_.Wait(mutex_);
             continue;

@@ -399,7 +399,7 @@ int32_t RecordFileMap::AllocWriteRecordFile(UTime &stamp, RecordFile **record_fi
     }
 
     /* used to recycle */
-    ret = store_client_center->AddToRecycleQueue(store_client_, temp_file);
+    ret = record_recycle->AddToRecycleQueue(store_client_, temp_file);
     assert(ret == 0);
 
     *record_file = temp_file;
@@ -414,7 +414,7 @@ int32_t RecordFileMap::FinishWriteRecordFile(RecordFile *record_file)
 
     // update record file in recycle queue
     {
-        ret = store_client_center->UpdateRecordFileInRecycleQueue(store_client_, record_file);
+        ret = record_recycle->UpdateRecordFile(store_client_, record_file);
         assert(ret == 0);
     }
 
@@ -699,31 +699,25 @@ int32_t StoreClient::GetFreeFile(RecordFile **record_file)
 int32_t StoreClient::GetLastRecordFile(RecordFile **record_file)
 {
     assert(record_file != NULL);
-    Log(logger_, "get last record file");
 
     return record_file_map_.GetLastRecordFile(record_file);
 }
 
 int32_t StoreClient::PutRecordFile(UTime &stamp, RecordFile *record_file)
 {
-    Log(logger_, "put record file, stamp is %d.%d", stamp.tv_sec, stamp.tv_nsec);
-
     record_file_map_.PutRecordFile(stamp, record_file);
-    store_client_center->AddToRecycleQueue(this, record_file);
+    record_recycle->AddToRecycleQueue(this, record_file);
 
     return 0;
 }
 
 int32_t StoreClient::RecycleRecordFile(RecordFile *record_file)
 {
-    Log(logger_, "recycle record file, record file is %p");
     return record_file_map_.EraseRecordFile(record_file);
 }
 
 int32_t StoreClient::CloseRead(int32_t id)
 {
-    Log(logger_, "close read id %d");
-
     Mutex::Locker lock(reader_mutex_);
     map<int32_t, RecordReader*>::iterator iter = record_readers_.find(id);
     if (iter == record_readers_.end())

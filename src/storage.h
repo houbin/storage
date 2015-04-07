@@ -14,6 +14,7 @@ extern IdCenter *id_center;
 extern StoreClientCenter *store_client_center;
 extern FreeFileTable *free_file_table;
 extern IndexFileManager *index_file_manager;
+extern RecordRecycle *record_recycle;
 
 #endif
 
