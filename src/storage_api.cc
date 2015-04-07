@@ -82,28 +82,19 @@ int32_t storage_formate_disk(char *disk)
 }
 
 void storage_handle_signal(int signum)
-{ if (signum == SIGUSR1)
+{ 
+    if (signum == SIGUSR1)
     {
-        int fd;
-        fd = open("/tmp/storage_log_level", O_RDONLY);
-        if (fd == -1)
+        string log_dir("/jovision/storage.conf");
+        if (!config->FileExist(log_dir.c_str()))
         {
-            LOG_WARN(logger, "no storage_log_level config file");
             return;
         }
 
-        char buffer[32] = {0};
-        int ret = read(fd, buffer, 31);
-        if (ret <= 0)
-        {
-            LOG_WARN(logger, "read config file error");
-            return;
-        }
-
-        LOG_ERROR(logger, "buffer is %s", buffer);
-
-        int log_level = atoi(buffer);
+        config->ReadFile(log_dir.c_str());
+        int log_level = config->Read("log_level", log_level);
         logger->SetLogLevel((Logger::LogLevel)log_level);
+
         LOG_INFO(logger, "logger set log level to %d", log_level);
     }
     else if (signum == SIGUSR2)
