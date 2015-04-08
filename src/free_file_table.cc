@@ -13,6 +13,18 @@ FreeFileTable::FreeFileTable(Logger *logger)
 
 }
 
+int32_t FreeFileTable::AddDisk(string disk_name)
+{
+    DiskInfo *disk_info = new DiskInfo;
+    assert(disk_info != NULL);
+
+    pair<map<string, DiskInfo*>::iterator, bool> ret;
+    ret = disk_free_file_info_.insert(make_pair(disk_name, disk_info));
+    assert(ret.second == true);
+
+    return 0;
+}
+
 uint32_t FreeFileTable::CountRecordFiles()
 {
     uint32_t sum = 0;
@@ -58,19 +70,9 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     Mutex::Locker lock(mutex_);
     string disk_base_name(record_file->base_name_);
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
-    if (iter == disk_free_file_info_.end())
-    {
-        disk_info = new DiskInfo;
-        assert(disk_info != NULL);
-        disk_free_file_info_.insert(make_pair(disk_base_name, disk_info));
-        LOG_DEBUG(logger_, "not found disk info");
-    }
-    else
-    {
-        disk_info = iter->second;
-        LOG_DEBUG(logger_, "found disk info");
-    }
+    assert(iter != disk_free_file_info_.end());
 
+    disk_info = iter->second;
     assert(disk_info != NULL);
 
     IndexFile *index_file = NULL;
@@ -121,6 +123,7 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
             // stream migrated to other disk
             LOG_INFO(logger_, "stream %s migrate to another disk", stream_info.c_str());
             disk_info->writing_streams.erase(stream_info);
+            stream_to_disk_map_.erase(stream_info);
         }
     }
 
@@ -188,15 +191,9 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
     valid_disk_info->free_file_queue.pop_front();
     valid_disk_info->writing_streams.insert(stream_info);
 
-    map<string, string>::iterator iter = stream_to_disk_map_.find(stream_info);
-    if (iter != stream_to_disk_map_.end())
-    {
-        iter->second = disk_str;
-    }
-    else
-    {
-        stream_to_disk_map_.insert(make_pair(stream_info, disk_str));
-    }
+    pair<map<string, string>::iterator, bool> ret;
+    ret = stream_to_disk_map_.insert(make_pair(stream_info, disk_str));
+    assert(ret.second == true);
 
     LOG_DEBUG(logger_, "get new disk record file %srecord_%05d", (*record_file)->base_name_.c_str(), (*record_file)->number_);
     return 0;
@@ -217,7 +214,7 @@ int32_t FreeFileTable::UpdateDiskWritingStream(string stream_info, RecordFile *r
     return 0;
 }
 
-int32_t FreeFileTable::Close(string stream_info)
+int32_t FreeFileTable::CloseStream(string stream_info)
 {
     LOG_DEBUG(logger_, "close stream %s", stream_info.c_str());
 

@@ -39,13 +39,15 @@ private:
 public:
     FreeFileTable(Logger *logger);
 
+    int32_t AddDisk(string disk_name);
+
     int32_t Put(RecordFile *record_file);
     int32_t Get(string stream_info, RecordFile **record_file);
 
     int32_t GetNewDiskFreeFile(string stream_info, RecordFile **record_file);
     int32_t UpdateDiskWritingStream(string stream_info, RecordFile *record_file);
 
-    int32_t Close(string stream_info);
+    int32_t CloseStream(string stream_info);
     int32_t Shutdown();
 
     void Dump();

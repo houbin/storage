@@ -45,6 +45,11 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     file_counts_ = atoi(file_count_str);
 }
 
+string IndexFile::GetBaseName()
+{
+    return base_name_;
+}
+
 uint32_t IndexFile::GetFileCounts()
 {
     return file_counts_;
@@ -242,6 +247,9 @@ int32_t IndexFileManager::AnalyzeAllIndexFile()
     for(; iter != index_file_map_.end(); iter++)
     {
         IndexFile *index_file = iter->second;
+        string disk_name = index_file->GetBaseName();
+
+        free_file_table->AddDisk(disk_name);
         index_file->AnalyzeAllEntry();
     }
 

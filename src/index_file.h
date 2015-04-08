@@ -26,6 +26,8 @@ private:
 public:
     IndexFile(Logger *logger, string base_name);
 
+    string GetBaseName();
+
     uint32_t GetFileCounts();
     int32_t AnalyzeAllEntry();
 

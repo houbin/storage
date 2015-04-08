@@ -608,7 +608,7 @@ int32_t StoreClient::CloseWrite(int32_t id)
     
     writer.Stop();
 
-    free_file_table->Close(stream_info_);
+    free_file_table->CloseStream(stream_info_);
 
     return 0;
 }
