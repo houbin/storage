@@ -272,7 +272,29 @@ int32_t FreeFileTable::Shutdown()
 
 void FreeFileTable::Dump()
 {
-    LOG_INFO(logger_, "free file table record file sum %d", CountRecordFiles());
+    LOG_INFO(logger_, "");
+    LOG_INFO(logger_, "############### free file table dump start ###############");
+    mutex_.Lock();
+    map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
+    for (; iter != disk_free_file_info_.end(); iter++)
+    {
+        string disk_name = iter->first;
+        DiskInfo *disk_info = iter->second;
+        assert(disk_info != NULL);
+
+        LOG_INFO(logger_, "disk name %s, streams %d, and streams list below", disk_name.c_str(), disk_info->writing_streams.size());
+        set<string>::iterator set_iter = disk_info->writing_streams.begin();
+        for (; set_iter != disk_info->writing_streams.end(); set_iter++)
+        {
+            string stream = *set_iter;
+            LOG_INFO(logger_, "%s", stream.c_str());
+        }
+        LOG_INFO(logger_, "");
+    }
+    
+    mutex_.Unlock();
+    LOG_INFO(logger_, "############### free file table dump end, sum files %d ###############", CountRecordFiles());
+    LOG_INFO(logger_, "");
 
     return;
 }

@@ -88,8 +88,7 @@ public:
 
     void Finish(int r)
     {
-        int32_t ret;
-        ret = writer_->WriteRecordFileIndex(r);
+        writer_->WriteRecordFileIndex(r);
         return;
     }
 };

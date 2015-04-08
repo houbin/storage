@@ -323,6 +323,10 @@ void storage_shutdown()
     delete id_center;
     id_center = NULL;
 
+    record_recycle->Shutdown();
+    delete record_recycle;
+    record_recycle = NULL;
+
     store_client_center->Shutdown();
     delete store_client_center;
     store_client_center = NULL;

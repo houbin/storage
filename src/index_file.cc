@@ -304,7 +304,7 @@ int32_t IndexFileManager::GetFileNumbers()
 
 void IndexFileManager::Dump()
 {
-    LOG_INFO(logger, "index file manager record file sum %d", GetFileNumbers());
+    LOG_INFO(logger, "******** index file manager record file sum %d ********", GetFileNumbers());
     return;
 }
 

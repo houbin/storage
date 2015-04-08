@@ -127,7 +127,7 @@ void *RecordRecycle::Entry()
 
         if (iter == recycle_map_.end())
         {
-            LOG_INFO(logger_, "recycle entry reached to end of recycle_map_");
+            LOG_ERROR(logger_, "recycle entry reached to end of recycle_map_");
         }
 
         if (stop_)
@@ -157,7 +157,7 @@ void RecordRecycle::Shutdown()
 
 void RecordRecycle::Dump()
 {
-    LOG_INFO(logger_, "############# record recycle map have %d record files #############", recycle_map_.size());
+    LOG_INFO(logger_, "*************** record recycle map have %d record files ***************", recycle_map_.size());
 
     return;
 }
@@ -223,18 +223,14 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
     int32_t ret;
     StoreClient *client = NULL;
 
-    RWLock::WRLocker lock(rwlock_);
     if (flag == 0)
     {
-        ret = FindStoreClientUnlocked(stream_info, &client);
+        ret = FindStoreClient(stream_info, &client);
         if (ret != 0)
         {
             LOG_INFO(logger_, "find store client error, stream info %s, ret %d", stream_info.c_str(), ret);
             return -ERR_ITEM_NOT_FOUND;
         }
-
-        assert(clients_[id] == NULL);
-        clients_[id] = client;
 
         ret = client->OpenRead(id);
         if (ret != 0)
@@ -242,21 +238,25 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
             LOG_INFO(logger_, "open read error, id %d, flag %d, stream info %s, ret %d", id, flag, stream_info.c_str(), ret);
             return ret;
         }
+
+        assert(clients_[id] == NULL);
+        {
+            RWLock::WRLocker lock(rwlock_);
+            clients_[id] = client;
+            client->IncUse();
+        }
     }
     else
     {
-        ret = FindStoreClientUnlocked(stream_info, &client);
+        bool new_client = false;
+        ret = FindStoreClient(stream_info, &client);
         if (ret != 0)
         {
             client = new StoreClient(logger_, stream_info);
             assert(client != NULL);
-
-            client_search_map_.insert(make_pair(stream_info, client));
             LOG_INFO(logger_, "no store client, so new store client, id %d, flag %d, stream info %s", id, flag, stream_info.c_str());
+            new_client = true;
         }
-
-        assert(clients_[id] == NULL);
-        clients_[id] = client;
 
         ret = client->OpenWrite(id);
         if (ret != 0)
@@ -264,11 +264,21 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
             LOG_INFO(logger_, "open write error, id %d, flag %d, stream info %s, ret %d", id, flag, stream_info.c_str());
             return ret;
         }
+
+        assert(clients_[id] == NULL);
+        {
+            RWLock::WRLocker lock(rwlock_);
+            clients_[id] = client;
+            if (new_client)
+            {
+                client_search_map_.insert(make_pair(stream_info, client));
+            }
+            client->IncUse();
+        }
     }
 
-    // some one use this client, and don't delete it
-    client->IncUse();
     LOG_DEBUG(logger_, "open ok, id %d, flag %d, stream info %s", id, flag, stream_info.c_str());
+
     return 0;
 }
 
@@ -297,7 +307,7 @@ int32_t StoreClientCenter::FindStoreClient(string stream_info, StoreClient **cli
     }
 
     *client = iter->second;
-    LOG_DEBUG(logger_, "find store client ok, stream info is %s", stream_info.c_str());
+    LOG_TRACE(logger_, "find store client ok, stream info is %s", stream_info.c_str());
 
     return 0;
 }
@@ -325,13 +335,11 @@ int32_t StoreClientCenter::GetStoreClient(int32_t id, StoreClient **client)
     return 0;
 }
 
-int32_t StoreClientCenter::TryRemoveStoreClient(StoreClient *client)
+int32_t StoreClientCenter::TryRemoveStoreClientUnlock(StoreClient *client)
 {
     assert(client != NULL);
-
     bool ret = 0;
     
-    RWLock::WRLocker lock(rwlock_);
     ret = client->CheckRecycle();
     if (!ret)
     {
@@ -351,6 +359,12 @@ int32_t StoreClientCenter::TryRemoveStoreClient(StoreClient *client)
     return 0;
 }
 
+int32_t StoreClientCenter::TryRemoveStoreClient(StoreClient *client)
+{
+    RWLock::WRLocker lock(rwlock_);
+    return TryRemoveStoreClientUnlock(client);
+}
+
 int32_t StoreClientCenter::Close(int32_t id, int flag)
 {
     assert(flag == 0 || flag == 1);
@@ -358,8 +372,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
     int32_t ret;
     StoreClient *client = NULL;
 
-    RWLock::WRLocker lock(rwlock_);
-    ret = GetStoreClientUnlocked(id, &client);
+    ret = GetStoreClient(id, &client);
     if (ret != 0)
     {
         LOG_INFO(logger_, "get store client error, id %d, ret %d", id, ret);
@@ -383,9 +396,14 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
         }
     }
 
-    // some one does't use this client
-    client->DecUse();
-    clients_[id] = NULL;
+    /* update clients */
+    {
+        RWLock::WRLocker lock(rwlock_);
+        clients_[id] = NULL;
+        client->DecUse();
+        TryRemoveStoreClientUnlock(client);
+    }
+
     LOG_DEBUG(logger_, "close store client return, id %d, ret %d", id, ret);
 
     return ret;
@@ -514,7 +532,7 @@ void StoreClientCenter::Dump()
 
     RWLock::RDLocker lock(rwlock_);
 
-    LOG_INFO(logger_, "############ store client center dump start ##############");
+    LOG_INFO(logger_, "############### store client center dump start ###############");
     map<string, StoreClient*>::iterator iter = client_search_map_.begin();
     for (; iter != client_search_map_.end(); iter++)
     {
@@ -522,7 +540,7 @@ void StoreClientCenter::Dump()
         store_client->Dump();
         record_file_sum += store_client->GetRecordFileNumbers();
     }
-    LOG_INFO(logger_, "############ store client center dump end, record file sum %d", record_file_sum);
+    LOG_INFO(logger_, "############### store client center dump end, record file sum %d ###############", record_file_sum);
 
     return;
 }

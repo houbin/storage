@@ -93,6 +93,7 @@ public:
 
     int32_t ListRecordFragments(int32_t id, UTime &start, UTime &end, deque<FRAGMENT_INFO_T> &frag_info_queue);
     int32_t TryRemoveStoreClient(StoreClient *client);
+    int32_t TryRemoveStoreClientUnlock(StoreClient *client);
 
     void Shutdown();
 
