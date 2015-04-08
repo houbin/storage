@@ -169,7 +169,7 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
 
         if (valid_disk_info == NULL)
         {
-            LOG_DEBUG(logger_, "no useful disk, start recycle");
+            LOG_INFO(logger_, "no useful disk, start recycle");
             mutex_.Unlock();
             record_recycle->StartRecycle();
             mutex_.Lock();
@@ -178,7 +178,7 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
         }
         else
         {
-            LOG_DEBUG(logger_, "find useful disk, disk_str %s", disk_str.c_str());
+            LOG_INFO(logger_, "find useful disk, disk_str %s", disk_str.c_str());
             break;
         }
     }

@@ -21,7 +21,7 @@ const static uint32_t kHeaderSize = 4 + 4 + 8 + 8 + 4;
 
 
 const static uint32_t kStreamReserveFiles = 20;
-const static uint32_t kMaxStreamsPerDisk = 50;
+const static uint32_t kMaxStreamsPerDisk = 5;
 
 const static uint32_t kFilesPerRecycle = 5;
 
