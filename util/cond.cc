@@ -5,6 +5,7 @@
 #include "mutex.h"
 #include "utime.h"
 #include "cond.h"
+#include "clock.h"
 
 namespace util
 {
@@ -49,6 +50,14 @@ int32_t Cond::WaitUtil(Mutex &mutex, UTime time)
     int r = pthread_cond_timedwait(&cond_, &mutex.m_, &ts);
 
     return (int32_t)r;
+}
+
+int32_t Cond::WaitAfter(Mutex &mutex, UTime after)
+{
+    UTime when = GetClockNow();
+    when += after;
+
+    return WaitUtil(mutex, when);
 }
 
 int32_t Cond::Signal()

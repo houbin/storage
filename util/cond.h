@@ -25,6 +25,7 @@ public:
 
     int32_t Wait(Mutex &mutex);
     int32_t WaitUtil(Mutex &mutex, UTime time);
+    int32_t WaitAfter(Mutex &mutex, UTime after);
     int32_t Signal();
     int32_t SignalAll();
 };

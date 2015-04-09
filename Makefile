@@ -30,7 +30,7 @@ all:$(PRG)
 #all:$(STATIC_PRG)
 
 $(PRG):$(OBJ)
-	$(CC) -m32 -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB)
+	$(CC) -m32 -fPIC -shared -DDEBUG -o $@ $(OBJ) $(LIB) -L./lib/ -ltcmalloc
 
 $(STATIC_PRG):$(OBJ)
 	ar -crv $@ $(OBJ)

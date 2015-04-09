@@ -87,7 +87,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
     record_file->Clear();
 
     disk_info->free_file_queue.push_back(record_file);
-    cond_.Signal();
+    cond_.SignalAll();
     LOG_INFO(logger_, "put free record file ok, record file %srecord_%05d", record_file->base_name_.c_str(), record_file->number_);
 
     return 0;
@@ -96,7 +96,7 @@ int32_t FreeFileTable::Put(RecordFile *record_file)
 int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    LOG_DEBUG(logger_, "get free record file, stream info [%s]", stream_info.c_str());
+    LOG_INFO(logger_, "get free record file, stream info [%s]", stream_info.c_str());
 
     int32_t ret;
 
@@ -114,7 +114,6 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
         {
             *record_file = disk_info->free_file_queue.front();
             disk_info->free_file_queue.pop_front();
-            LOG_DEBUG(logger_, "get free record file %srecord_%05d", (*record_file)->base_name_.c_str(), (*record_file)->number_);
 
             goto end;
         }
@@ -172,16 +171,16 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
 
         if (valid_disk_info == NULL)
         {
-            LOG_INFO(logger_, "no useful disk, start recycle");
+            LOG_INFO(logger_, "no useful disk, wait recycle");
             mutex_.Unlock();
             record_recycle->StartRecycle();
             mutex_.Lock();
-            cond_.Wait(mutex_);
+            cond_.WaitAfter(mutex_, 1);
+            LOG_INFO(logger_, "wait recycle ok");
             continue;
         }
         else
         {
-            LOG_INFO(logger_, "find useful disk, disk_str %s", disk_str.c_str());
             break;
         }
     }
