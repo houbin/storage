@@ -39,6 +39,8 @@ private:
 public:
     FreeFileTable(Logger *logger);
 
+    bool CheckDiskWriteStreams(string disk_base_name);
+
     int32_t AddDisk(string disk_name);
 
     int32_t Put(RecordFile *record_file);

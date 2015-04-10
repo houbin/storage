@@ -5,8 +5,8 @@
 namespace storage
 {
 
-RecordWriter::RecordWriter(Logger *logger,RecordFileMap *file_map)
-: logger_(logger), file_map_(file_map), queue_mutex_("RecordWriter::queue_mutex"),
+RecordWriter::RecordWriter(Logger *logger, string stream_info, RecordFileMap *file_map)
+: logger_(logger), stream_info_(stream_info), file_map_(file_map), queue_mutex_("RecordWriter::queue_mutex"),
 writer_mutex_("RecordWriter::record_file_mutex"), record_file_(NULL), buffer_(NULL), buffer_write_offset_(0),
 current_o_frame_(NULL), write_index_event_(NULL), stop_(false)
 {
@@ -314,7 +314,15 @@ void *RecordWriter::Entry()
                         ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
                         assert(ret == 0 && temp_file != NULL);
                     }
-                    free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
+                    else
+                    {
+                        ret = free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
+                        if (ret != 0)
+                        {
+                            ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
+                            assert(ret == 0 && temp_file != NULL);
+                        }
+                    }
 
                     writer_mutex_.Lock();
                     record_file_ = temp_file;
@@ -440,7 +448,7 @@ FreeResource:
 
 void RecordWriter::Start()
 {
-    Log(logger_, "Start");
+    LOG_INFO(logger_, "record writer Start, stream %s", stream_info_.c_str());
 
     record_file_ = NULL;
     buffer_ = new char[kBlockSize];
@@ -457,7 +465,7 @@ void RecordWriter::Start()
 
 void RecordWriter::Stop()
 {
-    Log(logger_, "stop");
+    LOG_INFO(logger_, "record writer stop, stream %s", stream_info_.c_str());
 
     /* stop queue */
     queue_mutex_.Lock();

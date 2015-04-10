@@ -515,7 +515,7 @@ void RecordFileMap::Shutdown()
 
 StoreClient::StoreClient(Logger *logger, string stream_info)
 : logger_(logger), stream_info_(stream_info), record_file_map_(logger_, this), 
- writer(logger_, &record_file_map_), reader_mutex_("StoreClient::read_mutex_"), use_count_()
+ writer(logger_, stream_info, &record_file_map_), reader_mutex_("StoreClient::read_mutex_"), use_count_()
 {
 
 }

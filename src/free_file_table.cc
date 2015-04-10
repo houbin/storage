@@ -13,6 +13,24 @@ FreeFileTable::FreeFileTable(Logger *logger)
 
 }
 
+bool FreeFileTable::CheckDiskWriteStreams(string disk_base_name)
+{
+    map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
+    if (iter == disk_free_file_info_.end())
+    {
+        return false;
+    }
+
+    DiskInfo *disk_info = iter->second;
+    uint32_t writing_streams = disk_info->writing_streams.size();
+    if (writing_streams >= kMaxStreamsPerDisk)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 int32_t FreeFileTable::AddDisk(string disk_name)
 {
     DiskInfo *disk_info = new DiskInfo;
@@ -203,6 +221,14 @@ int32_t FreeFileTable::UpdateDiskWritingStream(string stream_info, RecordFile *r
     string disk_base_name = record_file->base_name_;
 
     Mutex::Locker lock(mutex_);
+
+    bool ret = CheckDiskWriteStreams(disk_base_name);
+    if (ret == false)
+    {
+        LOG_INFO(logger_, "check disk writing streams error, disk %s, stream info %s", disk_base_name.c_str(), stream_info.c_str());
+        return -1;
+    }
+
     stream_to_disk_map_.insert(make_pair(stream_info, disk_base_name));
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.find(disk_base_name);
     assert(iter != disk_free_file_info_.end());

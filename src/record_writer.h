@@ -30,6 +30,7 @@ class RecordWriter : public Thread
 {
 private:
     Logger *logger_;
+    string stream_info_;
     RecordFileMap *file_map_;
 
     Mutex queue_mutex_;
@@ -51,7 +52,7 @@ private:
     bool stop_;
 
 public:
-    RecordWriter(Logger *logger, RecordFileMap *file_map_);
+    RecordWriter(Logger *logger, string stream_info, RecordFileMap *file_map_);
 
     bool IsStopped();
 
