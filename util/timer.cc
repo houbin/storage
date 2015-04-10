@@ -41,7 +41,7 @@ typedef std::map<Context*, scheduled_map_t::iterator> event_lookup_map_t;
 
 void SafeTimer::TimerThread()
 {
-    LOG_INFO(logger_, "TimerThread starting");
+    LOG_DEBUG(logger_, "TimerThread starting");
 
     mutex_.Lock();
     while (!stop_)
@@ -132,7 +132,7 @@ void SafeTimer::AddEventAt(UTime t, Context* callback)
 
 void SafeTimer::DoEvent(Context *callback)
 {
-    LOG_INFO(logger_, "do event, callback is %p", callback);
+    LOG_DEBUG(logger_, "do event, callback is %p", callback);
 
     map<Context*, multimap<UTime, Context *>::iterator>::iterator p = events_.find(callback);
     if (p == events_.end())
@@ -141,7 +141,7 @@ void SafeTimer::DoEvent(Context *callback)
         return;
     }
 
-    LOG_INFO(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
+    LOG_DEBUG(logger_, "CancelEvent %d.%d -> %p", p->second->first.tv_sec, p->second->first.tv_nsec, callback);
     Context *ct = p->first;
 
     events_.erase(p);

@@ -284,7 +284,7 @@ int32_t StoreClientCenter::Open(int flag, int32_t id, string &stream_info)
 
 int32_t StoreClientCenter::AddStoreClient(string &stream_info, StoreClient **client)
 {
-    LOG_DEBUG(logger_, "add store client, stream info %s", stream_info.c_str());
+    LOG_INFO(logger_, "add store client, stream info %s", stream_info.c_str());
 
     RWLock::WRLocker lock(rwlock_);
     *client = new StoreClient(logger_, stream_info);
@@ -404,7 +404,7 @@ int32_t StoreClientCenter::Close(int32_t id, int flag)
         TryRemoveStoreClientUnlock(client);
     }
 
-    LOG_DEBUG(logger_, "close store client return, id %d, ret %d", id, ret);
+    LOG_INFO(logger_, "close store client return, id %d, ret %d", id, ret);
 
     return ret;
 }
