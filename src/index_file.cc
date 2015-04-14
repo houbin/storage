@@ -216,6 +216,7 @@ int32_t IndexFileManager::ScanAllIndexFile()
             fp = fopen(temp_file_count_file.c_str(), "r");
             if (fp == NULL)
             {
+                LOG_INFO(logger, "fopen error, dir %s", temp_file_count_file.c_str());
                 continue;
             }
             else

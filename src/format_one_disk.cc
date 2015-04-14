@@ -4,8 +4,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
-#include "../../include/storage_api.h"
-#include "../../src/store_types.h"
+#include "../include/storage_api.h"
+#include "../src/store_types.h"
 
 using namespace std;
 using namespace storage;
@@ -30,16 +30,8 @@ int main(int argc, char *argv[])
     int file_info_length = sizeof(RecordFileInfo);
     int frag_info_length = sizeof(RecordFragmentInfo);
 
-    char current_dir[256] = {0};
-
-    char *temp_dir = NULL;
-    temp_dir = getcwd(current_dir, 256);
-    assert(temp_dir != NULL);
-    
-    chdir(current_dir);
-
     char command[256] = {0};
-    snprintf(command, 255, "./format_one_disk.sh %s %d %d", disk, file_info_length, frag_info_length);
+    snprintf(command, 255, "/jovision/shell/format_one_disk.sh %s %d %d", disk, file_info_length, frag_info_length);
     FILE *fp = NULL;
     fp = popen(command, "r");
     if (fp == NULL)
@@ -60,3 +52,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+

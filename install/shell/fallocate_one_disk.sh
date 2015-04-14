@@ -10,7 +10,12 @@ frag_info_length=$3
 
 disk_size=`parted /dev/$disk unit MiB print | grep -A2 Number | grep -v Number | grep -v '^$' | sed "s/MiB//g" | awk '{printf("%d\n", $4)}'`
 
-disk_use_size=$(echo "${disk_size} - 1000" | bc)
+if [ ${disk_size} -lt 102400 ];then
+    disk_use_size=$(echo "${disk_size} - 1024" | bc)
+else
+    disk_use_size=$(echo "${disk_size} - 10240" | bc)
+fi
+
 echo "$disk use size is ${disk_use_size}m"
 
 file_count=$(echo "${disk_use_size} / 256" | bc)
