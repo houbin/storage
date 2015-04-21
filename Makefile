@@ -4,7 +4,7 @@
 # #############################################################  
 # #set your own environment option  
 CC = g++
-CC_FLAG = -g -Wall -Wno-unused-parameter -Werror -fPIC -m32 
+CC_FLAG = -g -Wall -Wno-unused-parameter -Werror -fPIC -m32 -march=native
 #CC_FLAG = -Wall -Wno-unused-parameter -Werror -fPIC -m32 
 #-march=i686
 #   
