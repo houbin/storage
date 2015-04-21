@@ -95,7 +95,7 @@ void storage_handle_signal(int signum)
 
         config->ReadFile(log_dir.c_str());
         int log_level = config->Read("log_level", log_level);
-        logger->SetLogLevel((Logger::LogLevel)log_level);
+        logger->SetLogLevel((LogLevel)log_level);
 
         LOG_INFO(logger, "logger set log level to %d", log_level);
     }
@@ -204,8 +204,7 @@ void storage_start_watchdog(string process_path, int lost_threshold)
 
 void storage_init()
 {
-    int32_t ret;
-    string log_dir = "/var/log/storage/storage.log";
+    string log_dir = "/var/log/storage/";
     int32_t log_level = 2;
 
     config = new Config("/jovision/storage.conf");
@@ -213,9 +212,8 @@ void storage_init()
 
     log_dir = config->Read("log_dir", log_dir);
     log_level = config->Read("log_level", log_level);
-    ret = NewLogger(log_dir.c_str(), &logger);
-    logger->SetLogLevel((Logger::LogLevel)log_level);
-    assert(ret == 0);
+    NewLogger(log_dir.c_str(), &logger);
+    logger->SetLogLevel((LogLevel)log_level);
 
     id_center = new IdCenter(logger);
     assert(id_center != NULL);
