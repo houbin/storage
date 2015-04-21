@@ -31,4 +31,8 @@
 JCVR
 storage_test
 format_one_disk
+account.dat
+core.*
+demo77.dat
+yst*
 

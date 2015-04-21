@@ -75,6 +75,7 @@ int WatchDogClient::SendCloseToWatchDog(grpc_t *grpc)
 
     req.rebootStr = grpc_strdup(grpc, dog_client->reboot_path_.c_str());
     
+    LOG_INFO(logger, "send legal close start");
     ret = CLIENT_watchdog_send_legalclose_to_watchdog(grpc, &req, &resp);
 
     LOG_INFO(logger, "send and recv legal close ok");

@@ -25,7 +25,6 @@ int GrpcUdpClient::RecvByUdp(grpc_t *grpc, void *buffer, int len, int *timeout_m
     fd = user_info->fd;
     logger = user_info->logger;
 
-    
     socklen_t addr_len = sizeof(struct sockaddr);
     ret = recvfrom(fd, buffer, len, 0, (struct sockaddr *)&user_info->server_addr, &addr_len);
 
@@ -42,12 +41,9 @@ int GrpcUdpClient::SendByUdp(grpc_t *grpc, void *buffer, int len)
     GrpcUdpUserDefInfo *user_info = (GrpcUdpUserDefInfo *)grpc->userdef;
     assert(user_info != NULL);
 
-    logger = user_info->logger;
-
-    LOG_INFO(logger, "recvfrom watchdog server ok");
-
     ret = sendto(user_info->fd, buffer, len, 0, (struct sockaddr *)&user_info->server_addr, sizeof(struct sockaddr));
 
+    logger = user_info->logger;
     LOG_INFO(logger, "send to watchdog server, ret %d", ret);
 
     return ret;
@@ -128,12 +124,6 @@ void *GrpcUdpClient::Entry()
 void GrpcUdpClient::Stop()
 {
     stop_ = true;
-
-    if (fd_ > 0)
-    {
-        ::close(fd_);
-        fd_ = -1;
-    }
 
     if (IsStarted())
     {

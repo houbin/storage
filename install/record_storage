@@ -1,20 +1,20 @@
 #!/bin/bash
 #chkconfig:2345 80 05 --指定在哪几个级别执行，0一般指关机，6指的是重启，其他为正常启动。80为启动的优先级，05为关闭的优先级别
-#description:storage_auto_mount
+#description: record_storage
 RETVAL=0
 
 start()
 { #启动服务的入口函数
 
-echo  "storage boot auto mount start..."
+echo  "record storage ... "
 # 自动挂载并格式化所有的磁盘
 chmod +x /jovision/shell/*
 /jovision/shell/boot_auto_mount.sh > /dev/null
 
 #启动存储进程
-/usr/bin/JCVR > /dev/null &
+nohup /usr/bin/JCVR >/dev/null &
 
-echo  "storage boot auto mount end..."
+echo  "record storage end..."
 }
 
 stop()

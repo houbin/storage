@@ -50,6 +50,7 @@ int CLIENT_watchdog_send_beacon_to_watchdog(grpc_t *grpc, PARAM_REQ_watchdog_sen
 
 int SERVER_watchdog_send_beacon_to_watchdog(grpc_t *grpc)
 {
+#if 0
 	int ret;
 	PARAM_REQ_watchdog_send_beacon_to_watchdog req;
 	PARAM_RESP_watchdog_send_beacon_to_watchdog resp;
@@ -69,7 +70,7 @@ int SERVER_watchdog_send_beacon_to_watchdog(grpc_t *grpc)
 	ret = USERDEF_watchdog_send_beacon_to_watchdog(grpc, &req, &resp);
 	if (ret != 0)
 		return ret;
-
+#endif
 	return 0;
 }
 int CLIENT_REQ_watchdog_send_legalclose_to_watchdog(grpc_t *grpc, PARAM_REQ_watchdog_send_legalclose_to_watchdog *req)
@@ -119,6 +120,7 @@ int CLIENT_watchdog_send_legalclose_to_watchdog(grpc_t *grpc, PARAM_REQ_watchdog
 
 int SERVER_watchdog_send_legalclose_to_watchdog(grpc_t *grpc)
 {
+#if 0
 	int ret;
 	PARAM_REQ_watchdog_send_legalclose_to_watchdog req;
 	PARAM_RESP_watchdog_send_legalclose_to_watchdog resp;
@@ -137,6 +139,7 @@ int SERVER_watchdog_send_legalclose_to_watchdog(grpc_t *grpc)
 	if (ret != 0)
 		return ret;
 
+#endif
 	return 0;
 }
 
