@@ -11,6 +11,7 @@
 #include "free_file_table.h"
 #include "index_file.h"
 #include "store_client_center.h"
+#include "watchdog_client.h"
 
 using namespace util;
 using namespace storage;
@@ -23,9 +24,9 @@ FreeFileTable *free_file_table = NULL;
 IndexFileManager *index_file_manager = NULL;
 Config *config = NULL;
 RecordRecycle *record_recycle = NULL;
+WatchDogClient *dog_client = NULL;
 
-extern "C"
-{
+#define WATCHDOG_SERVER_PORT 6010
 
 int32_t storage_get_disk_info(char *disk, DISK_INFO_T *disk_info)
 {
@@ -123,6 +124,84 @@ void storage_register_signal(int signum)
     return;
 }
 
+void storage_get_process_info(string &process_path, string &process_dir)
+{
+    char buffer[1024] = {0};
+    int ret = 0;
+    int fd;
+    int offset = 0;
+    char cmdline_path[32] = {0};
+    char cmdline_info[256] = {0};
+    char *start = NULL;
+    string whole_process_path;
+
+    int cnt = readlink("/proc/self/exe", buffer, 1023);
+    assert(cnt > 0 && cnt <= 1023);
+
+    snprintf(cmdline_path, 31, "/proc/self/cmdline");
+    fd = open(cmdline_path, O_RDONLY);
+    if (fd < 0)
+    {
+        LOG_WARN(logger, "open cmdline file error, error msg %s", strerror(errno));
+        assert(fd >= 0);
+    }
+
+    ret = read(fd, cmdline_info, 255);
+    assert (ret > 0);
+
+    // skip relative exe path
+    start = &(cmdline_info[offset]);
+    offset = strlen(start) + 1;
+
+    // assign absolute exe path
+    whole_process_path.assign(buffer);
+
+    while (offset < ret)
+    {
+        start = &(cmdline_info[offset]);
+        whole_process_path.append(" ");
+        whole_process_path.append(start);
+
+        offset = offset + strlen(start) + 1;
+    }
+    
+    process_path = whole_process_path;
+
+    int i = 0;
+    for (i = cnt; i >= 0; i--)
+    {
+        if (buffer[i] == '/')
+        {
+            buffer[i+1] = 0;
+            break;
+        }
+    }
+
+    process_dir.assign(buffer);
+
+    LOG_INFO(logger, "process absolute path %s, process absolute dir %s", process_path.c_str(), process_dir.c_str());
+
+    return ;
+}
+
+void storage_start_watchdog(string process_path, int lost_threshold)
+{
+    struct sockaddr_in server_addr;
+    string reboot_path;
+
+    memset(&server_addr, 0, sizeof(struct sockaddr_in));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    server_addr.sin_port = htons(WATCHDOG_SERVER_PORT);
+
+    dog_client = new WatchDogClient(logger, server_addr, process_path, getpid(), lost_threshold);
+    assert(dog_client != NULL);
+
+    dog_client->Init();
+
+    return;
+}
+
 void storage_init()
 {
     int32_t ret;
@@ -156,24 +235,24 @@ void storage_init()
     assert(index_file_manager != NULL);
     index_file_manager->Init();
 
-    char buffer[1024] = {0};
-    int cnt = readlink("/proc/self/exe", buffer, 1023);
-    assert(cnt > 0 && cnt <= 1023);
+    // get path and dir of exe
+    string process_path;
+    string process_dir;
+    storage_get_process_info(process_path, process_dir);
 
-    int i = 0;
-    for (i = cnt; i >= 0; i--)
-    {
-        if (buffer[i] == '/')
-        {
-            buffer[i+1] = 0;
-            break;
-        }
-    }
-    chdir(buffer);
-    LOG_INFO(logger, "storage init ok");
+    // change current work dir
+    chdir(process_dir.c_str());
+
+    int lost_threshold = 0;
+    lost_threshold = config->Read("watchdog_lost_threshold", lost_threshold);
+    assert(lost_threshold > 0);
+    storage_start_watchdog(process_path, lost_threshold);
 
     storage_register_signal(SIGUSR1);
     storage_register_signal(SIGUSR2);
+
+    LOG_INFO(logger, "storage init ok");
+
     return;
 }
 
@@ -339,11 +418,13 @@ void storage_shutdown()
     delete index_file_manager;
     index_file_manager = NULL;
 
+    dog_client->Shutdown();
+    delete dog_client;
+    dog_client = NULL;
+
     delete logger;
     logger = NULL;
     
     return;
-}
-
 }
 

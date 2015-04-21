@@ -19,7 +19,7 @@
 # Compiled Static libraries
 *.lai
 *.la
-*.a
+#*.a
 *.lib
 
 # Executables
@@ -30,4 +30,5 @@
 # my
 JCVR
 storage_test
+format_one_disk
 
