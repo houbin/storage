@@ -1,6 +1,7 @@
 #include "record_writer.h"
 #include "index_file.h"
 #include "storage.h"
+#include "config_opts.h"
 
 namespace storage
 {
@@ -450,8 +451,11 @@ void RecordWriter::Start()
 {
     LOG_INFO(logger_, "record writer Start, stream %s", stream_info_.c_str());
 
+    int ret = 0;
+
     record_file_ = NULL;
-    buffer_ = new char[kBlockSize];
+    ret =  posix_memalign((void **)&buffer_, kPageSize, kBlockSize);
+    assert(ret == 0);
     assert(buffer_ != NULL);
     buffer_write_offset_ = 0;
 
@@ -475,7 +479,7 @@ void RecordWriter::Stop()
     Join();
 
     /* delete buffer */
-    delete []buffer_;
+    free(buffer_);
     buffer_ = NULL;
     buffer_write_offset_ = 0;
 

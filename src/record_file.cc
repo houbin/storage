@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <libaio.h>
 #include "../util/clock.h"
 #include "../util/coding.h"
 #include "../util/crc32c.h"
@@ -17,7 +18,8 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"), write_fd_(-1), read_fd_(-1), read_count_(0),
+: logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"),
+write_fd_(-1), aio_ctx(0), read_fd_(-1), read_count_(0),
 locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
@@ -25,6 +27,7 @@ locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_
 
 int32_t RecordFile::OpenFd(bool for_write)
 {
+    int ret = 0;
     char buffer[32] = {0};
 
     snprintf(buffer, 32, "record_%05d", number_);
@@ -34,8 +37,16 @@ int32_t RecordFile::OpenFd(bool for_write)
     if (for_write)
     {
         assert(write_fd_ < 0);
-        write_fd_ = open(record_file_path.c_str(), O_WRONLY);
+        write_fd_ = open(record_file_path.c_str(), O_WRONLY | O_DIRECT | O_DSYNC, 0644);
         assert(write_fd_ >= 0);
+
+        aio_ctx = 0;
+        ret = io_setup(128, &aio_ctx);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup error");
+            assert(ret == 0);
+        }
         
         lseek(write_fd_, record_offset_, SEEK_SET);
         record_fragment_count_ += 1;
@@ -577,14 +588,39 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 
     RWLock::WRLocker lock(rwlock_);
 
-    ret = write(write_fd_, write_buffer, length);
-    if (ret != (int)length)
-    {
-        Log(logger_, "write return %d, errno msg is %s", ret, strerror(errno));
-        assert(ret == (int)length);
-    }
+    struct iocb cb;
+    struct iocb *cbs = &cb;
+    io_prep_pwrite(&cb, write_fd_, write_buffer, length, record_offset_);
 
-    fdatasync(write_fd_);
+    int attempts = 10;
+    do
+    {
+        ret = io_submit(aio_ctx, 1, &cbs);
+        if (ret < 0)
+        {
+            LOG_WARN(logger_, "io_submit error, errno %d", ret);
+            if (ret == -EAGAIN && attempts-- > 0)
+            {
+                usleep(500);
+                continue;
+            }
+
+            assert(0 == "io_submit got unexpected error");
+        }
+    }while(false);
+
+    struct io_event e;
+    struct timespec t;
+    t.tv_sec = 10; // wait 10s
+    t.tv_nsec = 0;
+
+    ret = io_getevents(aio_ctx, 1, 1, &e, &t);
+    if (ret != 1)
+    {
+        LOG_FATAL(logger_, "io_getevents error, maybe bad block of disk");
+        assert(ret == 1);
+    }
+    
     UpdateTimes(update);
     record_offset_ += length;
     have_write_frame_ = true;

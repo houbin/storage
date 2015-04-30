@@ -3,6 +3,7 @@
 
 #include <string>
 #include <deque>
+#include <libaio.h>
 #include "../util/logger.h"
 #include "../util/mutex.h"
 #include "../util/rwlock.h"
@@ -25,6 +26,7 @@ public:
     RWLock rwlock_;
     
     int write_fd_;
+    io_context_t aio_ctx;
     
     int read_fd_;
     int read_count_;
