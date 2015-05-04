@@ -45,7 +45,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 
     file_count_path = base_name + "file_count";
     file_count_fd = open(file_count_path.c_str(), O_RDONLY);
-    assert(file_count_fd != NULL);
+    assert(file_count_fd > 0);
 
     int32_t r = 0;
     r = libaio_single_read(ctx, file_count_fd, file_count_str, 31, 0);
@@ -79,7 +79,7 @@ int32_t IndexFile::AnalyzeAllEntry()
     record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
     assert(record_file_info_buffer != NULL);
 
-    ret = libaio_single_read(aio_ctx_, fd_, record_file_info_buffer, record_file_info_length * file_counts_, fd_);
+    ret = libaio_single_read(aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
     assert(ret == 0);
 
     uint32_t i = 0;

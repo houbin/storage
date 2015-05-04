@@ -40,8 +40,7 @@ int32_t RecordFile::OpenFd(bool for_write)
         write_fd_ = open(record_file_path.c_str(), O_WRONLY | O_DIRECT | O_DSYNC, 0644);
         assert(write_fd_ >= 0);
 
-        aio_ctx = 0;
-        ret = io_setup(128, &aio_ctx);
+        ret = io_setup(128, &aio_ctx_);
         if (ret != 0)
         {
             LOG_FATAL(logger_, "io_setup error");
@@ -585,7 +584,7 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
     RWLock::WRLocker lock(rwlock_);
 
     ret = libaio_single_write(aio_ctx_, write_fd_, write_buffer, length, record_offset_);
-    if (ret <= 0 || ret != length)
+    if (ret <= 0 || ret != (int32_t)length)
     {
         LOG_FATAL(logger_, "libaio write error, ret %d", ret);
         assert(ret > 0);
