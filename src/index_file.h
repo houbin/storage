@@ -20,8 +20,10 @@ private:
     Mutex mutex_;
 
     string base_name_;
-    FILE *index_file_;
+    int fd_;
     uint32_t file_counts_;
+
+    io_context_t aio_ctx_;
 
 public:
     IndexFile(Logger *logger, string base_name);

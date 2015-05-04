@@ -3,7 +3,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <libaio.h>
 #include "../util/clock.h"
 #include "../util/coding.h"
 #include "../util/crc32c.h"
@@ -11,6 +10,7 @@
 #include "record_file.h"
 #include "index_file.h"
 #include "storage.h"
+#include "libaio_wrap.h"
 
 using namespace util;
 
@@ -19,7 +19,7 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"),
-write_fd_(-1), aio_ctx(0), read_fd_(-1), read_count_(0),
+write_fd_(-1), aio_ctx_(0), read_fd_(-1), read_count_(0),
 locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
@@ -65,8 +65,6 @@ int32_t RecordFile::OpenFd(bool for_write)
 
 int32_t RecordFile::Clear()
 {
-    //Log(logger_, "clear record file index memory info");
-
     if (this->write_fd_ >= 0)
     {
         close(this->write_fd_);
@@ -504,7 +502,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
 
-    int ret = 0;
+    int32_t ret = 0;
 
     assert(read_fd_ >= 0);
     if (offset >= record_offset_)
@@ -514,37 +512,35 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     }
 
     char header[kHeaderSize] = {0};
-    ret = pread(read_fd_, header, kHeaderSize, offset);
+    ret = libaio_single_read(aio_ctx_, read_fd_, header, kHeaderSize, offset);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
         return ret;
     }
     else if (ret == 0)
     {
-        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, kHeaderSize);
+        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, kHeaderSize);
         return -ERR_READ_REACH_TO_END;
     }
     assert(ret == (int)kHeaderSize);
 
+    ret = DecodeHeader(header, frame);
+    if (ret != 0)
     {
-        int32_t ret = DecodeHeader(header, frame);
-        if (ret != 0)
-        {
-            LOG_ERROR(logger_, "decode header error, ret is %d", ret);
-            return ret;
-        }
+        LOG_ERROR(logger_, "decode header error, ret is %d", ret);
+        return ret;
     }
 
-    ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
+    ret = libaio_single_read(aio_ctx_, read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
         return ret;
     }
     else if (ret == 0)
     {
-        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, frame->size);
+        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, frame->size);
         return -ERR_READ_REACH_TO_END;
     }
     assert(ret == (int)frame->size);
@@ -588,39 +584,13 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 
     RWLock::WRLocker lock(rwlock_);
 
-    struct iocb cb;
-    struct iocb *cbs = &cb;
-    io_prep_pwrite(&cb, write_fd_, write_buffer, length, record_offset_);
-
-    int attempts = 10;
-    do
+    ret = libaio_single_write(aio_ctx_, write_fd_, write_buffer, length, record_offset_);
+    if (ret <= 0 || ret != length)
     {
-        ret = io_submit(aio_ctx, 1, &cbs);
-        if (ret < 0)
-        {
-            LOG_WARN(logger_, "io_submit error, errno %d", ret);
-            if (ret == -EAGAIN && attempts-- > 0)
-            {
-                usleep(500);
-                continue;
-            }
-
-            assert(0 == "io_submit got unexpected error");
-        }
-    }while(false);
-
-    struct io_event e;
-    struct timespec t;
-    t.tv_sec = 10; // wait 10s
-    t.tv_nsec = 0;
-
-    ret = io_getevents(aio_ctx, 1, 1, &e, &t);
-    if (ret != 1)
-    {
-        LOG_FATAL(logger_, "io_getevents error, maybe bad block of disk");
-        assert(ret == 1);
+        LOG_FATAL(logger_, "libaio write error, ret %d", ret);
+        assert(ret > 0);
     }
-    
+
     UpdateTimes(update);
     record_offset_ += length;
     have_write_frame_ = true;
@@ -676,7 +646,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         char header[kHeaderSize] = {0};
         FRAME_INFO_T frame = {0};
         
-        ret = pread(read_fd_, header, kHeaderSize, stamp_offset);
+        ret = libaio_single_read(aio_ctx_, read_fd_, header, kHeaderSize, stamp_offset);
         assert(ret == (int)kHeaderSize);
 
         ret = DecodeHeader(header, &frame);

@@ -35,6 +35,7 @@
 #define ERR_READ_OVER_THAN_END_OFFSET 3013
 #define ERR_STREAM_NOT_WRITE        3014
 #define ERR_CLIENT_USED             3015
+#define ERR_AIO                     3016
 
 
 #endif

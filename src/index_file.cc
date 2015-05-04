@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include "index_file.h"
 #include "record_file.h"
@@ -11,6 +12,7 @@
 #include "../util/crc32c.h"
 #include "storage.h"
 #include "store_client.h"
+#include "libaio_wrap.h"
 
 using namespace util;
 
@@ -18,29 +20,39 @@ namespace storage
 {
 
 IndexFile::IndexFile(Logger *logger, string base_name)
-: logger_(logger), mutex_("IndexFile::Locker"), base_name_(base_name)
+: logger_(logger), mutex_("IndexFile::Locker"), base_name_(base_name), aio_ctx_(0)
 {
     int ret = 0;
+    io_setup(8, &aio_ctx_);
 
     string file_path;
     file_path = base_name_ + "index";
-    index_file_ = fopen(file_path.c_str(), "rb+");
-    if (index_file_ == NULL)
+    fd_ = open(file_path.c_str(), O_RDWR);
+    if (fd_ < 0)
     {
-        LOG_FATAL(logger_, "fopen error, base name [%s], errno msg is %s", file_path.c_str(), strerror(errno));
-        assert(index_file_ != NULL);
+        LOG_FATAL(logger_, "open error, base name [%s], errno msg is %s", file_path.c_str(), strerror(errno));
+        assert(fd_ >= 0);
     }
 
     /* read file counts */
     string file_count_path;
-    FILE *file_count_handle = NULL;
+    int file_count_fd = 0;
     char file_count_str[32] = {0};
+    io_context_t ctx;
+
+    ret = io_setup(8, &ctx);
+    assert(ret == 0);
+
     file_count_path = base_name + "file_count";
-    file_count_handle = fopen(file_count_path.c_str(), "r");
-    assert(file_count_handle != NULL);
-    ret = fread(file_count_str, 1, 32, file_count_handle);
-    assert(ret < 32);
-    fclose(file_count_handle);
+    file_count_fd = open(file_count_path.c_str(), O_RDONLY);
+    assert(file_count_fd != NULL);
+
+    int32_t r = 0;
+    r = libaio_single_read(ctx, file_count_fd, file_count_str, 31, 0);
+    assert(ret == 0);
+
+    io_destroy(ctx);
+    close(file_count_fd);
 
     file_counts_ = atoi(file_count_str);
 }
@@ -67,13 +79,8 @@ int32_t IndexFile::AnalyzeAllEntry()
     record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
     assert(record_file_info_buffer != NULL);
 
-    fseek(index_file_, 0, SEEK_SET);
-    ret = fread((void*)record_file_info_buffer, record_file_info_length, file_counts_, index_file_);
-    if (ret != file_counts_)
-    {
-        LOG_FATAL(logger_, "fread error, ret is %d, errno msg is [%s]", ret, strerror(errno));
-        assert(ret == file_counts_);
-    }
+    ret = libaio_single_read(aio_ctx_, fd_, record_file_info_buffer, record_file_info_length * file_counts_, fd_);
+    assert(ret == 0);
 
     uint32_t i = 0;
     for (i = 0; i < file_counts_; i++)
@@ -122,19 +129,11 @@ int32_t IndexFile::AnalyzeAllEntry()
 int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 {
     LOG_DEBUG(logger_, "index file write, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
-    int ret = 0;
+    int32_t ret = 0;
 
     Mutex::Locker lock(mutex_);
-    ret = fseek(index_file_, offset, SEEK_SET);
-    assert(ret != -1);
-    ret = fwrite(buffer, 1, length, index_file_);
-    if (ret != (int)length)
-    {
-        LOG_FATAL(logger_, "fwrite error, index file %sindex, ret %d, length %u, errno msg is [%s]", 
-                                base_name_.c_str(), ret, length, strerror(errno));
-        assert(ret == (int)length);
-    }
-    fflush(index_file_);
+    ret = libaio_single_write(aio_ctx_, fd_, buffer, length, offset);
+    assert(ret == 0);
     LOG_DEBUG(logger_, "index file write ok, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
 
     return 0;
@@ -143,21 +142,13 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 {
     LOG_DEBUG(logger_, "index file read, base name %s, length is %u, offset is %u", base_name_.c_str(), length, offset);
-    int ret;
+    int32_t ret = 0;
 
     Mutex::Locker lock(mutex_);
-    ret = fseek(index_file_, offset, SEEK_SET);
-    assert(ret != -1);
+    ret = libaio_single_read(aio_ctx_, fd_, buffer, length, offset);
+    assert(ret == 0);
 
-    ret = fread(buffer, 1, length, index_file_);
-    if (ret != (int)length)
-    {
-        LOG_ERROR(logger_, "fread error, base name %sindex, ret %d, length %u, errno msg is [%s]", 
-                                base_name_.c_str(), ret, length, strerror(errno));
-        assert(ret == (int)length);
-    }
-
-    LOG_DEBUG(logger_, "index file read ok , length is %d, offset is %d", length, offset);
+    LOG_DEBUG(logger_, "index file read, base name %s, length is %u, offset is %u", base_name_.c_str(), length, offset);
 
     return 0;
 }
@@ -167,7 +158,8 @@ int32_t IndexFile::Shutdown()
     LOG_INFO(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
-    fclose(index_file_);
+    io_destroy(aio_ctx_);
+    close(fd_);
 
     return 0;
 }
@@ -212,17 +204,17 @@ int32_t IndexFileManager::ScanAllIndexFile()
 
             /* test if dir is legal */
             string temp_file_count_file = base_name + "file_count";
-            FILE *fp = NULL;
-            fp = fopen(temp_file_count_file.c_str(), "r");
-            if (fp == NULL)
+            int fd = 0;
+            fd = open(temp_file_count_file.c_str(), O_RDONLY);
+            if (fd < 0)
             {
-                LOG_INFO(logger, "fopen error, dir %s", temp_file_count_file.c_str());
+                LOG_INFO(logger, "open error, dir %s", temp_file_count_file.c_str());
                 continue;
             }
             else
             {
-                fclose(fp);
-                fp = NULL;
+                close(fd);
+                fd = 0;
             }
 
             index_file = new IndexFile(logger_, base_name);

@@ -26,7 +26,7 @@ public:
     RWLock rwlock_;
     
     int write_fd_;
-    io_context_t aio_ctx;
+    io_context_t aio_ctx_;
     
     int read_fd_;
     int read_count_;
