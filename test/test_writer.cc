@@ -163,12 +163,14 @@ void *FrameWriter::Entry()
         WriteFrame();
         seq_++;
 
-        if (i % 1234 == 1233)
+        if (i % 123412341234 == 1233)
+        //if (i % 100 == 0)
         {
             fprintf(stderr, "storage close write id %d, i is %d\n", op_id_, i);
             storage_close(op_id_);
             op_id_ = -1;
-            sleep(10);
+            //sleep(10);
+            sleep(1);
         }
     }
 

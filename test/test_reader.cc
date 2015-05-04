@@ -2,7 +2,7 @@
 #include "test_reader.h"
 #include "../util/crc32c.h"
 #include "../util/coding.h"
-#include "../include/storage.h"
+#include "../src/storage.h"
 
 #define ERR_STREAM_INFO_CHECk_FAILED 9000
 #define ERR_CRC_CHECK_FAILED 9001

@@ -40,7 +40,8 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     char file_count_str[32] = {0};
     io_context_t ctx;
 
-    ret = io_setup(8, &ctx);
+    ctx = 0;
+    ret = io_setup(128, &ctx);
     assert(ret == 0);
 
     file_count_path = base_name + "file_count";
@@ -49,7 +50,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 
     int32_t r = 0;
     r = libaio_single_read(ctx, file_count_fd, file_count_str, 31, 0);
-    assert(ret == 0);
+    assert(r > 0);
 
     io_destroy(ctx);
     close(file_count_fd);
@@ -80,7 +81,7 @@ int32_t IndexFile::AnalyzeAllEntry()
     assert(record_file_info_buffer != NULL);
 
     ret = libaio_single_read(aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
-    assert(ret == 0);
+    assert(ret == record_file_section_size);
 
     uint32_t i = 0;
     for (i = 0; i < file_counts_; i++)
@@ -133,7 +134,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 
     Mutex::Locker lock(mutex_);
     ret = libaio_single_write(aio_ctx_, fd_, buffer, length, offset);
-    assert(ret == 0);
+    assert(ret == (int32_t)length);
     LOG_DEBUG(logger_, "index file write ok, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
 
     return 0;

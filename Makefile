@@ -20,7 +20,7 @@ STATIC_PRG = libstorage.a
 OBJ = src/free_file_table.o src/id_center.o src/index_file.o src/record_file.o src/storage_api.o \
 src/store_client_center.o util/clock.o util/coding.o util/cond.o util/crc32c.o util/logger.o \
 util/mutex.o util/thread.o util/timer.o src/record_writer.o src/record_reader.o src/store_client.o \
-util/config.o util/grpc_udp_client.o src/watchdog_client.o util/env_posix.o
+util/config.o util/grpc_udp_client.o src/watchdog_client.o util/env_posix.o src/libaio_wrap.o
 
 C_OBJS = grpc/watchdog.o grpc/watchdog_c_userdef.o
 

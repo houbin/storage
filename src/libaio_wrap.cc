@@ -22,7 +22,7 @@ int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buff
                 usleep(500);
                 continue;
             }
-            LOG_FATAL("io_submit got unexpected error");
+            LOG_FATAL(logger, "io_submit got unexpected error");
             return -ERR_AIO;
         }
     }while(false);
@@ -35,7 +35,7 @@ int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buff
     ret = io_getevents(aio_ctx, 1, 1, &e, &t);
     if (ret != 1)
     {
-        LOG_FATAL(logger, "io_getevents error, maybe bad block of disk");
+        LOG_FATAL(logger, "io_getevents error, maybe bad block of disk, ret %d", ret);
         return -ERR_AIO;
     }
 
@@ -61,7 +61,7 @@ int32_t libaio_single_read(io_context_t aio_ctx, int read_fd, char *read_buffer,
                 usleep(500);
                 continue;
             }
-            LOG_FATAL("io_submit got unexpected error");
+            LOG_FATAL(logger, "io_submit got unexpected error");
             return -ERR_AIO;
         }
     }while(false);
@@ -74,7 +74,7 @@ int32_t libaio_single_read(io_context_t aio_ctx, int read_fd, char *read_buffer,
     ret = io_getevents(aio_ctx, 1, 1, &e, &t);
     if (ret != 1)
     {
-        LOG_FATAL(logger, "io_getevents error, maybe bad block of disk");
+        LOG_FATAL(logger, "io_getevents error, maybe bad block of disk, ret %d", ret);
         return -ERR_AIO;
     }
 

@@ -30,6 +30,16 @@ int32_t RecordFile::OpenFd(bool for_write)
     int ret = 0;
     char buffer[32] = {0};
 
+    if (read_fd_ < 0 && write_fd_ < 0)
+    {
+        ret = io_setup(128, &aio_ctx_);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup error");
+            assert(ret == 0);
+        }
+    }
+
     snprintf(buffer, 32, "record_%05d", number_);
     string record_file_path(base_name_);
     record_file_path.append(buffer);
@@ -40,14 +50,6 @@ int32_t RecordFile::OpenFd(bool for_write)
         write_fd_ = open(record_file_path.c_str(), O_WRONLY | O_DIRECT | O_DSYNC, 0644);
         assert(write_fd_ >= 0);
 
-        ret = io_setup(128, &aio_ctx_);
-        if (ret != 0)
-        {
-            LOG_FATAL(logger_, "io_setup error");
-            assert(ret == 0);
-        }
-        
-        lseek(write_fd_, record_offset_, SEEK_SET);
         record_fragment_count_ += 1;
         assert(record_fragment_count_ <= 256);
         frag_start_offset_ = record_offset_;
@@ -604,6 +606,12 @@ int32_t RecordFile::FinishWrite()
     {
         close(write_fd_);
         write_fd_ = -1;
+
+        if (read_fd_ < 0)
+        {
+            io_destroy(aio_ctx_);
+            aio_ctx_ = 0;
+        }
     }
 
     have_write_frame_ = false;
@@ -683,6 +691,12 @@ int32_t RecordFile::FinishRead()
     {
         close(read_fd_);
         read_fd_ = -1;
+
+        if (write_fd_ < 0)
+        {
+            io_destroy(aio_ctx_);
+            aio_ctx_ = 0;
+        }
     }
 
     return 0;
