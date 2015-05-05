@@ -2,7 +2,7 @@ CC = g++
 CC_FLAG = -g -rdynamic -m32
 
 INC =
-LIB = -L../ -lstorage -lpthread
+LIB = -L../install -lstorage -lpthread
 
 PRG = storage_test
 
