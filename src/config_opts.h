@@ -21,9 +21,8 @@ const static uint32_t kMagicCode = 0x4A4F5649;
 /* magic code + type + frame time + stamp + frame size */
 const static uint32_t kHeaderSize = 4 + 4 + 8 + 8 + 4;
 
-
 const static uint32_t kStreamReserveFiles = 20;
-const static uint32_t kMaxStreamsPerDisk = 150;
+const static uint32_t kMaxStreamsPerDisk = 50;
 
 const static uint32_t kFilesPerRecycle = 10;
 
