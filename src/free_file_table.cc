@@ -50,6 +50,14 @@ uint32_t FreeFileTable::CountRecordFiles()
     map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
     for (; iter != disk_free_file_info_.end(); iter++)
     {
+        // get rid of record files of bad disk
+        string disk_name = iter->first;
+        bool if_bad_disk = bad_disk_map->CheckIfBadDisk(disk_name);
+        if (if_bad_disk == true)
+        {
+            continue;
+        }
+        
         DiskInfo *disk_info = iter->second;
         
         sum += disk_info->free_file_queue.size();
@@ -123,25 +131,28 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
     if (stream_iter != stream_to_disk_map_.end())
     {
         string disk_str(stream_iter->second);
+        
         map<string, DiskInfo*>::iterator disk_iter = disk_free_file_info_.find(disk_str);
         assert(disk_iter != disk_free_file_info_.end());
 
         DiskInfo *disk_info = disk_iter->second;
         assert(disk_info != NULL);
-        if (!disk_info->free_file_queue.empty())
+
+        bool if_bad_disk = false;
+        if_bad_disk = bad_disk_map->CheckIfBadDisk(disk_str);
+
+        // get a new record file in this disk
+        if (if_bad_disk == false || !disk_info->free_file_queue.empty())
         {
             *record_file = disk_info->free_file_queue.front();
             disk_info->free_file_queue.pop_front();
-
             goto end;
         }
-        else
-        {
-            // stream migrated to other disk
-            LOG_INFO(logger_, "stream %s migrate to another disk", stream_info.c_str());
-            disk_info->writing_streams.erase(stream_info);
-            stream_to_disk_map_.erase(stream_info);
-        }
+
+        // should switch to another disk
+        LOG_INFO(logger_, "stream %s migrate to another disk", stream_info.c_str());
+        disk_info->writing_streams.erase(stream_info);
+        stream_to_disk_map_.erase(stream_info);
     }
 
     ret = GetNewDiskFreeFile(stream_info, record_file);
@@ -151,8 +162,8 @@ end:
     mutex_.Unlock();
     
     TryRecycle();
-    LOG_INFO(logger_, "get free record file ok, stream info [%s], record_file %srecord_%05d", stream_info.c_str(), (*record_file)->base_name_.c_str(),
-                        (*record_file)->number_);
+    LOG_INFO(logger_, "get free record file ok, stream info [%s], record_file %srecord_%05d",
+                            stream_info.c_str(), (*record_file)->base_name_.c_str(), (*record_file)->number_);
     return 0;
 }
 
@@ -168,6 +179,16 @@ int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **recor
         map<string, DiskInfo*>::iterator iter = disk_free_file_info_.begin();
         for (; iter != disk_free_file_info_.end(); iter++)
         {
+            bool if_bad_disk = false;
+            string disk_name = iter->first;
+
+            // skip bad disk
+            if_bad_disk = bad_disk_map->CheckIfBadDisk(disk_name);
+            if (if_bad_disk == true)
+            {
+                continue;
+            }
+            
             DiskInfo *disk_info = iter->second;
             assert(disk_info != NULL);
 

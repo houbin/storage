@@ -4,6 +4,7 @@
 #include <string.h>
 #include <set>
 #include "../util/logger.h"
+#include "../util/rwlock.h"
 
 using namespace std;
 using namespace util;
@@ -15,17 +16,21 @@ class BadDiskMap
 {
 private:
     Logger *logger_;
-    Mutex mutex_;
+    RWLock rwlock_;
     set<string> bad_disks_;
 
 public:
-    BadDiskMap(Logger *logger) : logger_(logger), mutex_("UnUsableDiskMap::mutex")
+    BadDiskMap(Logger *logger) : logger_(logger), rwlock_("UnUsableDiskMap::rwlock")
     {
     
     }
 
+    void Init();
+
     bool CheckIfBadDisk(string disk);
     int32_t AddBadDisk(string bad_disk);
+
+    void Shutdown();
 };
 
 }

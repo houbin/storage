@@ -359,10 +359,9 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
     ret = index_file->Read(record_frag_info_buffer, frag_info_length, frag_info_offset); 
     if (ret != 0) 
     { 
-        Log(logger_, "index file read length is %d, offset is %d error", frag_info_length, frag_info_offset); 
-        assert(ret != 0); 
+        LOG_WARN(logger_, "maybe bad block of disk, ret %d, read length %d, offset %d", ret, frag_info_length, frag_info_offset); 
+        return ret;
     } 
-
     
     for(int i = 0; i < read_index_file_frag_count; i++)
     {
@@ -406,15 +405,14 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 
 int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
-    //Log(logger_, "get all record frag info index");
-
     int32_t ret;
 
     deque<RecordFragmentInfo> temp_queue;
     ret = GetAllFragInfoEx(temp_queue);
-    assert(ret == 0);
-
-    //Log(logger_, "size of temp_queue is %d", temp_queue.size());
+    if (ret != 0)
+    {
+        return ret;
+    }
 
     while(!temp_queue.empty())
     {
@@ -476,6 +474,11 @@ int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start
 
     /* get all frag info */
     ret = GetAllFragInfoEx(temp_queue);
+    if (ret != 0)
+    {
+        // maybe bad block of disk
+        return ret;
+    }
     assert (ret == 0);
 
     deque<RecordFragmentInfo>::iterator iter = temp_queue.begin();
@@ -517,6 +520,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     if (ret < 0)
     {
         LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
     else if (ret == 0)
@@ -537,6 +541,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     if (ret < 0)
     {
         LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
     else if (ret == 0)
@@ -583,18 +588,22 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 {
     int ret;
 
-    RWLock::WRLocker lock(rwlock_);
+    rwlock_.GetWriteLock();
 
     ret = libaio_single_write(aio_ctx_, write_fd_, write_buffer, length, record_offset_);
     if (ret <= 0 || ret != (int32_t)length)
     {
+        rwlock_.PutWriteLock();
         LOG_FATAL(logger_, "libaio write error, ret %d", ret);
-        assert(ret > 0);
+        bad_disk_map->AddBadDisk(base_name_);
+        return -ERR_BAD_DISK;
     }
 
     UpdateTimes(update);
     record_offset_ += length;
     have_write_frame_ = true;
+
+    rwlock_.PutWriteLock();
 
     return 0;
 }
@@ -644,7 +653,6 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         return -ERR_ITEM_NOT_FOUND;
     }
     
-    
     seek_end_offset = frag_end_offset;
 
     uint32_t stamp_offset = frag_start_offset;
@@ -654,6 +662,13 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         FRAME_INFO_T frame = {0};
         
         ret = libaio_single_read(aio_ctx_, read_fd_, header, kHeaderSize, stamp_offset);
+        if (ret < 0)
+        {
+            // maybe bad block of disk
+            LOG_WARN(logger_, "libaio read header error, ret %d, dir %s, ", ret, base_name_.c_str());
+            bad_disk_map->AddBadDisk(base_name_);
+            return ret;
+        }
         assert(ret == (int)kHeaderSize);
 
         ret = DecodeHeader(header, &frame);

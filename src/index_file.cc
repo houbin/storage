@@ -50,6 +50,10 @@ IndexFile::IndexFile(Logger *logger, string base_name)
 
     int32_t r = 0;
     r = libaio_single_read(ctx, file_count_fd, file_count_str, 31, 0);
+    if (r <= 0)
+    {
+        LOG_FATAL(logger_, "libaio read file_count error, r %d, dir %s", base_name_.c_str());
+    }
     assert(r > 0);
 
     io_destroy(ctx);
@@ -81,6 +85,10 @@ int32_t IndexFile::AnalyzeAllEntry()
     assert(record_file_info_buffer != NULL);
 
     ret = libaio_single_read(aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
+    if (ret != record_file_section_size)
+    {
+        LOG_FATAL(logger_, "libaio read index error, ret %d, dir %s", ret, base_name_.c_str());
+    }
     assert(ret == record_file_section_size);
 
     uint32_t i = 0;
@@ -132,10 +140,19 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
     LOG_DEBUG(logger_, "index file write, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
     int32_t ret = 0;
 
-    Mutex::Locker lock(mutex_);
+    mutex_.Lock();
     ret = libaio_single_write(aio_ctx_, fd_, buffer, length, offset);
+    if (ret == -ERR_AIO)
+    {
+        mutex_.Unlock();
+        bad_disk_map->AddBadDisk(base_name_);
+        return -ERR_BAD_DISK;
+    }
+
     assert(ret == (int32_t)length);
     LOG_DEBUG(logger_, "index file write ok, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
+
+    mutex_.Unlock();
 
     return 0;
 }
@@ -145,9 +162,17 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
     LOG_DEBUG(logger_, "index file read, base name %s, length is %u, offset is %u", base_name_.c_str(), length, offset);
     int32_t ret = 0;
 
-    Mutex::Locker lock(mutex_);
+    mutex_.Lock();
     ret = libaio_single_read(aio_ctx_, fd_, buffer, length, offset);
-    assert(ret == 0);
+    if (ret < 0)
+    {
+        LOG_WARN(logger_, "libaio read error, ret %d, dir %s", ret, base_name_.c_str());
+        mutex_.Unlock();
+        bad_disk_map->AddBadDisk(base_name_);
+        return -ERR_BAD_DISK;
+    }
+    assert(ret == (int)length);
+    mutex_.Unlock();
 
     LOG_DEBUG(logger_, "index file read, base name %s, length is %u, offset is %u", base_name_.c_str(), length, offset);
 

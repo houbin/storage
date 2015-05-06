@@ -131,6 +131,10 @@ int32_t RecordWriter::WriteBuffer(uint32_t write_length)
     int32_t ret;
 
     ret = record_file_->Append(buffer_, write_length, buffer_times_);
+    if (ret == -ERR_BAD_DISK)
+    {
+        return ret;
+    }
     assert(ret == 0);
 
     memset(buffer_, 0, kBlockSize);
@@ -237,6 +241,47 @@ int32_t RecordWriter::DoWriteIndexEvent(bool again)
     return 0;
 }
 
+int32_t RecordWriter::PrepareRecordFile(bool need_new_file, UTime &stamp)
+{
+    int32_t ret;
+    RecordFile *temp_file = NULL;
+
+    if (need_new_file == false && record_file_ != NULL)
+    {
+        bool if_bad_disk = false;
+        if_bad_disk = bad_disk_map->CheckIfBadDisk(record_file_->base_name_);
+        if (if_bad_disk == false)
+        {
+            return 0;
+        }
+    }
+
+    if (need_new_file == false)
+    {
+        // get exist record file ok
+        ret = file_map_->OpenWriteRecordFile(&temp_file);
+        if (ret == 0)
+        {
+            ret = free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
+            if (ret == 0)
+            {
+                goto end;
+            }
+        }
+    }
+
+    // alloc new record file
+    ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
+    assert(ret == 0 && temp_file != NULL);
+
+end:
+    writer_mutex_.Lock();
+    record_file_ = temp_file;
+    writer_mutex_.Unlock();
+
+    return 0;
+}
+
 void *RecordWriter::Entry()
 {
     int32_t ret;
@@ -266,6 +311,7 @@ void *RecordWriter::Entry()
             uint32_t file_offset = 0;
             bool add_o_frame = false;
             uint32_t file_left_size  = 0;
+            bool need_new_file = false;
 
             if (frame_type == JVN_DATA_O)
             {
@@ -305,43 +351,47 @@ void *RecordWriter::Entry()
                 frame_length += kHeaderSize + current_o_frame_->size;
             }
 
+            frame_buffer = (char *)malloc(frame_length);
+            EncodeFrame(add_o_frame, frame, frame_buffer);
+            UpdateBufferTimes(frame_type, stamp);
+
+            // write one frame
+            do
             {
-                if (record_file_ == NULL)
+                ret = PrepareRecordFile(need_new_file, stamp);
+                assert(ret == 0);
+
+                file_offset = record_file_->record_offset_;
+                assert(file_offset <= kRecordFileSize);
+                file_left_size = kRecordFileSize - file_offset;
+
+                if ((buffer_write_offset_ + frame_length) > file_left_size)
                 {
-                    RecordFile *temp_file = NULL;
-                    ret = file_map_->OpenWriteRecordFile(&temp_file);
-                    if (ret != 0)
+                    /* no enough space in record file */
+                    if (buffer_write_offset_ != 0)
                     {
-                        ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
-                        assert(ret == 0 && temp_file != NULL);
-                    }
-                    else
-                    {
-                        ret = free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
+                        ret = WriteBuffer(kBlockSize);
                         if (ret != 0)
                         {
-                            ret = file_map_->AllocWriteRecordFile(stamp, &temp_file);
-                            assert(ret == 0 && temp_file != NULL);
+                            // maybe bad of disk
+                            LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
+                            file_map_->FinishWriteRecordFile(record_file_);
+                            DoWriteIndexEvent(true);
+                            need_new_file = true;
+                            continue;
                         }
                     }
 
-                    writer_mutex_.Lock();
-                    record_file_ = temp_file;
-                    writer_mutex_.Unlock();
+                    DoWriteIndexEvent(true);
+                    file_map_->FinishWriteRecordFile(record_file_);
+
+                    // get new record file
+                    need_new_file = true;
+                    continue;
                 }
-            }
 
-            file_offset = record_file_->record_offset_;
-            assert(file_offset <= kRecordFileSize);
-            file_left_size = kRecordFileSize - file_offset;
-
-            frame_buffer = (char *)malloc(frame_length);
-            UpdateBufferTimes(frame_type, stamp);
-            EncodeFrame(add_o_frame, frame, frame_buffer);
-
-            if ((buffer_write_offset_ + frame_length) <= file_left_size)
-            {
-                uint32_t temp_buffer_write_offset = 0;
+                // have enough space in record file
+                uint32_t frame_buffer_write_offset = 0;
                 uint32_t frame_left_len = frame_length;
                 while(frame_left_len > 0)
                 {
@@ -349,66 +399,29 @@ void *RecordWriter::Entry()
                     if (buffer_left_size == 0)
                     {
                         ret = WriteBuffer(kBlockSize);
-                        assert(ret == 0);
+                        if (ret != 0)
+                        {
+                            // maybe bad block of disk
+                            LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
+                            file_map_->FinishWriteRecordFile(record_file_);
+                            DoWriteIndexEvent(true);
+                            need_new_file = true;
+                            continue;
+                        }
                     }
 
                     uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len: buffer_left_size;
-                    memcpy(buffer_ + buffer_write_offset_, frame_buffer + temp_buffer_write_offset, copy_len);
+                    memcpy(buffer_ + buffer_write_offset_, frame_buffer + frame_buffer_write_offset, copy_len);
 
                     frame_left_len -= copy_len;
                     buffer_write_offset_ += copy_len;
-                    temp_buffer_write_offset += copy_len;
+                    frame_buffer_write_offset += copy_len;
                 }
 
                 goto FreeResource;
-            }
-            else
-            {
-                /* no enough space in record file */
-                if (buffer_write_offset_ != 0)
-                {
-                    ret = WriteBuffer(kBlockSize);
-                    assert(ret == 0);
-                }
+            }while(true);
 
-                DoWriteIndexEvent(true);
-                file_map_->FinishWriteRecordFile(record_file_);
-
-                {
-                    // alloc new record file
-                    RecordFile *record_file = NULL;
-                    UTime stamp(frame->frame_time.seconds, frame->frame_time.nseconds);
-                    ret = file_map_->AllocWriteRecordFile(stamp, &record_file);
-                    assert(ret == 0 && record_file != NULL);
-
-                    writer_mutex_.Lock();
-                    record_file_ = record_file;
-                    writer_mutex_.Unlock();
-                }
-
-                uint32_t temp_buffer_write_offset = 0;
-                uint32_t frame_left_len = frame_length;
-                while(frame_left_len > 0)
-                {
-                    uint32_t buffer_left_size = kBlockSize - buffer_write_offset_;
-                    if (buffer_left_size == 0)
-                    {
-                        ret = WriteBuffer(kBlockSize);
-                        assert(ret == 0);
-                    }
-
-                    uint32_t copy_len = (buffer_left_size >= frame_left_len) ? frame_left_len : buffer_left_size;
-                    memcpy(buffer_ + buffer_write_offset_, frame_buffer + temp_buffer_write_offset, copy_len);
-
-                    frame_left_len -= copy_len;
-                    buffer_write_offset_ += copy_len;
-                    temp_buffer_write_offset += copy_len;
-                }
-
-                goto FreeResource;
-            }
-
-FreeResource:    
+FreeResource:
             if (frame != NULL)
             {
                 safe_free(frame->buffer);
@@ -428,8 +441,8 @@ FreeResource:
                 LOG_INFO(logger_, "stop_, write left data");
 
                 queue_mutex_.Unlock();
-                ret = WriteBuffer(kBlockSize);
-                assert(ret == 0);
+                //if write buffer error, ignore it
+                WriteBuffer(kBlockSize);
                 DoWriteIndexEvent(false);
                 file_map_->FinishWriteRecordFile(record_file_);
                 queue_mutex_.Lock();

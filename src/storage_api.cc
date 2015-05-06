@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include "storage.h"
 #include "../util/logger.h"
 #include "../util/config.h"
 #include "../include/storage_api.h"
@@ -25,6 +26,7 @@ IndexFileManager *index_file_manager = NULL;
 Config *config = NULL;
 RecordRecycle *record_recycle = NULL;
 WatchDogClient *dog_client = NULL;
+BadDiskMap *bad_disk_map = NULL;
 
 #define WATCHDOG_SERVER_PORT 6010
 
@@ -215,20 +217,30 @@ void storage_init()
     NewLogger(log_dir.c_str(), &logger);
     logger->SetLogLevel((LogLevel)log_level);
 
+    //init bad_disk_map
+    bad_disk_map = new BadDiskMap(logger);
+    assert(bad_disk_map != NULL);
+    bad_disk_map->Init();
+
+    // init id_center
     id_center = new IdCenter(logger);
     assert(id_center != NULL);
 
+    // init store_client_center
     store_client_center = new StoreClientCenter(logger);
     assert(store_client_center != NULL);
     store_client_center->Init();
 
+    // init record_recycle
     record_recycle = new RecordRecycle(logger, store_client_center);
     assert(record_recycle != NULL);
     record_recycle->Init();
-
+    
+    // init free_init_table
     free_file_table = new FreeFileTable(logger);
     assert(free_file_table != NULL);
 
+    // init index_file_manager
     index_file_manager = new IndexFileManager(logger);
     assert(index_file_manager != NULL);
     index_file_manager->Init();
@@ -396,6 +408,10 @@ void storage_shutdown()
 {
     LOG_INFO(logger, "storage shutdown");
 
+    dog_client->Shutdown();
+    delete dog_client;
+    dog_client = NULL;
+
     id_center->Shutdown();
     delete id_center;
     id_center = NULL;
@@ -416,9 +432,9 @@ void storage_shutdown()
     delete index_file_manager;
     index_file_manager = NULL;
 
-    dog_client->Shutdown();
-    delete dog_client;
-    dog_client = NULL;
+    bad_disk_map->Shutdown();
+    delete bad_disk_map;
+    bad_disk_map = NULL;
 
     delete logger;
     logger = NULL;
