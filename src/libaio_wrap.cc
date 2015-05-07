@@ -36,7 +36,7 @@ int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buff
     if (ret < 0)
     {
         LOG_FATAL(logger, "io_getevents error, ret %d", ret);
-        return -ret;
+        return ret;
     }
     else if (ret == 0)
     {
@@ -81,7 +81,7 @@ int32_t libaio_single_read(io_context_t aio_ctx, int read_fd, char *read_buffer,
     if (ret < 0)
     {
         LOG_FATAL(logger, "io_getevents error, ret %d", ret);
-        return -ret;
+        return ret;
     }
     else if (ret == 0)
     {

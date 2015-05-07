@@ -360,6 +360,7 @@ void *RecordWriter::Entry()
             {
                 ret = PrepareRecordFile(need_new_file, stamp);
                 assert(ret == 0);
+                need_new_file = false;
 
                 file_offset = record_file_->record_offset_;
                 assert(file_offset <= kRecordFileSize);

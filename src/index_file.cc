@@ -20,10 +20,14 @@ namespace storage
 {
 
 IndexFile::IndexFile(Logger *logger, string base_name)
-: logger_(logger), mutex_("IndexFile::Locker"), base_name_(base_name), aio_ctx_(0)
+: logger_(logger), mutex_("IndexFile::Locker"), base_name_(base_name), write_aio_ctx_(0), read_aio_ctx_(0)
 {
     int ret = 0;
-    io_setup(8, &aio_ctx_);
+    ret = io_setup(8, &write_aio_ctx_);
+    assert(ret == 0);
+
+    ret = io_setup(8, &read_aio_ctx_);
+    assert(ret == 0);
 
     string file_path;
     file_path = base_name_ + "index";
@@ -84,7 +88,7 @@ int32_t IndexFile::AnalyzeAllEntry()
     record_file_info_buffer = (struct RecordFileInfo *)malloc(record_file_section_size);
     assert(record_file_info_buffer != NULL);
 
-    ret = libaio_single_read(aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
+    ret = libaio_single_read(read_aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
     if (ret != record_file_section_size)
     {
         LOG_FATAL(logger_, "libaio read index error, ret %d, dir %s", ret, base_name_.c_str());
@@ -141,7 +145,7 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
     int32_t ret = 0;
 
     mutex_.Lock();
-    ret = libaio_single_write(aio_ctx_, fd_, buffer, length, offset);
+    ret = libaio_single_write(write_aio_ctx_, fd_, buffer, length, offset);
     if (ret == -ERR_AIO)
     {
         mutex_.Unlock();
@@ -163,7 +167,7 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
     int32_t ret = 0;
 
     mutex_.Lock();
-    ret = libaio_single_read(aio_ctx_, fd_, buffer, length, offset);
+    ret = libaio_single_read(read_aio_ctx_, fd_, buffer, length, offset);
     if (ret < 0)
     {
         LOG_WARN(logger_, "libaio read error, ret %d, dir %s", ret, base_name_.c_str());
@@ -184,7 +188,8 @@ int32_t IndexFile::Shutdown()
     LOG_INFO(logger_, "shutdown");
 
     Mutex::Locker lock(mutex_);
-    io_destroy(aio_ctx_);
+    io_destroy(write_aio_ctx_);
+    io_destroy(read_aio_ctx_);
     close(fd_);
 
     return 0;

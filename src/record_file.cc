@@ -19,7 +19,7 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"),
-write_fd_(-1), aio_ctx_(0), read_fd_(-1), read_count_(0),
+write_fd_(-1), write_aio_ctx_(0), read_fd_(-1), read_count_(0), read_aio_ctx_(0),
 locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
@@ -29,16 +29,6 @@ int32_t RecordFile::OpenFd(bool for_write)
 {
     int ret = 0;
     char buffer[32] = {0};
-
-    if (read_fd_ < 0 && write_fd_ < 0)
-    {
-        ret = io_setup(128, &aio_ctx_);
-        if (ret != 0)
-        {
-            LOG_FATAL(logger_, "io_setup error");
-            assert(ret == 0);
-        }
-    }
 
     snprintf(buffer, 32, "record_%05d", number_);
     string record_file_path(base_name_);
@@ -53,12 +43,28 @@ int32_t RecordFile::OpenFd(bool for_write)
         record_fragment_count_ += 1;
         assert(record_fragment_count_ <= 256);
         frag_start_offset_ = record_offset_;
+
+        // setup write_aio_ctx_
+        ret = io_setup(8, &write_aio_ctx_);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup write_aio_ctx error");
+            assert(ret == 0);
+        }
     }
     else
     {
         assert(read_fd_ < 0);
         read_fd_ = open(record_file_path.c_str(), O_RDONLY);
         assert(read_fd_ >= 0);
+
+        // setup read_aio_ctx_
+        ret = io_setup(8, &read_aio_ctx_);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup read_aio_ctx error");
+            assert(ret == 0);
+        }
     }
 
     return 0;
@@ -516,7 +522,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     }
 
     char header[kHeaderSize] = {0};
-    ret = libaio_single_read(aio_ctx_, read_fd_, header, kHeaderSize, offset);
+    ret = libaio_single_read(read_aio_ctx_, read_fd_, header, kHeaderSize, offset);
     if (ret < 0)
     {
         LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
@@ -537,7 +543,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
         return ret;
     }
 
-    ret = libaio_single_read(aio_ctx_, read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
+    ret = libaio_single_read(read_aio_ctx_, read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
     if (ret < 0)
     {
         LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
@@ -590,11 +596,12 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 
     rwlock_.GetWriteLock();
 
-    ret = libaio_single_write(aio_ctx_, write_fd_, write_buffer, length, record_offset_);
+    ret = libaio_single_write(write_aio_ctx_, write_fd_, write_buffer, length, record_offset_);
     if (ret <= 0 || ret != (int32_t)length)
     {
         rwlock_.PutWriteLock();
-        LOG_FATAL(logger_, "libaio write error, ret %d", ret);
+        LOG_FATAL(logger_, "libaio write error, ret %d, write_fd_ %d, length %u, record_offset_ %u", 
+                                ret, write_fd_, length, record_offset_);
         bad_disk_map->AddBadDisk(base_name_);
         return -ERR_BAD_DISK;
     }
@@ -616,11 +623,8 @@ int32_t RecordFile::FinishWrite()
         close(write_fd_);
         write_fd_ = -1;
 
-        if (read_fd_ < 0)
-        {
-            io_destroy(aio_ctx_);
-            aio_ctx_ = 0;
-        }
+        io_destroy(write_aio_ctx_);
+        write_aio_ctx_ = 0;
     }
 
     have_write_frame_ = false;
@@ -661,7 +665,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         char header[kHeaderSize] = {0};
         FRAME_INFO_T frame = {0};
         
-        ret = libaio_single_read(aio_ctx_, read_fd_, header, kHeaderSize, stamp_offset);
+        ret = libaio_single_read(read_aio_ctx_, read_fd_, header, kHeaderSize, stamp_offset);
         if (ret < 0)
         {
             // maybe bad block of disk
@@ -707,11 +711,8 @@ int32_t RecordFile::FinishRead()
         close(read_fd_);
         read_fd_ = -1;
 
-        if (write_fd_ < 0)
-        {
-            io_destroy(aio_ctx_);
-            aio_ctx_ = 0;
-        }
+        io_destroy(read_aio_ctx_);
+        read_aio_ctx_ = 0;
     }
 
     return 0;
