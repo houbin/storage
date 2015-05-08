@@ -320,7 +320,7 @@ void *RecordWriter::Entry()
                 current_o_frame_ = frame;
                 frame = temp;                
                 
-                LOG_INFO(logger_, "O frame, replace current o frame");
+                LOG_DEBUG(logger_, "O frame, replace current o frame");
                 goto FreeResource;
             }
             else if (frame_type == JVN_DATA_I)

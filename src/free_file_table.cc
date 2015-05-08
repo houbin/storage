@@ -142,7 +142,7 @@ int32_t FreeFileTable::Get(string stream_info, RecordFile **record_file)
         if_bad_disk = bad_disk_map->CheckIfBadDisk(disk_str);
 
         // get a new record file in this disk
-        if (if_bad_disk == false || !disk_info->free_file_queue.empty())
+        if (if_bad_disk == false && !disk_info->free_file_queue.empty())
         {
             *record_file = disk_info->free_file_queue.front();
             disk_info->free_file_queue.pop_front();
@@ -170,7 +170,7 @@ end:
 int32_t FreeFileTable::GetNewDiskFreeFile(string stream_info, RecordFile **record_file)
 {
     assert(record_file != NULL);
-    LOG_DEBUG(logger_, "get new disk free file, stream info %s", stream_info.c_str());
+    LOG_INFO(logger_, "get new disk free file, stream info %s", stream_info.c_str());
 
     DiskInfo *valid_disk_info = NULL;
     string disk_str;
