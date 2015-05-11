@@ -246,28 +246,45 @@ int32_t RecordWriter::PrepareRecordFile(bool need_new_file, UTime &stamp)
     int32_t ret;
     RecordFile *temp_file = NULL;
 
-    if (need_new_file == false && record_file_ != NULL)
+    if (need_new_file == false)
     {
-        bool if_bad_disk = false;
-        if_bad_disk = bad_disk_map->CheckIfBadDisk(record_file_->base_name_);
-        if (if_bad_disk == false)
+        if (record_file_ != NULL)
         {
-            return 0;
+            bool if_bad_disk = false;
+            if_bad_disk = bad_disk_map->CheckIfBadDisk(record_file_->base_name_);
+            if (if_bad_disk == false)
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            // get exist record file ok
+            ret = file_map_->OpenWriteRecordFile(&temp_file);
+            if (ret == 0)
+            {
+                bool if_bad_disk = false;
+                if_bad_disk = bad_disk_map->CheckIfBadDisk(temp_file->base_name_);
+                if (if_bad_disk == false)
+                {
+                    ret = free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
+                    if (ret == 0)
+                    {
+                        goto end;
+                    }
+                }
+            }
         }
     }
 
-    if (need_new_file == false)
+    LOG_INFO(logger_, "need a new record file, need_new_file %d, record_file_ %p", need_new_file, record_file_);
+
+    // close old record file
+    if (record_file_ != NULL)
     {
-        // get exist record file ok
-        ret = file_map_->OpenWriteRecordFile(&temp_file);
-        if (ret == 0)
-        {
-            ret = free_file_table->UpdateDiskWritingStream(temp_file->stream_info_, temp_file);
-            if (ret == 0)
-            {
-                goto end;
-            }
-        }
+        DoWriteIndexEvent(true);
+        file_map_->FinishWriteRecordFile(record_file_);
+        record_file_ = NULL;
     }
 
     // alloc new record file
@@ -374,17 +391,11 @@ void *RecordWriter::Entry()
                         ret = WriteBuffer(kBlockSize);
                         if (ret != 0)
                         {
-                            // maybe bad of disk
                             LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
-                            file_map_->FinishWriteRecordFile(record_file_);
-                            DoWriteIndexEvent(true);
                             need_new_file = true;
                             continue;
                         }
                     }
-
-                    DoWriteIndexEvent(true);
-                    file_map_->FinishWriteRecordFile(record_file_);
 
                     // get new record file
                     need_new_file = true;
@@ -404,8 +415,6 @@ void *RecordWriter::Entry()
                         {
                             // maybe bad block of disk
                             LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
-                            file_map_->FinishWriteRecordFile(record_file_);
-                            DoWriteIndexEvent(true);
                             need_new_file = true;
                             continue;
                         }
@@ -417,6 +426,11 @@ void *RecordWriter::Entry()
                     frame_left_len -= copy_len;
                     buffer_write_offset_ += copy_len;
                     frame_buffer_write_offset += copy_len;
+                }
+                    
+                if (ret != 0)
+                {
+                    continue;
                 }
 
                 goto FreeResource;

@@ -13,7 +13,9 @@ int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buff
     int attempts = 10;
     do
     {
+        LOG_WARN(logger, "test io_submit start, write fd %d", write_fd, ret);
         ret = io_submit(aio_ctx, 1, &cbs);
+        LOG_WARN(logger, "test io_submit end, write fd %d", write_fd, ret);
         if (ret < 0)
         {
             LOG_WARN(logger, "io_submit error, write fd %d, return %d", write_fd, ret);
@@ -29,7 +31,7 @@ int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buff
 
     struct io_event e;
     struct timespec t;
-    t.tv_sec = 5; // wait 5s
+    t.tv_sec = 1; // wait 5s
     t.tv_nsec = 0;
 
     ret = io_getevents(aio_ctx, 1, 1, &e, &t);
