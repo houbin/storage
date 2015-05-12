@@ -375,6 +375,9 @@ void *RecordWriter::Entry()
             // write one frame
             do
             {
+                uint32_t frame_buffer_write_offset = 0;
+                uint32_t frame_left_len = frame_length;
+
                 ret = PrepareRecordFile(need_new_file, stamp);
                 assert(ret == 0);
                 need_new_file = false;
@@ -392,19 +395,12 @@ void *RecordWriter::Entry()
                         if (ret != 0)
                         {
                             LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
-                            need_new_file = true;
-                            continue;
                         }
                     }
-
-                    // get new record file
-                    need_new_file = true;
-                    continue;
+                    goto again;
                 }
 
                 // have enough space in record file
-                uint32_t frame_buffer_write_offset = 0;
-                uint32_t frame_left_len = frame_length;
                 while(frame_left_len > 0)
                 {
                     uint32_t buffer_left_size = kBlockSize - buffer_write_offset_;
@@ -415,8 +411,7 @@ void *RecordWriter::Entry()
                         {
                             // maybe bad block of disk
                             LOG_WARN(logger_, "write buffer error, ret %d, record file %s", ret, record_file_->base_name_.c_str());
-                            need_new_file = true;
-                            continue;
+                            goto again;
                         }
                     }
 
@@ -428,12 +423,10 @@ void *RecordWriter::Entry()
                     frame_buffer_write_offset += copy_len;
                 }
                     
-                if (ret != 0)
-                {
-                    continue;
-                }
-
                 goto FreeResource;
+            again:
+                need_new_file = true;
+                continue;
             }while(true);
 
 FreeResource:
