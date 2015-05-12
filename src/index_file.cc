@@ -57,6 +57,11 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     if (r <= 0)
     {
         LOG_FATAL(logger_, "libaio read file_count error, r %d, dir %s", base_name_.c_str());
+        bad_disk_map->AddBadDisk(base_name_);
+
+        io_destroy(ctx);
+        close(file_count_fd);
+        return;
     }
     assert(r > 0);
 
@@ -92,6 +97,10 @@ int32_t IndexFile::AnalyzeAllEntry()
     if (ret != record_file_section_size)
     {
         LOG_FATAL(logger_, "libaio read index error, ret %d, dir %s", ret, base_name_.c_str());
+
+        bad_disk_map->AddBadDisk(base_name_);
+        safe_free(record_file_info_buffer);
+        return -ERR_BAD_DISK;
     }
     assert(ret == record_file_section_size);
 
@@ -146,14 +155,13 @@ int32_t IndexFile::Write(uint32_t offset, char *buffer, uint32_t length)
 
     mutex_.Lock();
     ret = libaio_single_write(write_aio_ctx_, fd_, buffer, length, offset);
-    if (ret == -ERR_AIO)
+    if (ret != (int32_t)length)
     {
         mutex_.Unlock();
         bad_disk_map->AddBadDisk(base_name_);
         return -ERR_BAD_DISK;
     }
 
-    assert(ret == (int32_t)length);
     LOG_DEBUG(logger_, "index file write ok, base name %sindex, offset is %u, length is %u", base_name_.c_str(), offset, length);
 
     mutex_.Unlock();
@@ -168,13 +176,14 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 
     mutex_.Lock();
     ret = libaio_single_read(read_aio_ctx_, fd_, buffer, length, offset);
-    if (ret < 0)
+    if (ret != (int32_t)length)
     {
         LOG_WARN(logger_, "libaio read error, ret %d, dir %s", ret, base_name_.c_str());
         mutex_.Unlock();
         bad_disk_map->AddBadDisk(base_name_);
         return -ERR_BAD_DISK;
     }
+
     assert(ret == (int)length);
     mutex_.Unlock();
 
