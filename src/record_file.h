@@ -3,11 +3,11 @@
 
 #include <string>
 #include <deque>
-#include <libaio.h>
 #include "../util/logger.h"
 #include "../util/mutex.h"
 #include "../util/rwlock.h"
 #include "store_types.h"
+#include "libaio_wrap.h"
 
 using namespace std;
 using namespace util;
@@ -26,11 +26,11 @@ public:
     RWLock rwlock_;
     
     int write_fd_;
-    io_context_t write_aio_ctx_;
+    aio_context_t write_aio_ctx_;
     
     int read_fd_;
     int read_count_;
-    io_context_t read_aio_ctx_;
+    aio_context_t read_aio_ctx_;
 
     string stream_info_;
     bool locked_;

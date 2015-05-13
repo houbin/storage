@@ -10,7 +10,7 @@ CC_FLAG = -g -Wall -Wno-unused-parameter -Werror -fPIC -m32 -march=native
 #   
 #   #set your inc and lib
 INC = -I./include -I./src/ -I./util
-LIB = -lpthread -lrt -lstdc++ -lm -laio -L./libs -lcJSON -lgrpc
+LIB = -lpthread -lrt -lstdc++ -lm  -L./libs -lcJSON -lgrpc
   
 #make target lib and relevant obj
 PRG = libstorage.so
