@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/bash
 JOVISION=/jovision/mnt
 FORMAT_DISK=$1
 RECORD_INFO_INDEX_LENGTH=$2
