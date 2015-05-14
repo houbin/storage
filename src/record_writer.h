@@ -70,6 +70,8 @@ public:
     int32_t ResetWriteIndexEvent(uint32_t after_seconds);
     int32_t DoWriteIndexEvent(bool again);
 
+    int32_t PrepareRecordFile(bool need_new_file, UTime &stamp);
+
     void Start();
     void *Entry();
     void Stop();

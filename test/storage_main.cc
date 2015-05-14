@@ -4,7 +4,7 @@
 #include "test_reader.h"
 #include "../util/config.h"
 #include "storage_main.h"
-#include "../include/storage.h"
+#include "../src/storage.h"
 
 using namespace std;
 using namespace util;

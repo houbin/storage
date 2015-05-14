@@ -12,7 +12,7 @@ chmod +x /jovision/shell/*
 /jovision/shell/boot_auto_mount.sh > /dev/null
 
 #启动存储进程
-nohup /usr/bin/JCVR >/dev/null &
+nohup /jovision/bin/JCVR >/dev/null &
 
 echo  "record storage end..."
 }

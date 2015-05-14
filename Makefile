@@ -10,7 +10,7 @@ CC_FLAG = -g -Wall -Wno-unused-parameter -Werror -fPIC -m32 -march=native
 #   
 #   #set your inc and lib
 INC = -I./include -I./src/ -I./util
-LIB = -lpthread -lrt -lstdc++ -lm -L./libs -lcJSON -lgrpc
+LIB = -lpthread -lrt -lstdc++ -lm  -L./libs -lcJSON -lgrpc
   
 #make target lib and relevant obj
 PRG = libstorage.so
@@ -20,7 +20,7 @@ STATIC_PRG = libstorage.a
 OBJ = src/free_file_table.o src/id_center.o src/index_file.o src/record_file.o src/storage_api.o \
 src/store_client_center.o util/clock.o util/coding.o util/cond.o util/crc32c.o util/logger.o \
 util/mutex.o util/thread.o util/timer.o src/record_writer.o src/record_reader.o src/store_client.o \
-util/config.o util/grpc_udp_client.o src/watchdog_client.o util/env_posix.o
+util/config.o util/grpc_udp_client.o src/watchdog_client.o util/env_posix.o src/libaio_wrap.o src/bad_disks.o
 
 C_OBJS = grpc/watchdog.o grpc/watchdog_c_userdef.o
 

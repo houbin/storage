@@ -270,8 +270,13 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         // get all frag info in this record file
         deque<FRAGMENT_INFO_T> all_frag_info;
         ret = record_file->GetAllFragInfo(all_frag_info);
-        assert (ret == 0);
+        if (ret != 0)
+        {
+            // maybe bad block of disk, so ignore this record file
+            continue;
+        }
 
+        // just for debug 
         Log(logger_, "record file %srecord_%05d get all frag info, count is %d",
                         record_file->base_name_.c_str(), record_file->number_, all_frag_info.size());
         deque<FRAGMENT_INFO_T>::iterator iter = all_frag_info.begin();
@@ -279,9 +284,10 @@ int32_t RecordFileMap::ListRecordFragments(UTime &start, UTime &end, deque<FRAGM
         for (; iter != all_frag_info.end(); iter++)
         {
             FRAGMENT_INFO_T temp_frag = *iter;
-            Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, 
-                        temp_frag.start_time.seconds, temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
+            Log(logger_, " frag seq %d, %d.%d to %d.%d", count++, temp_frag.start_time.seconds,
+                            temp_frag.start_time.nseconds, temp_frag.end_time.seconds, temp_frag.end_time.nseconds);
         }
+        // end debug
 
         /* start time landed in the record file */
         if (record_file->start_time_ <= start && record_file->end_time_ >= start)

@@ -10,6 +10,7 @@
 #include "record_file.h"
 #include "index_file.h"
 #include "storage.h"
+#include "libaio_wrap.h"
 
 using namespace util;
 
@@ -17,7 +18,8 @@ namespace storage
 {
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
-: logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"), write_fd_(-1), read_fd_(-1), read_count_(0),
+: logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"),
+write_fd_(-1), write_aio_ctx_(0), read_fd_(-1), read_count_(0), read_aio_ctx_(0),
 locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
@@ -25,6 +27,7 @@ locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_
 
 int32_t RecordFile::OpenFd(bool for_write)
 {
+    int ret = 0;
     char buffer[32] = {0};
 
     snprintf(buffer, 32, "record_%05d", number_);
@@ -34,19 +37,34 @@ int32_t RecordFile::OpenFd(bool for_write)
     if (for_write)
     {
         assert(write_fd_ < 0);
-        write_fd_ = open(record_file_path.c_str(), O_WRONLY);
+        write_fd_ = open(record_file_path.c_str(), O_WRONLY | O_DIRECT | O_DSYNC, 0644);
         assert(write_fd_ >= 0);
-        
-        lseek(write_fd_, record_offset_, SEEK_SET);
+
         record_fragment_count_ += 1;
         assert(record_fragment_count_ <= 256);
         frag_start_offset_ = record_offset_;
+
+        // setup write_aio_ctx_
+        ret = io_setup(8, &write_aio_ctx_);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup write_aio_ctx error");
+            assert(ret == 0);
+        }
     }
     else
     {
         assert(read_fd_ < 0);
         read_fd_ = open(record_file_path.c_str(), O_RDONLY);
         assert(read_fd_ >= 0);
+
+        // setup read_aio_ctx_
+        ret = io_setup(8, &read_aio_ctx_);
+        if (ret != 0)
+        {
+            LOG_FATAL(logger_, "io_setup read_aio_ctx error");
+            assert(ret == 0);
+        }
     }
 
     return 0;
@@ -54,8 +72,6 @@ int32_t RecordFile::OpenFd(bool for_write)
 
 int32_t RecordFile::Clear()
 {
-    //Log(logger_, "clear record file index memory info");
-
     if (this->write_fd_ >= 0)
     {
         close(this->write_fd_);
@@ -349,10 +365,9 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
     ret = index_file->Read(record_frag_info_buffer, frag_info_length, frag_info_offset); 
     if (ret != 0) 
     { 
-        Log(logger_, "index file read length is %d, offset is %d error", frag_info_length, frag_info_offset); 
-        assert(ret != 0); 
+        LOG_WARN(logger_, "maybe bad block of disk, ret %d, read length %d, offset %d", ret, frag_info_length, frag_info_offset); 
+        return ret;
     } 
-
     
     for(int i = 0; i < read_index_file_frag_count; i++)
     {
@@ -396,15 +411,14 @@ int32_t RecordFile::GetAllFragInfoEx(deque<RecordFragmentInfo> &frag_info_queue)
 
 int32_t RecordFile::GetAllFragInfo(deque<FRAGMENT_INFO_T> &frag_info_queue)
 {
-    //Log(logger_, "get all record frag info index");
-
     int32_t ret;
 
     deque<RecordFragmentInfo> temp_queue;
     ret = GetAllFragInfoEx(temp_queue);
-    assert(ret == 0);
-
-    //Log(logger_, "size of temp_queue is %d", temp_queue.size());
+    if (ret != 0)
+    {
+        return ret;
+    }
 
     while(!temp_queue.empty())
     {
@@ -466,6 +480,11 @@ int32_t RecordFile::GetStampStartAndEndOffset(UTime &stamp, uint32_t &frag_start
 
     /* get all frag info */
     ret = GetAllFragInfoEx(temp_queue);
+    if (ret != 0)
+    {
+        // maybe bad block of disk
+        return ret;
+    }
     assert (ret == 0);
 
     deque<RecordFragmentInfo>::iterator iter = temp_queue.begin();
@@ -493,7 +512,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 {
     assert(frame != NULL);
 
-    int ret = 0;
+    int32_t ret = 0;
 
     assert(read_fd_ >= 0);
     if (offset >= record_offset_)
@@ -503,37 +522,37 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     }
 
     char header[kHeaderSize] = {0};
-    ret = pread(read_fd_, header, kHeaderSize, offset);
+    ret = libaio_single_read(read_aio_ctx_, read_fd_, header, kHeaderSize, offset);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
     else if (ret == 0)
     {
-        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, kHeaderSize);
+        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, kHeaderSize);
         return -ERR_READ_REACH_TO_END;
     }
     assert(ret == (int)kHeaderSize);
 
+    ret = DecodeHeader(header, frame);
+    if (ret != 0)
     {
-        int32_t ret = DecodeHeader(header, frame);
-        if (ret != 0)
-        {
-            LOG_ERROR(logger_, "decode header error, ret is %d", ret);
-            return ret;
-        }
+        LOG_ERROR(logger_, "decode header error, ret is %d", ret);
+        return ret;
     }
 
-    ret = pread(read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
+    ret = libaio_single_read(read_aio_ctx_, read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "pread error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
     else if (ret == 0)
     {
-        LOG_ERROR(logger_, "pread read to end of file, offset %d, size %d", offset, frame->size);
+        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, frame->size);
         return -ERR_READ_REACH_TO_END;
     }
     assert(ret == (int)frame->size);
@@ -575,19 +594,23 @@ int32_t RecordFile::Append(char *write_buffer, uint32_t length, BufferTimes &upd
 {
     int ret;
 
-    RWLock::WRLocker lock(rwlock_);
+    rwlock_.GetWriteLock();
 
-    ret = write(write_fd_, write_buffer, length);
-    if (ret != (int)length)
+    ret = libaio_single_write(write_aio_ctx_, write_fd_, write_buffer, length, record_offset_);
+    if (ret <= 0 || ret != (int32_t)length)
     {
-        Log(logger_, "write return %d, errno msg is %s", ret, strerror(errno));
-        assert(ret == (int)length);
+        rwlock_.PutWriteLock();
+        LOG_FATAL(logger_, "libaio write error, ret %d, write_fd_ %d, length %u, record_offset_ %u", 
+                                ret, write_fd_, length, record_offset_);
+        bad_disk_map->AddBadDisk(base_name_);
+        return -ERR_BAD_DISK;
     }
 
-    fdatasync(write_fd_);
     UpdateTimes(update);
     record_offset_ += length;
     have_write_frame_ = true;
+
+    rwlock_.PutWriteLock();
 
     return 0;
 }
@@ -599,6 +622,9 @@ int32_t RecordFile::FinishWrite()
     {
         close(write_fd_);
         write_fd_ = -1;
+
+        io_destroy(write_aio_ctx_);
+        write_aio_ctx_ = 0;
     }
 
     have_write_frame_ = false;
@@ -631,7 +657,6 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         return -ERR_ITEM_NOT_FOUND;
     }
     
-    
     seek_end_offset = frag_end_offset;
 
     uint32_t stamp_offset = frag_start_offset;
@@ -640,7 +665,14 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
         char header[kHeaderSize] = {0};
         FRAME_INFO_T frame = {0};
         
-        ret = pread(read_fd_, header, kHeaderSize, stamp_offset);
+        ret = libaio_single_read(read_aio_ctx_, read_fd_, header, kHeaderSize, stamp_offset);
+        if (ret < 0)
+        {
+            // maybe bad block of disk
+            LOG_WARN(logger_, "libaio read header error, ret %d, dir %s, ", ret, base_name_.c_str());
+            bad_disk_map->AddBadDisk(base_name_);
+            return ret;
+        }
         assert(ret == (int)kHeaderSize);
 
         ret = DecodeHeader(header, &frame);
@@ -678,6 +710,9 @@ int32_t RecordFile::FinishRead()
     {
         close(read_fd_);
         read_fd_ = -1;
+
+        io_destroy(read_aio_ctx_);
+        read_aio_ctx_ = 0;
     }
 
     return 0;
