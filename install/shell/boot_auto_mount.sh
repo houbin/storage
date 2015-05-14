@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 LOG_FILE=/var/log/storage/boot_auto_mount.log
 

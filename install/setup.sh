@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 JOVISION_MOUNT_DIR=/jovision/mnt
 JOVISION_SHELL_DIR=/jovision/shell
@@ -41,7 +41,7 @@ chkconfig --add record_storage
 
 # add LD_LIBRARY_PATH
 if_has_jovision_path=$(echo $LD_LIBRARY_PATH | grep ${JOVISION_LIB_DIR})
-if [ "${if_has_jovision_path}" == "" ];
+if [ -z "${if_has_jovision_path}" ];
 then
     echo "export LD_LIBRARY_PATH=${JOVISION_LIB_DIR}:LD_LIBRARY_PATH" >> /etc/bashrc
     source /etc/bashrc
