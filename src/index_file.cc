@@ -56,7 +56,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     r = libaio_single_read(ctx, file_count_fd, file_count_str, 31, 0);
     if (r <= 0)
     {
-        LOG_FATAL(logger_, "libaio read file_count error, r %d, dir %s", base_name_.c_str());
+        LOG_FATAL(logger_, "libaio read file_count error, r %d, dir %s", r, base_name_.c_str());
         bad_disk_map->AddBadDisk(base_name_);
 
         io_destroy(ctx);

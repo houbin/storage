@@ -24,7 +24,7 @@ int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buf
         ret = io_submit(aio_ctx, 1, &cbs);
         if (ret != 1)
         {
-            LOG_WARN(logger, "io_submit error, write fd %d, return %d", write_fd, ret);
+            LOG_WARN(logger, "io_submit error, write fd %d, return %d, attempts %d", write_fd, ret, attempts);
             if (ret == -EAGAIN && attempts-- > 0)
             {
                 usleep(500);
@@ -33,7 +33,8 @@ int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buf
             LOG_FATAL(logger, "io_submit got unexpected error");
             return -ERR_AIO;
         }
-    }while(false);
+        break;
+    }while(true);
 
     struct io_event e;
     struct timespec t;
@@ -76,7 +77,7 @@ int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer
         ret = io_submit(aio_ctx, 1, &cbs);
         if (ret != 1)
         {
-            LOG_WARN(logger, "io_submit error, read fd %d, return %d", read_fd, ret);
+            LOG_WARN(logger, "io_submit error, read fd %d, return %d, attempts %d", read_fd, ret, attempts);
             if (ret == -EAGAIN && attempts-- > 0)
             {
                 usleep(500);
@@ -85,7 +86,8 @@ int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer
             LOG_FATAL(logger, "io_submit got unexpected error");
             return -ERR_AIO;
         }
-    }while(false);
+        break;
+    }while(true);
 
     struct io_event e;
     struct timespec t;
