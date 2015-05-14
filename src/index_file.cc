@@ -94,7 +94,7 @@ int32_t IndexFile::AnalyzeAllEntry()
     assert(record_file_info_buffer != NULL);
 
     ret = libaio_single_read(read_aio_ctx_, fd_, (char *)record_file_info_buffer, record_file_section_size, 0);
-    if (ret != record_file_section_size)
+    if (ret < 0)
     {
         LOG_FATAL(logger_, "libaio read index error, ret %d, dir %s", ret, base_name_.c_str());
 
@@ -176,7 +176,7 @@ int32_t IndexFile::Read(char *buffer, uint32_t length, uint32_t offset)
 
     mutex_.Lock();
     ret = libaio_single_read(read_aio_ctx_, fd_, buffer, length, offset);
-    if (ret != (int32_t)length)
+    if (ret < 0)
     {
         LOG_WARN(logger_, "libaio read error, ret %d, dir %s", ret, base_name_.c_str());
         mutex_.Unlock();

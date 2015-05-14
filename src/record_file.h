@@ -27,7 +27,8 @@ public:
     
     int write_fd_;
     aio_context_t write_aio_ctx_;
-    
+
+    Mutex read_aio_ctx_mutex_;
     int read_fd_;
     int read_count_;
     aio_context_t read_aio_ctx_;

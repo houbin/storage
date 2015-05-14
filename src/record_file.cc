@@ -19,7 +19,7 @@ namespace storage
 
 RecordFile::RecordFile(Logger *logger, string base_name, uint32_t number)
 : logger_(logger), base_name_(base_name), number_(number), rwlock_("RecordFile::rwlocker"),
-write_fd_(-1), write_aio_ctx_(0), read_fd_(-1), read_count_(0), read_aio_ctx_(0),
+write_fd_(-1), write_aio_ctx_(0), read_aio_ctx_mutex_("RecordFile::read_aio_ctx_mutex"), read_fd_(-1), read_count_(0), read_aio_ctx_(0),
 locked_(false), have_write_frame_(false), record_fragment_count_(0), frag_start_offset_(0), record_offset_(0)
 {
     ZeroRecordFileTimes();
@@ -514,6 +514,7 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
 
     int32_t ret = 0;
 
+    Mutex::Locker lock(read_aio_ctx_mutex_);
     assert(read_fd_ >= 0);
     if (offset >= record_offset_)
     {
@@ -525,13 +526,13 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     ret = libaio_single_read(read_aio_ctx_, read_fd_, header, kHeaderSize, offset);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, kHeaderSize);
+        LOG_ERROR(logger_, "libaio read error, ret %d, offset %d, size %d", ret, offset, kHeaderSize);
         bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
-    else if (ret == 0)
+    else if (ret != (int)kHeaderSize)
     {
-        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, kHeaderSize);
+        LOG_ERROR(logger_, "reached to end of file, ret %d, offset %d, size %d", ret, offset, kHeaderSize);
         return -ERR_READ_REACH_TO_END;
     }
     assert(ret == (int)kHeaderSize);
@@ -546,14 +547,14 @@ int32_t RecordFile::ReadFrame(uint32_t offset, FRAME_INFO_T *frame)
     ret = libaio_single_read(read_aio_ctx_, read_fd_, frame->buffer, frame->size, offset + kHeaderSize);
     if (ret < 0)
     {
-        LOG_ERROR(logger_, "libaio read error, ret %d, errno msg [%s], offset %d, size %d", ret, strerror(errno), offset, frame->size);
+        LOG_ERROR(logger_, "libaio read error, ret %d, offset %d, size %d", ret, offset, frame->size);
         bad_disk_map->AddBadDisk(base_name_);
         return ret;
     }
-    else if (ret == 0)
+    else if(ret != (int)frame->size)
     {
-        LOG_ERROR(logger_, "libaio read to end of file, offset %d, size %d", offset, frame->size);
-        return -ERR_READ_REACH_TO_END;
+        LOG_ERROR(logger_, "reached to end of file, ret %d, offset %d, size %d", ret, offset, frame->size);
+        return ret;
     }
     assert(ret == (int)frame->size);
 
@@ -659,6 +660,7 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
     
     seek_end_offset = frag_end_offset;
 
+    Mutex::Locker lock(read_aio_ctx_mutex_);
     uint32_t stamp_offset = frag_start_offset;
     while(stamp_offset < frag_end_offset)
     {
@@ -672,6 +674,11 @@ int32_t RecordFile::SeekStampOffset(UTime &stamp, uint32_t &seek_start_offset, u
             LOG_WARN(logger_, "libaio read header error, ret %d, dir %s, ", ret, base_name_.c_str());
             bad_disk_map->AddBadDisk(base_name_);
             return ret;
+        }
+        else if (ret != (int)kHeaderSize)
+        {
+            LOG_WARN(logger_, "reached to end of file, ret %d, dir %s", ret, base_name_.c_str());
+            return -ERR_READ_REACH_TO_END;
         }
         assert(ret == (int)kHeaderSize);
 
