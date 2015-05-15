@@ -14,7 +14,7 @@ int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buf
     cb.aio_lio_opcode = IOCB_CMD_PWRITE;
 
     // command specific options
-    cb.aio_buf = (unsigned long)write_buffer;
+    cb.aio_buf = (uint64_t)(unsigned long)write_buffer;
     cb.aio_offset = offset;
     cb.aio_nbytes = length;
 
@@ -67,7 +67,7 @@ int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer
     cb.aio_lio_opcode = IOCB_CMD_PREAD;
 
     // command specific options
-    cb.aio_buf = (unsigned long)read_buffer;
+    cb.aio_buf = (uint64_t)(unsigned long)read_buffer;
     cb.aio_offset = offset;
     cb.aio_nbytes = length;
 
@@ -89,6 +89,7 @@ int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer
     }while(false);
 
     struct io_event e;
+    memset(&e, 0, sizeof(struct io_event));
     struct timespec t;
     t.tv_sec = 2; // wait 2s
     t.tv_nsec = 0;

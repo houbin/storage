@@ -21,7 +21,7 @@ inline int io_submit(aio_context_t ctx, long nr, struct iocb **iocbpp)
 
 inline int io_getevents(aio_context_t ctx, long min_nr, long max_nr, struct io_event *events, struct timespec *timeout)
 {
-    return syscall(__NR_io_submit, ctx, min_nr, max_nr, events, timeout);
+    return syscall(__NR_io_getevents, ctx, min_nr, max_nr, events, timeout);
 }
 
 int32_t libaio_single_write(aio_context_t aio_ctx, int fd, char *write_buffer, uint32_t length, uint64_t offset);
