@@ -102,7 +102,7 @@ int32_t IndexFile::AnalyzeAllEntry()
         safe_free(record_file_info_buffer);
         return -ERR_BAD_DISK;
     }
-    assert(ret == record_file_section_size);
+    assert(ret == (int32_t)record_file_section_size);
 
     uint32_t i = 0;
     for (i = 0; i < file_counts_; i++)
