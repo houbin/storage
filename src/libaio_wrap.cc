@@ -14,7 +14,7 @@ int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buf
     cb.aio_lio_opcode = IOCB_CMD_PWRITE;
 
     // command specific options
-    cb.aio_buf = (uint64_t)write_buffer;
+    cb.aio_buf = (unsigned long)write_buffer;
     cb.aio_offset = offset;
     cb.aio_nbytes = length;
 
@@ -62,11 +62,12 @@ int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer
     struct iocb *cbs = &cb;
 
     // setup I/O control block
+    memset(&cb, 0, sizeof(struct iocb));
     cb.aio_fildes = read_fd;
     cb.aio_lio_opcode = IOCB_CMD_PREAD;
 
     // command specific options
-    cb.aio_buf = (uint64_t)read_buffer;
+    cb.aio_buf = (unsigned long)read_buffer;
     cb.aio_offset = offset;
     cb.aio_nbytes = length;
 

@@ -83,7 +83,7 @@ uint32_t IndexFile::GetFileCounts()
 
 int32_t IndexFile::AnalyzeAllEntry()
 {
-    size_t ret;
+    int32_t ret;
     uint32_t record_file_section_size = 0;
     uint32_t record_file_info_length = 0;
     struct RecordFileInfo *record_file_info_buffer = NULL;
