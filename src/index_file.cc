@@ -42,7 +42,7 @@ IndexFile::IndexFile(Logger *logger, string base_name)
     string file_count_path;
     int file_count_fd = 0;
     char file_count_str[32] = {0};
-    aio_context_t ctx;
+    io_context_t ctx;
 
     ctx = 0;
     ret = io_setup(128, &ctx);

@@ -23,8 +23,8 @@ private:
     int fd_;
     uint32_t file_counts_;
 
-    aio_context_t write_aio_ctx_;
-    aio_context_t read_aio_ctx_;
+    io_context_t write_aio_ctx_;
+    io_context_t read_aio_ctx_;
 
 public:
     IndexFile(Logger *logger, string base_name);

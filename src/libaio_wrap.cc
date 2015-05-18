@@ -2,21 +2,14 @@
 #include "../util/logger.h"
 #include "libaio_wrap.h"
 
-int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buffer, uint32_t length, uint64_t offset)
+int32_t libaio_single_write(io_context_t aio_ctx, int write_fd, char *write_buffer, uint32_t length, uint64_t offset)
 {
     int ret = 0;
     struct iocb cb;
     struct iocb *cbs = &cb;
 
     // setup I/O control block
-    memset(&cb, 0, sizeof(struct iocb));
-    cb.aio_fildes = write_fd;
-    cb.aio_lio_opcode = IOCB_CMD_PWRITE;
-
-    // command specific options
-    cb.aio_buf = (uint64_t)(unsigned long)write_buffer;
-    cb.aio_offset = offset;
-    cb.aio_nbytes = length;
+    io_prep_pwrite(&cb, write_fd, write_buffer, length, offset);
 
     int attempts = 10;
     do
@@ -56,21 +49,14 @@ int32_t libaio_single_write(aio_context_t aio_ctx, int write_fd, char *write_buf
     return e.res;
 }
 
-int32_t libaio_single_read(aio_context_t aio_ctx, int read_fd, char *read_buffer, uint32_t length, uint64_t offset)
+int32_t libaio_single_read(io_context_t aio_ctx, int read_fd, char *read_buffer, uint32_t length, uint64_t offset)
 {
     int ret = 0;
     struct iocb cb;
     struct iocb *cbs = &cb;
 
     // setup I/O control block
-    memset(&cb, 0, sizeof(struct iocb));
-    cb.aio_fildes = read_fd;
-    cb.aio_lio_opcode = IOCB_CMD_PREAD;
-
-    // command specific options
-    cb.aio_buf = (uint64_t)(unsigned long)read_buffer;
-    cb.aio_offset = offset;
-    cb.aio_nbytes = length;
+    io_prep_pread(cbs, read_fd, read_buffer, length, offset);
 
     int attempts = 10;
     do
